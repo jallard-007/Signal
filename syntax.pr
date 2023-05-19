@@ -1,0 +1,47 @@
+// conditional statements
+if (false) {
+
+} elif (true) {
+
+} else {
+
+}
+
+// addition, subtraction, etc. all the same as c
+
+// function declaration
+
+function functionName() : int {
+
+}
+
+// variable declaration, auto type, can set manually
+
+variableName : int;
+variableName : int = 0;
+
+// custom type
+
+typedef intVector {
+  arr : int ^,
+  arrSize : int,
+};
+
+// pointer to type
+
+ptrVar : int ^;
+ptrVar : int ^ = nullptr;
+
+// address of operator
+
+@ thing;
+
+// dereference operator
+
+# ptrVar;
+
+// arrays
+
+intArr : int [10];
+intArr : int [] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
