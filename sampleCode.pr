@@ -1,39 +1,58 @@
 include stdio;
 
-typedef intArray {
-  arr : int ^,
-  size : int,
-};
+template [T] struct vectorTemplate {
+  data : T ^;
+  size : int;
 
-function main() {
-  arraySize: int = 9;
-  data: int [arraySize] = [-3, 23, 21, 554, 3, 6, -234, 123, 43];
-  arrayStruct: intArray;
-  arrayStruct.arr = @data;
-  arrayStruct.size = arraySize;
-  max: int = findMax(@arrayStruct);
-  min: int = findMin(@arrayStruct);
-  print(max);
-  print("\n");
-  print(min);
+  func findMax() : T {
+    max : T = 0;
+    for (i : int = 0; i < arr->size; ++i) {
+      if (this->data[i] > max) {
+        max = arr[i];
+      }
+    }
+    return max;
+  }
+
+  func findMin(): T {
+    min : T = 0;
+    for (i : int = 0; i < arr->size; ++i) {
+      if (this->data[i] < min) {
+        min = arr[i];
+      }
+    }
+    return min;
+  }
 }
 
-function findMax(var arr : ^ intArray): int {
-  max : int = 0;
-  for (i : int = 0; i < arr->size; ++i) {
-    if (arr->data[i] > max) {
-      max = arr[i];
-    }
-  }
-  return max;
-}
+create [int] vectorTemplate as intVector;
+create [double] vectorTemplate as doubleVector;
 
-function findMin(arr : ^ intArray): int {
-  min : int = 0;
-  for (i : int = 0; i < arr->size; ++i) {
-    if (arr->data[i] < min) {
-      min = arr[i];
-    }
+func main() {
+  {
+    arraySize: int = 9;
+    data: int [arraySize] = [-3, 23, 21, 554, 3, 6, -234, 123, 43];
+    vector: intVector;
+    vector.arr = data;
+    vector.size = arraySize;
+    max : int = vector.findMax();
+    min: int = vector.findMin();
+    print(max);
+    print("\n");
+    print(min);
   }
-  return min;
+
+  {
+    arraySize: int = 4;
+    data: double [arraySize] = [-3.4, 23.2, 21.3, 43.8];
+    vector: intVector;
+    vector.arr = data;
+    vector.size = arraySize;
+    max : double = vector.findMax();
+    min: double = vector.findMin();
+    print(max);
+    print("\n");
+    print(min);
+  }
+
 }

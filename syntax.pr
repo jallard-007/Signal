@@ -11,18 +11,18 @@ if (false) {
 
 // function declaration
 
-function functionName() : int {
+func functionName() : int {
 
 }
 
-// variable declaration, auto type, can set manually
+// variable declaration, type set manually
 
 variableName : int;
 variableName : int = 0;
 
 // custom type
 
-typedef intVector {
+struct intVector {
   arr : int ^,
   arrSize : int,
 };
@@ -38,10 +38,22 @@ ptrVar : int ^ = nullptr;
 
 // dereference operator
 
-# ptrVar;
+~ ptrVar;
 
 // arrays
 
 intArr : int [10];
 intArr : int [] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+
+// templates, must explicitly create a type template
+
+template [T] struct structName {
+
+}
+
+template [T, K] func templateName(var : T): K {
+
+}
+
+create [int, char] templateName as actualType;
