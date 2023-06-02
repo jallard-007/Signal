@@ -1,0 +1,37 @@
+#include <iostream>
+#include <fstream>
+#include "lexer.hpp"
+
+void printUsage() {
+  std::cout << "Usage: ./main <filename>\n";
+}
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    printUsage();
+    return 1;
+  }
+  std::cout << "Filepath: " << argv[1] << '\n';
+  std::ifstream t(argv[1]);
+  if (!t.is_open()) {
+    std::cerr << "Could not open the file\n";
+    return 1;
+  }
+  t.seekg(0, std::ios::end);
+  size_t size = t.tellg();
+  std::string buffer(size, ' ');
+  t.seekg(0);
+  t.read(&buffer[0], size);
+  t.close();
+  Lexer lex(buffer);
+  auto& vec = lex.tokenize();
+  std::cout << vec.size() << '\n';
+  for (auto v : vec) {
+    if (typeToString.find(v.type) != typeToString.end()) {
+      std::cout << typeToString.at(v.type);
+    } else {
+
+    }
+  }
+  return 0;
+}
