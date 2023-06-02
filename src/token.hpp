@@ -7,6 +7,7 @@ enum class TokenType : uint8_t {
   NOTHING,
   
   IDENTIFIER,
+  CHAR_LITERAL,
   STRING_LITERAL,
   BINARY_NUMBER,
   DECIMAL_NUMBER,
@@ -14,6 +15,7 @@ enum class TokenType : uint8_t {
   NEWLINE,
 
   // KEYWORDS
+  AS,
   INCLUDE,
   FUNC,
   STRUCT,
@@ -59,14 +61,12 @@ enum class TokenType : uint8_t {
   DOT,
   DIVISION,
 
-  CHAR_LITERAL,
-
   // TYPES
   CHAR_TYPE,
-  INT,
+  INT_TYPE,
+  DOUBLE_TYPE,
 
   BAD_VALUE
-
 };
 
 // maps characters to tokens that can be matched with a single character
@@ -110,16 +110,19 @@ const std::unordered_map<char, TokenType> charToType {
 };
 
 const std::unordered_map<std::string, TokenType> stringToType {
+  {"as", TokenType::AS},
   {"break", TokenType::BREAK},
   {"case", TokenType::CASE},
   {"create", TokenType::CREATE},
   {"continue", TokenType::CONTINUE},
   {"default", TokenType::DEFAULT},
+  {"double", TokenType::DOUBLE_TYPE},
   {"elif", TokenType::ELIF},
   {"else", TokenType::ELSE},
   {"for", TokenType::FOR},
   {"func", TokenType::FUNC},
   {"if", TokenType::IF},
+  {"int", TokenType::INT_TYPE},
   {"include", TokenType::INCLUDE},
   {"return", TokenType::RETURN},
   {"struct", TokenType::STRUCT},
@@ -152,7 +155,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::COLON, ":"},
   {TokenType::SEMICOLON, ";"},
   {TokenType::STRING_LITERAL, "\""},
-  {TokenType::CHAR_LITERAL, "'"},
+  {TokenType::CHAR_LITERAL, "'j'"},
   {TokenType::NEWLINE, "\n"},
   {TokenType::LEFT_ARROW, "<"},
   {TokenType::RIGHT_ARROW, ">"},
@@ -160,27 +163,30 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::COMMA, ","},
   {TokenType::DOT, "."},
   {TokenType::DIVISION, "/"},
+  {TokenType::AS, "as"},
   {TokenType::BREAK, "break"},
   {TokenType::CASE, "case"},
   {TokenType::CREATE, "create"},
   {TokenType::CONTINUE, "continue"},
   {TokenType::DEFAULT, "default"},
+  {TokenType::DOUBLE_TYPE, "double"},
   {TokenType::ELIF, "elif"},
   {TokenType::ELSE, "else"},
   {TokenType::FOR, "for"},
   {TokenType::FUNC, "func"},
   {TokenType::IF, "if"},
+  {TokenType::INT_TYPE, "int"},
   {TokenType::INCLUDE, "include"},
   {TokenType::RETURN, "return"},
   {TokenType::STRUCT, "struct"},
   {TokenType::SWITCH, "switch"},
   {TokenType::TEMPLATE, "template"},
   {TokenType::WHILE, "while"},
-  {TokenType::IDENTIFIER, "IDENTIFIER"},
-  {TokenType::DECIMAL_NUMBER, "DEC_NUMBER"},
-  {TokenType::BINARY_NUMBER, "BIN_NUMBER"},
-  {TokenType::HEX_NUMBER, "HEX_NUMBER"},
-  {TokenType::STRING_LITERAL, "STRING_LITERAL"},
+  {TokenType::IDENTIFIER, "identifier"},
+  {TokenType::DECIMAL_NUMBER, "10"},
+  {TokenType::BINARY_NUMBER, "0b1010"},
+  {TokenType::HEX_NUMBER, "0xFF"},
+  {TokenType::STRING_LITERAL, "\"string\""},
 };
 
 #define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)

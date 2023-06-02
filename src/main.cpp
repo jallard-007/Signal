@@ -19,18 +19,20 @@ int main(int argc, char **argv) {
   }
   t.seekg(0, std::ios::end);
   size_t size = t.tellg();
-  std::string buffer(size, ' ');
+  std::string buffer;
+  buffer.resize(size);
   t.seekg(0);
   t.read(&buffer[0], size);
   t.close();
   Lexer lex(buffer);
   auto& vec = lex.tokenize();
-  std::cout << vec.size() << '\n';
+  if (vec.back().type == TokenType::BAD_VALUE) {
+    std::cerr << "Unknown symbol\n";
+    return 1;
+  }
   for (auto v : vec) {
     if (typeToString.find(v.type) != typeToString.end()) {
       std::cout << typeToString.at(v.type);
-    } else {
-
     }
   }
   return 0;

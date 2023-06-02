@@ -18,6 +18,6 @@ struct Lexer {
   std::vector<Token>& tokenize();
 
   void moveToNextNonWhiteSpaceChar();
-  void moveToEndOfKeywordOrIdentifier();
+  void movePastKeywordOrIdentifier();
   void movePastNumber();
 };

@@ -4,18 +4,21 @@
 #include "token.hpp"
 #include "lexer.hpp"
 
-bool my_isalpha(char ch) {
-    return std::isalpha(static_cast<unsigned char>(ch));
+bool my_isalpha(char c) {
+  return std::isalpha(static_cast<unsigned char>(c));
 }
 
-bool my_isalnum(char ch) {
-    return std::isalnum(static_cast<unsigned char>(ch));
+bool my_isalnum(char c) {
+  return std::isalnum(static_cast<unsigned char>(c));
 }
 
-Lexer::Lexer(const std::string& fs): content{fs.data()}, size{(uint32_t)fs.length()}  {
-  if (fs.length() > UINT32_MAX) {
+Lexer::Lexer(const std::string& fileContent):
+  content{fileContent.data()}, size{(uint32_t)fileContent.length()}
+{
+  if (fileContent.length() > UINT32_MAX) {
     exit(1);
   }
+  position = 0;
 }
 
 std::vector<Token>& Lexer::tokenize() {
@@ -24,31 +27,30 @@ std::vector<Token>& Lexer::tokenize() {
     if (charToType.find(c) != charToType.end()) {
       tokens.emplace_back(position, charToType.at(c));
       ++position;
-      moveToNextNonWhiteSpaceChar();
-      continue;
     }
 
-    if (c >= '0' && c <= '9') {
+    else if (c >= '0' && c <= '9') {
       if (position + 1 < size) {
         c = content[position + 1];
-        if (c >= '0' && c <= '9') {
-          tokens.emplace_back(position, TokenType::DECIMAL_NUMBER);
-        } else if (c == 'b') {
+        if (c == 'b') {
           tokens.emplace_back(position, TokenType::BINARY_NUMBER);
+          ++position;
         } else if (c == 'x') {
           tokens.emplace_back(position, TokenType::HEX_NUMBER);
+          ++position;
+        } else {
+          tokens.emplace_back(position, TokenType::DECIMAL_NUMBER);
         }
-        ++position;
       } else {
         tokens.emplace_back(position, TokenType::DECIMAL_NUMBER);
       }
       movePastNumber();
     }
   
-    if (my_isalpha(c) || c == '_') {
+    else if (my_isalpha(c) || c == '_') {
       const uint32_t oldPos = position;
-      moveToEndOfKeywordOrIdentifier();
-      if (position - oldPos > MIN_CHARS_TO_DISAMBIG) {
+      movePastKeywordOrIdentifier();
+      if (position - oldPos >= MIN_CHARS_TO_DISAMBIG) {
         tokens.emplace_back(oldPos, TokenType::IDENTIFIER);
       } else {
         char chars[MIN_CHARS_TO_DISAMBIG]{};
@@ -58,11 +60,15 @@ std::vector<Token>& Lexer::tokenize() {
         }
         if (stringToType.find(chars) != stringToType.end()) {
           tokens.emplace_back(oldPos, stringToType.at(chars));
-          continue;
+        } else {
+          tokens.emplace_back(oldPos, TokenType::IDENTIFIER);
         }
       }
-      moveToNextNonWhiteSpaceChar();
+    } else {
+      tokens.emplace_back(position, TokenType::BAD_VALUE);
+      return tokens;
     }
+    moveToNextNonWhiteSpaceChar();
   }
   return tokens;
 }
@@ -76,14 +82,13 @@ void Lexer::moveToNextNonWhiteSpaceChar() {
   }
 }
 
-void Lexer::moveToEndOfKeywordOrIdentifier() {
+void Lexer::movePastKeywordOrIdentifier() {
   for (++position; position < size; ++position) {
     const char c = content[position];
     if (!my_isalnum(c) && c != '_') {
       break;
     }
   }
-  moveToNextNonWhiteSpaceChar();
 }
 
 void Lexer::movePastNumber() {
@@ -93,6 +98,4 @@ void Lexer::movePastNumber() {
       break;
     }
   }
-  moveToNextNonWhiteSpaceChar();
 }
-
