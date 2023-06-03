@@ -28,9 +28,9 @@ std::vector<Token>& Lexer::tokenize() {
       uint32_t oldPos = position;
       TokenType type = charToType.at(c);
       if (type == TokenType::STRING_LITERAL) {
-        movePastStringLiteral();
+        movePastLiteral('"');
       } else if (type == TokenType::CHAR_LITERAL) {
-        movePastCharLiteral();
+        movePastLiteral('\'');
       } else {
         ++position;
       }
@@ -113,26 +113,12 @@ void Lexer::movePastNumber() {
   }
 }
 
-void Lexer::movePastStringLiteral() {
+void Lexer::movePastLiteral(char delimeter) {
   char prev = content[position];
   char prevPrev = content[position];
   for (++position; position < size; ++position) {
     const char c = content[position];
-    if (c == '"' && !(prev == '\\' && prevPrev != '\\')) {
-      ++position;
-      return;
-    }
-    prevPrev = prev;
-    prev = c;
-  }
-}
-
-void Lexer::movePastCharLiteral() {
-  char prev = content[position];
-  char prevPrev = content[position];
-  for (++position; position < size; ++position) {
-    const char c = content[position];
-    if (c == '\'' && !(prev == '\\' && prevPrev != '\\')) {
+    if (c == delimeter && !(prev == '\\' && prevPrev != '\\')) {
       ++position;
       return;
     }
