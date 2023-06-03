@@ -154,8 +154,6 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::BACK_SLASH, "\\"},
   {TokenType::COLON, ":"},
   {TokenType::SEMICOLON, ";"},
-  {TokenType::STRING_LITERAL, "\""},
-  {TokenType::CHAR_LITERAL, "'j'"},
   {TokenType::NEWLINE, "\n"},
   {TokenType::LEFT_ARROW, "<"},
   {TokenType::RIGHT_ARROW, ">"},
@@ -187,6 +185,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::BINARY_NUMBER, "0b1010"},
   {TokenType::HEX_NUMBER, "0xFF"},
   {TokenType::STRING_LITERAL, "\"string\""},
+  {TokenType::CHAR_LITERAL, "'j'"},
 };
 
 #define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)

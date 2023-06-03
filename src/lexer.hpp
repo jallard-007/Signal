@@ -20,4 +20,6 @@ struct Lexer {
   void moveToNextNonWhiteSpaceChar();
   void movePastKeywordOrIdentifier();
   void movePastNumber();
+  void movePastStringLiteral();
+  void movePastCharLiteral();
 };

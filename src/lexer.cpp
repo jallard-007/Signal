@@ -25,8 +25,16 @@ std::vector<Token>& Lexer::tokenize() {
   while (position < size) {
     char c = content[position];
     if (charToType.find(c) != charToType.end()) {
-      tokens.emplace_back(position, charToType.at(c));
-      ++position;
+      uint32_t oldPos = position;
+      TokenType type = charToType.at(c);
+      if (type == TokenType::STRING_LITERAL) {
+        movePastStringLiteral();
+      } else if (type == TokenType::CHAR_LITERAL) {
+        movePastCharLiteral();
+      } else {
+        ++position;
+      }
+      tokens.emplace_back(oldPos, type);
     }
 
     else if (c >= '0' && c <= '9') {
@@ -46,16 +54,17 @@ std::vector<Token>& Lexer::tokenize() {
       }
       movePastNumber();
     }
-  
+
     else if (my_isalpha(c) || c == '_') {
       const uint32_t oldPos = position;
       movePastKeywordOrIdentifier();
       if (position - oldPos >= MIN_CHARS_TO_DISAMBIG) {
         tokens.emplace_back(oldPos, TokenType::IDENTIFIER);
       } else {
-        char chars[MIN_CHARS_TO_DISAMBIG]{};
+        // + 1 for null termination
+        char chars[MIN_CHARS_TO_DISAMBIG + 1]{};
         chars[0] = c;
-        for (uint32_t i = oldPos + 1, j = 1; i < position; ++i, ++j) {
+        for (uint32_t i = oldPos + 1, j = 1; i < position && j < MIN_CHARS_TO_DISAMBIG; ++i, ++j) {
           chars[j] = content[i];
         }
         if (stringToType.find(chars) != stringToType.end()) {
@@ -64,10 +73,13 @@ std::vector<Token>& Lexer::tokenize() {
           tokens.emplace_back(oldPos, TokenType::IDENTIFIER);
         }
       }
-    } else {
+    }
+    
+    else {
       tokens.emplace_back(position, TokenType::BAD_VALUE);
       return tokens;
     }
+    
     moveToNextNonWhiteSpaceChar();
   }
   return tokens;
@@ -76,7 +88,8 @@ std::vector<Token>& Lexer::tokenize() {
 
 void Lexer::moveToNextNonWhiteSpaceChar() {
   for (; position < size; ++position) {
-    if (content[position] != ' ' && content[position] != '\t') {
+    const char c = content[position];
+    if (c != ' ' && c != '\t') {
       return;
     }
   }
@@ -86,7 +99,7 @@ void Lexer::movePastKeywordOrIdentifier() {
   for (++position; position < size; ++position) {
     const char c = content[position];
     if (!my_isalnum(c) && c != '_') {
-      break;
+      return;
     }
   }
 }
@@ -95,7 +108,35 @@ void Lexer::movePastNumber() {
   for (++position; position < size; ++position) {
     const char c = content[position];
     if (c < '0' || c > '9') {
-      break;
+      return;
     }
+  }
+}
+
+void Lexer::movePastStringLiteral() {
+  char prev = content[position];
+  char prevPrev = content[position];
+  for (++position; position < size; ++position) {
+    const char c = content[position];
+    if (c == '"' && !(prev == '\\' && prevPrev != '\\')) {
+      ++position;
+      return;
+    }
+    prevPrev = prev;
+    prev = c;
+  }
+}
+
+void Lexer::movePastCharLiteral() {
+  char prev = content[position];
+  char prevPrev = content[position];
+  for (++position; position < size; ++position) {
+    const char c = content[position];
+    if (c == '\'' && !(prev == '\\' && prevPrev != '\\')) {
+      ++position;
+      return;
+    }
+    prevPrev = prev;
+    prev = c;
   }
 }
