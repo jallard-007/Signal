@@ -17,7 +17,9 @@ TEST_CASE("Unit Test - Literals", "[tokenizer]") {
    CHECK(firstToken("\"") == TokenType::STRING_LITERAL);
    CHECK(firstToken("0") == TokenType::DECIMAL_NUMBER);
    CHECK(firstToken("0b") == TokenType::BINARY_NUMBER);
+   CHECK(firstToken("1b") == TokenType::DECIMAL_NUMBER);
    CHECK(firstToken("0x") == TokenType::HEX_NUMBER);
+   CHECK(firstToken("1x") == TokenType::DECIMAL_NUMBER);
 }
 
 TEST_CASE("Keywords", "[tokenizer]") {
@@ -30,11 +32,13 @@ TEST_CASE("Keywords", "[tokenizer]") {
    CHECK(firstToken("elif") == TokenType::ELIF);
    CHECK(firstToken("else") == TokenType::ELSE);
    CHECK(firstToken("enum") == TokenType::ENUM);
+   CHECK(firstToken("false") == TokenType::FALSE);
    CHECK(firstToken("for") == TokenType::FOR);
    CHECK(firstToken("func") == TokenType::FUNC);
    CHECK(firstToken("function") == TokenType::IDENTIFIER);
    CHECK(firstToken("if") == TokenType::IF);
    CHECK(firstToken("ifelif") == TokenType::IDENTIFIER);
+   CHECK(firstToken("null") == TokenType::NULL_);
    CHECK(firstToken("include") == TokenType::INCLUDE);
    CHECK(firstToken("return") == TokenType::RETURN);
    CHECK(firstToken("returns") == TokenType::IDENTIFIER);
@@ -42,6 +46,7 @@ TEST_CASE("Keywords", "[tokenizer]") {
    CHECK(firstToken("switch") == TokenType::SWITCH);
    CHECK(firstToken("template") == TokenType::TEMPLATE);
    CHECK(firstToken("templat ") == TokenType::IDENTIFIER);
+   CHECK(firstToken("true") == TokenType::TRUE);
    CHECK(firstToken("while") == TokenType::WHILE);
 }
 

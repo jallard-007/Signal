@@ -53,6 +53,8 @@ Token Tokenizer::tokenizeNext() {
         TokenType newType = charWithEqualToType.at(c);
         if (newType != TokenType::NOTHING) {
           type = newType;
+        } else {
+          --position;
         }
       } else if (c == '<' && cNext == '<') {
         if (position < size && content[position] == '=') {
@@ -75,7 +77,7 @@ Token Tokenizer::tokenizeNext() {
   }
 
   else if (c >= '0' && c <= '9') {
-    if (position + 1 < size) {
+    if (c == '0' && position + 1 < size) {
       c = content[++position];
       if (c == 'b') {
         type = TokenType::BINARY_NUMBER;
