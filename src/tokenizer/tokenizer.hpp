@@ -3,19 +3,20 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "token.hpp"
+#include "../token.hpp"
 
-struct Lexer {
+struct Tokenizer {
   std::vector<Token> tokens;
   const char* content;
   const uint32_t size;
   uint32_t position;
 
-  Lexer() = delete;
+  Tokenizer() = delete;
 
-  Lexer(const std::string&);
+  Tokenizer(const std::string&);
 
-  std::vector<Token>& tokenize();
+  std::vector<Token>& tokenizeAll();
+  Token tokenizeNext();
 
   void moveToNextNonWhiteSpaceChar();
   void movePastKeywordOrIdentifier();

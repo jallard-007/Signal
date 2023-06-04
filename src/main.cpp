@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include "lexer.hpp"
+#include "./tokenizer/tokenizer.hpp"
 
 void printUsage() {
   std::cout << "Usage: ./main <filename>\n";
@@ -24,8 +24,8 @@ int main(int argc, char **argv) {
   t.seekg(0);
   t.read(&buffer[0], size);
   t.close();
-  Lexer lex(buffer);
-  auto& vec = lex.tokenize();
+  Tokenizer lex(buffer);
+  auto& vec = lex.tokenizeAll();
   if (vec.back().type == TokenType::BAD_VALUE) {
     std::cerr << "Unknown symbol\n";
     return 1;

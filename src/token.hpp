@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <cstdint>
 #include <unordered_map>
 
@@ -66,7 +67,8 @@ enum class TokenType : uint8_t {
   INT_TYPE,
   DOUBLE_TYPE,
 
-  BAD_VALUE
+  BAD_VALUE,
+  END_OF_FILE
 };
 
 // maps characters to tokens that can be matched with a single character
@@ -91,8 +93,8 @@ const std::unordered_map<char, TokenType> charToType {
   {'{', TokenType::OPEN_BRACE},
   {'}', TokenType::CLOSE_BRACE},
   {'|', TokenType::BAR},
-  {']', TokenType::OPEN_BRACKET},
-  {'[', TokenType::CLOSE_BRACKET},
+  {']', TokenType::CLOSE_BRACKET},
+  {'[', TokenType::OPEN_BRACKET},
   {'\\', TokenType::BACK_SLASH},
   // third row
   {':', TokenType::COLON},
@@ -194,4 +196,5 @@ struct Token {
   uint32_t position;
   TokenType type;
   Token(u_int32_t pos, TokenType t): position{pos}, type{t} {}
+  bool operator==(const Token& tk) const {return position == tk.position && type == tk.type;}
 };

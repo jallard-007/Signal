@@ -1,4 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
+find_package(Catch2 3 REQUIRED)
 project(main, CXX)
 set(CMAKE_CXX_STANDARD 17)
-add_executable(main ./src/main.cpp ./src/lexer.cpp)
+
+add_executable(main ./src/main.cpp ./src/tokenizer/tokenizer.cpp)
+add_executable(test ./src/tokenizer/tokenizer.cpp ./src/tokenizer/test_tokenizer.cpp)
+target_link_libraries(test PRIVATE Catch2::Catch2WithMain)
+
+if ( CMAKE_COMPILER_IS_GNUCC )
+    target_compile_options(main PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+if ( MSVC )
+    target_compile_options(main PRIVATE /W4)
+endif()
