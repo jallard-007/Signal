@@ -19,9 +19,11 @@ Tokenizer::Tokenizer(const std::string& fileContent):
     exit(1);
   }
   position = 0;
+  prevType = TokenType::NOTHING;
 }
 
-std::vector<Token>& Tokenizer::tokenizeAll() {
+std::vector<Token> Tokenizer::tokenizeAll() {
+  std::vector<Token> tokens;
   while (tokens.emplace_back(tokenizeNext()).type != TokenType::END_OF_FILE);
   return tokens;
 }
@@ -70,7 +72,32 @@ Token Tokenizer::tokenizeNext() {
         } else {
           type = TokenType::SHIFT_RIGHT;
         }
-      } else {
+      } else if (c == '-') {
+        if (cNext == '-') {
+          if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+            type = TokenType::DECREMENT_POSTFIX;
+          } else {
+            type = TokenType::DECREMENT_PREFIX;
+          }
+        } else {
+          if (prevType == TokenType::IDENTIFIER ||
+            isLiteral(prevType) ||
+            prevType == TokenType::CLOSE_PAREN ||
+            prevType == TokenType::CLOSE_BRACE) {
+            type = TokenType::SUBTRACTION;
+          } else {
+            type = TokenType::NEGATIVE;
+          }
+        }
+      } else if (c == '+' && cNext == '+') {
+        if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+          type = TokenType::INCREMENT_POSTFIX;
+        } else {
+          type = TokenType::INCREMENT_PREFIX;
+        }
+      }
+      
+      else {
         --position;
       }
     }
@@ -112,6 +139,7 @@ Token Tokenizer::tokenizeNext() {
     }
   }
   
+  prevType = type;
   return {tokenStartPos, type};
 }
 

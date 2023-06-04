@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   t.read(&buffer[0], size);
   t.close();
   Tokenizer lex(buffer);
-  auto& vec = lex.tokenizeAll();
+  auto vec = lex.tokenizeAll();
   if (vec.back().type == TokenType::BAD_VALUE) {
     std::cerr << "Unknown symbol\n";
     return 1;

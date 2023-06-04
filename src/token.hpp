@@ -51,17 +51,25 @@ enum class TokenType : uint8_t {
   OPEN_BRACKET,
   CLOSE_BRACKET,
   BACK_SLASH,
-  ADDRESS_OF,
-  DEREFERENCE,
   COLON,
   SEMICOLON,
   TERNARY,
   COMMA,
   DOT,
 
+  // UNARY
+  ADDRESS_OF,
+  DEREFERENCE,
+  INCREMENT_POSTFIX,
+  INCREMENT_PREFIX,
+  DECREMENT_POSTFIX,
+  DECREMENT_PREFIX,
+  NEGATIVE,
+
+  // BINARY
   // arithmetic
-  PLUS,
-  MINUS,
+  ADDITION,
+  SUBTRACTION,
   MULTIPLICATION,
   DIVISION,
   MODULO,
@@ -101,6 +109,9 @@ enum class TokenType : uint8_t {
 
 };
 
+bool isLiteral(TokenType);
+bool isKeyword(TokenType);
+
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {
   // top row of keyboard
@@ -116,8 +127,8 @@ const std::unordered_map<char, TokenType> charToType {
   {'*', TokenType::MULTIPLICATION},
   {'(', TokenType::OPEN_PAREN},
   {')', TokenType::CLOSE_PAREN},
-  {'-', TokenType::MINUS},
-  {'+', TokenType::PLUS},
+  {'-', TokenType::NEGATIVE},
+  {'+', TokenType::ADDITION},
   {'=', TokenType::ASSIGNMENT},
   // second row
   {'{', TokenType::OPEN_BRACE},
@@ -219,8 +230,12 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::MULTIPLICATION_ASSIGNMENT, "*="},
   {TokenType::OPEN_PAREN, "("},
   {TokenType::CLOSE_PAREN, ")"},
-  {TokenType::MINUS, "-"},
-  {TokenType::PLUS, "+"},
+  {TokenType::NEGATIVE, "-"},
+  {TokenType::DECREMENT_PREFIX, "--"},
+  {TokenType::DECREMENT_POSTFIX, "--"},
+  {TokenType::ADDITION, "+"},
+  {TokenType::INCREMENT_PREFIX, "++"},
+  {TokenType::INCREMENT_POSTFIX, "++"},
   {TokenType::ASSIGNMENT, "="},
   {TokenType::EQUAL, "=="},
   {TokenType::OPEN_BRACE, "{"},

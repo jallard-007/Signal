@@ -6,16 +6,16 @@
 #include "../token.hpp"
 
 struct Tokenizer {
-  std::vector<Token> tokens;
   const char* content;
   const uint32_t size;
   uint32_t position;
+  TokenType prevType;
 
   Tokenizer() = delete;
 
   Tokenizer(const std::string&);
 
-  std::vector<Token>& tokenizeAll();
+  std::vector<Token> tokenizeAll();
   Token tokenizeNext();
 
   void moveToNextNonWhiteSpaceChar();

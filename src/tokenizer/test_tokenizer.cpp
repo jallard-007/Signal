@@ -6,6 +6,14 @@ TokenType firstToken(const char* c) {
    return tokenizer.tokenizeNext().type;
 }
 
+TokenType tokenAtN(const char* c, uint32_t n) {
+   Tokenizer tokenizer{c};
+   for (int i = 0; i < n; ++i) {
+      tokenizer.tokenizeNext();
+   }
+   return tokenizer.tokenizeNext().type;
+}
+
 TEST_CASE("Unit Test - Special", "[tokenizer]") {
    CHECK(firstToken("$") == TokenType::BAD_VALUE);
    CHECK(firstToken("`") == TokenType::BAD_VALUE);
@@ -22,7 +30,7 @@ TEST_CASE("Unit Test - Literals", "[tokenizer]") {
    CHECK(firstToken("1x") == TokenType::DECIMAL_NUMBER);
 }
 
-TEST_CASE("Keywords", "[tokenizer]") {
+TEST_CASE("Unit Test - Keywords", "[tokenizer]") {
    CHECK(firstToken("as") == TokenType::AS);
    CHECK(firstToken("break") == TokenType::BREAK);
    CHECK(firstToken("case") == TokenType::CASE);
@@ -61,8 +69,6 @@ TEST_CASE("Unit Test - General", "[tokenizer]") {
    CHECK(firstToken("[") == TokenType::OPEN_BRACKET);
    CHECK(firstToken("]") == TokenType::CLOSE_BRACKET);
    CHECK(firstToken("\\") == TokenType::BACK_SLASH);
-   CHECK(firstToken("@") == TokenType::ADDRESS_OF);
-   CHECK(firstToken("~") == TokenType::DEREFERENCE);
    CHECK(firstToken(":") == TokenType::COLON);
    CHECK(firstToken(";") == TokenType::SEMICOLON);
    CHECK(firstToken("?") == TokenType::TERNARY);
@@ -70,9 +76,26 @@ TEST_CASE("Unit Test - General", "[tokenizer]") {
    CHECK(firstToken(".") == TokenType::DOT);
 }
 
-TEST_CASE("Unit Test - Arithmetic", "[tokenizer]") {
-   CHECK(firstToken("+") == TokenType::PLUS);
-   CHECK(firstToken("-") == TokenType::MINUS);
+TEST_CASE("Unit Test - Operations", "[tokenizer]") {
+   // UNARY
+   CHECK(firstToken("@") == TokenType::ADDRESS_OF);
+   CHECK(firstToken("~") == TokenType::DEREFERENCE);
+   CHECK(firstToken("++") == TokenType::INCREMENT_PREFIX);
+   CHECK(firstToken("--") == TokenType::DECREMENT_PREFIX);
+   CHECK(tokenAtN("identifier++", 1) == TokenType::INCREMENT_POSTFIX);
+   CHECK(tokenAtN("identifier--", 1) == TokenType::DECREMENT_POSTFIX);
+   CHECK(firstToken(" - ") == TokenType::NEGATIVE);
+   CHECK(tokenAtN("return - ", 1) == TokenType::NEGATIVE);
+
+   // BINARY
+   CHECK(firstToken(" + ") == TokenType::ADDITION);
+   CHECK(tokenAtN("id - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("0 - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("0b - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("0x - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("'0' - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("\"0\" - ", 1) == TokenType::SUBTRACTION);
+
    CHECK(firstToken("*") == TokenType::MULTIPLICATION);
    CHECK(firstToken("/") == TokenType::DIVISION);
    CHECK(firstToken("%") == TokenType::MODULO);
@@ -81,6 +104,7 @@ TEST_CASE("Unit Test - Arithmetic", "[tokenizer]") {
    CHECK(firstToken("<<") == TokenType::SHIFT_LEFT);
    CHECK(firstToken(">>") == TokenType::SHIFT_RIGHT);
 }
+
 TEST_CASE("Unit Test - Assignments", "[tokenizer]") {
    CHECK(firstToken("=") == TokenType::ASSIGNMENT);
    CHECK(firstToken("+=") == TokenType::ADDITION_ASSIGNMENT);
