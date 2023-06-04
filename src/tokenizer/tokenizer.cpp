@@ -39,10 +39,38 @@ Token Tokenizer::tokenizeNext() {
     type = charToType.at(c);
     if (type == TokenType::STRING_LITERAL) {
       movePastLiteral('"');
-    } else if (type == TokenType::CHAR_LITERAL) {
+    }
+    else if (type == TokenType::CHAR_LITERAL) {
       movePastLiteral('\'');
-    } else {
-      ++position;
+    }
+    else if (++position < size) {
+      const char cNext = content[position++];
+      if (c == '|' && cNext == '|') {
+        type = TokenType::LOGICAL_OR;
+      } else if (c == '&' && cNext == '&') {
+        type = TokenType::LOGICAL_AND;
+      } else if (cNext == '=') {
+        TokenType newType = charWithEqualToType.at(c);
+        if (newType != TokenType::NOTHING) {
+          type = newType;
+        }
+      } else if (c == '<' && cNext == '<') {
+        if (position < size && content[position] == '=') {
+          type = TokenType::SHIFT_LEFT_ASSIGNMENT;
+          ++position;
+        } else {
+          type = TokenType::SHIFT_LEFT;
+        }
+      } else if (c == '>' && cNext == '>') {
+        if (position < size && content[position] == '=') {
+          type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
+          ++position;
+        } else {
+          type = TokenType::SHIFT_RIGHT;
+        }
+      } else {
+        --position;
+      }
     }
   }
 
