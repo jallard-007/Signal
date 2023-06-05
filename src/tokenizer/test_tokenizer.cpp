@@ -14,13 +14,13 @@ TokenType tokenAtN(const char* c, uint32_t n) {
    return tokenizer.tokenizeNext().type;
 }
 
-TEST_CASE("Unit Test - Special", "[tokenizer]") {
+TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {
    CHECK(firstToken("$") == TokenType::BAD_VALUE);
    CHECK(firstToken("`") == TokenType::BAD_VALUE);
    CHECK(firstToken("") == TokenType::END_OF_FILE);
 }
 
-TEST_CASE("Unit Test - Literals", "[tokenizer]") {
+TEST_CASE("Unit Test - Literals", "[tokenizer][tokenType]") {
    CHECK(firstToken("'") == TokenType::CHAR_LITERAL);
    CHECK(firstToken("\"") == TokenType::STRING_LITERAL);
    CHECK(firstToken("0") == TokenType::DECIMAL_NUMBER);
@@ -30,7 +30,7 @@ TEST_CASE("Unit Test - Literals", "[tokenizer]") {
    CHECK(firstToken("1x") == TokenType::DECIMAL_NUMBER);
 }
 
-TEST_CASE("Unit Test - Keywords", "[tokenizer]") {
+TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("as") == TokenType::AS);
    CHECK(firstToken("break") == TokenType::BREAK);
    CHECK(firstToken("case") == TokenType::CASE);
@@ -58,7 +58,7 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer]") {
    CHECK(firstToken("while") == TokenType::WHILE);
 }
 
-TEST_CASE("Unit Test - General", "[tokenizer]") {
+TEST_CASE("Unit Test - General", "[tokenizer][tokenType]") {
    CHECK(firstToken("_") == TokenType::IDENTIFIER);
    CHECK(firstToken("#") == TokenType::COMMENT);
    CHECK(firstToken("\n") == TokenType::NEWLINE);
@@ -76,7 +76,7 @@ TEST_CASE("Unit Test - General", "[tokenizer]") {
    CHECK(firstToken(".") == TokenType::DOT);
 }
 
-TEST_CASE("Unit Test - Operations", "[tokenizer]") {
+TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
    // UNARY
    CHECK(firstToken("@") == TokenType::ADDRESS_OF);
    CHECK(firstToken("~") == TokenType::DEREFERENCE);
@@ -105,7 +105,7 @@ TEST_CASE("Unit Test - Operations", "[tokenizer]") {
    CHECK(firstToken(">>") == TokenType::SHIFT_RIGHT);
 }
 
-TEST_CASE("Unit Test - Assignments", "[tokenizer]") {
+TEST_CASE("Unit Test - Assignments", "[tokenizer][tokenType]") {
    CHECK(firstToken("=") == TokenType::ASSIGNMENT);
    CHECK(firstToken("+=") == TokenType::ADDITION_ASSIGNMENT);
    CHECK(firstToken("-=") == TokenType::SUBTRACTION_ASSIGNMENT);
@@ -118,7 +118,7 @@ TEST_CASE("Unit Test - Assignments", "[tokenizer]") {
    CHECK(firstToken(">>=") == TokenType::SHIFT_RIGHT_ASSIGNMENT);
 }
 
-TEST_CASE("Unit Test - Logical", "[tokenizer]") {
+TEST_CASE("Unit Test - Logical", "[tokenizer][tokenType]") {
    CHECK(firstToken("!") == TokenType::NOT);
    CHECK(firstToken("==") == TokenType::EQUAL);
    CHECK(firstToken("!=") == TokenType::NOT_EQUAL);
@@ -130,9 +130,29 @@ TEST_CASE("Unit Test - Logical", "[tokenizer]") {
    CHECK(firstToken(">=") == TokenType::GREATER_THAN_EQUAL);
 }
 
-TEST_CASE("Unit Test - Types", "[tokenizer]") {
+TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
    CHECK(firstToken("char") == TokenType::CHAR_TYPE);
    CHECK(firstToken("int") == TokenType::INT_TYPE);
    CHECK(firstToken("double") == TokenType::DOUBLE_TYPE);
    CHECK(firstToken("^") == TokenType::POINTER);
+}
+
+TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
+   {
+   const char* chars = "func functionName(content:char^, size:int)\n# this is a comment\nnotAComment  ";
+   Tokenizer tokenizer{chars};
+   CHECK(tokenizer.extractToken({0, TokenType::FUNC}) == "");
+   CHECK(tokenizer.extractToken({5, TokenType::IDENTIFIER}) == "functionName");
+   CHECK(tokenizer.extractToken({17, TokenType::OPEN_PAREN}) == "");
+   CHECK(tokenizer.extractToken({18, TokenType::IDENTIFIER}) == "content");
+   CHECK(tokenizer.extractToken({43, TokenType::COMMENT}) == "# this is a comment");
+   CHECK(tokenizer.extractToken({63, TokenType::IDENTIFIER}) == "notAComment");
+   }
+
+   const char* chars = "num:int = 0xFFF    &     0b1101010101  & 54 ";
+   Tokenizer tokenizer{chars};
+   CHECK(tokenizer.extractToken({0, TokenType::IDENTIFIER}) == "num");
+   CHECK(tokenizer.extractToken({10, TokenType::HEX_NUMBER}) == "0xFFF");
+   CHECK(tokenizer.extractToken({25, TokenType::BINARY_NUMBER}) == "0b1101010101");
+   CHECK(tokenizer.extractToken({41, TokenType::DECIMAL_NUMBER}) == "54");
 }

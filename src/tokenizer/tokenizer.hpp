@@ -6,7 +6,7 @@
 #include "../token.hpp"
 
 struct Tokenizer {
-  const char* content;
+  const std::string& content;
   const uint32_t size;
   uint32_t position;
   TokenType prevType;
@@ -21,5 +21,8 @@ struct Tokenizer {
   void moveToNextNonWhiteSpaceChar();
   void movePastKeywordOrIdentifier();
   void movePastNumber();
-  void movePastLiteral(char delimeter);
+  void movePastHexNumber();
+  void movePastLiteral(char);
+  void moveToNewLine();
+  std::string extractToken(Token);
 };

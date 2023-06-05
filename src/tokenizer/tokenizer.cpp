@@ -13,7 +13,7 @@ bool my_isalnum(char c) {
 }
 
 Tokenizer::Tokenizer(const std::string& fileContent):
-  content{fileContent.data()}, size{(uint32_t)fileContent.length()}
+  content{fileContent}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -170,6 +170,15 @@ void Tokenizer::movePastNumber() {
   }
 }
 
+void Tokenizer::movePastHexNumber() {
+  for (++position; position < size; ++position) {
+    const char c = content[position];
+    if (!(c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c >= 'f')) {
+      return;
+    }
+  }
+}
+
 void Tokenizer::movePastLiteral(char delimeter) {
   char prev = content[position];
   char prevPrev = content[position];
@@ -182,4 +191,65 @@ void Tokenizer::movePastLiteral(char delimeter) {
     prevPrev = prev;
     prev = c;
   }
+}
+
+void Tokenizer::moveToNewLine() {
+  for (; position < size; ++position) {
+    if (content[position] == '\n') {
+      return;
+    }
+  }
+}
+
+/**
+ * Should only be called with types that need to be extracted,
+ * otherwise an empty string will be returned.
+ * 
+ * Valid types include:
+ * TokenType::IDENTIFIER, TokenType::DECIMAL_NUMBER, TokenType::HEX_NUMBER,
+ * TokenType::BINARY_NUMBER, TokenType::STRING_LITERAL, TokenType::CHAR_LITERAL,
+ * and TokenType::COMMENT
+*/
+std::string Tokenizer::extractToken(Token token) {
+  const uint32_t oldPos = position;
+  position = token.position;
+  switch (token.type) {
+    case TokenType::IDENTIFIER:
+      movePastKeywordOrIdentifier();
+      break;
+
+    case TokenType::DECIMAL_NUMBER:
+      movePastNumber();
+      break;
+
+    case TokenType::HEX_NUMBER:
+      ++position;
+      movePastHexNumber();
+      break;
+
+    case TokenType::BINARY_NUMBER:
+      ++position;
+      movePastNumber();
+      break;
+
+    case TokenType::STRING_LITERAL:
+      movePastLiteral('"');
+      break;
+
+    case TokenType::CHAR_LITERAL:
+      movePastLiteral('\'');
+      break;
+
+    case TokenType::COMMENT:
+      moveToNewLine();
+      break;
+
+    default:
+      // should never reach here
+      position = oldPos;
+      return "";
+  }
+  std::string tokenVal = content.substr(token.position, position - token.position);
+  position = oldPos;
+  return tokenVal;
 }
