@@ -138,21 +138,24 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 }
 
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
-   {
-   const char* chars = "func functionName(content:char^, size:int)\n# this is a comment\nnotAComment  ";
-   Tokenizer tokenizer{chars};
-   CHECK(tokenizer.extractToken({0, TokenType::FUNC}) == "");
-   CHECK(tokenizer.extractToken({5, TokenType::IDENTIFIER}) == "functionName");
-   CHECK(tokenizer.extractToken({17, TokenType::OPEN_PAREN}) == "");
-   CHECK(tokenizer.extractToken({18, TokenType::IDENTIFIER}) == "content");
-   CHECK(tokenizer.extractToken({43, TokenType::COMMENT}) == "# this is a comment");
-   CHECK(tokenizer.extractToken({63, TokenType::IDENTIFIER}) == "notAComment");
-   }
-
-   const char* chars = "num:int = 0xFFF    &     0b1101010101  & 54 ";
-   Tokenizer tokenizer{chars};
-   CHECK(tokenizer.extractToken({0, TokenType::IDENTIFIER}) == "num");
-   CHECK(tokenizer.extractToken({10, TokenType::HEX_NUMBER}) == "0xFFF");
-   CHECK(tokenizer.extractToken({25, TokenType::BINARY_NUMBER}) == "0b1101010101");
-   CHECK(tokenizer.extractToken({41, TokenType::DECIMAL_NUMBER}) == "54");
+   const std::string str = "func functionName(content:char^, size:int)\n# this is a comment\nnotAComment  ";
+   Tokenizer tokenizer{str};
+   auto tokens = tokenizer.tokenizeAll();
+   REQUIRE(tokens.size() == 17);
+   CHECK(tokenizer.extractToken(tokens[0]) == "func");
+   CHECK(tokenizer.extractToken(tokens[1]) == "functionName");
+   CHECK(tokenizer.extractToken(tokens[2]) == "");
+   CHECK(tokenizer.extractToken(tokens[3]) == "content");
+   CHECK(tokenizer.extractToken(tokens[4]) == "");
+   CHECK(tokenizer.extractToken(tokens[5]) == "char");
+   CHECK(tokenizer.extractToken(tokens[6]) == "");
+   CHECK(tokenizer.extractToken(tokens[7]) == "");
+   CHECK(tokenizer.extractToken(tokens[8]) == "size");
+   CHECK(tokenizer.extractToken(tokens[9]) == "");
+   CHECK(tokenizer.extractToken(tokens[10]) == "int");
+   CHECK(tokenizer.extractToken(tokens[11]) == "");
+   CHECK(tokenizer.extractToken(tokens[12]) == "");
+   CHECK(tokenizer.extractToken(tokens[13]) == "# this is a comment");
+   CHECK(tokenizer.extractToken(tokens[14]) == "");
+   CHECK(tokenizer.extractToken(tokens[15]) == "notAComment");
 }

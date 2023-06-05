@@ -1,9 +1,8 @@
 #include "nodes.hpp"
 
-Type::Type(TokenType tp): which{whichOne::builtIn}, tp{tp} {}
-Type::Type(const std::string& str): which{whichOne::custom}, str{str} {}
+Constant::Constant(Token token): value{token} {}
 
-Variable::Variable(const std::string& name): name{name} {}
+Variable::Variable(Token token): name{token} {}
 
 Statement::Statement(std::unique_ptr<Constant> ptr) {
   new (&var) std::unique_ptr<Constant>{std::move(ptr)};
@@ -35,20 +34,20 @@ Statement::~Statement() {
   }
 }
 
-FunctionDec::FunctionDec(const std::string& name): name{std::move(name)} {}
+FunctionDec::FunctionDec(Token token): name{token} {}
 
-Declaration::Declaration(): type{DecType::NONE} {}
+Declaration::Declaration(): decType{DecType::NONE} {}
 
-Declaration::Declaration(Declaration&& dec): type{dec.type} {
+Declaration::Declaration(Declaration&& dec): decType{dec.decType} {
   new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
 }
 
-Declaration::Declaration(std::unique_ptr<FunctionDec> funcDec): type{DecType::FUNCTION} {
+Declaration::Declaration(std::unique_ptr<FunctionDec> funcDec): decType{DecType::FUNCTION} {
   new (&func) std::unique_ptr<FunctionDec>{std::move(funcDec)};
 }
 
 Declaration::~Declaration() {
-  switch(type) {
+  switch(decType) {
     case DecType::FUNCTION: func.~unique_ptr<FunctionDec>(); break;
     default: break;
   }

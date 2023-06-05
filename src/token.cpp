@@ -13,5 +13,6 @@ bool isBuiltInType(TokenType type) {
 }
 
 bool isTypeDelimeter(TokenType type) {
-  return type == TokenType::COMMA || type == TokenType::CLOSE_PAREN;
+  return type == TokenType::COMMA || type == TokenType::CLOSE_PAREN
+    || type == TokenType::OPEN_BRACE;
 }

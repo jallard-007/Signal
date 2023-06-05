@@ -295,7 +295,9 @@ const std::unordered_map<TokenType, std::string> typeToString {
 
 struct Token {
   uint32_t position;
+  uint16_t length;
   TokenType type;
-  Token(u_int32_t pos, TokenType t): position{pos}, type{t} {}
-  bool operator==(const Token& tk) const {return position == tk.position && type == tk.type;}
+  Token() = delete;
+  Token(const Token& tok): position{tok.position}, length{tok.length}, type{tok.type} {}
+  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
 };

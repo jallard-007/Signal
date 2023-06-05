@@ -10,28 +10,26 @@ enum class StatementType {
   VARIABLE,
 };
 
-struct Constant {
-  std::string type;
-  std::string value;
-
-  Constant() = default;
+struct Type {
+  std::vector<Token> tokens;
+  
+  Type() = default;
 };
 
-struct Type {
-  enum class whichOne {custom, builtIn, none} which = whichOne::none;
-  std::string str;
-  TokenType tp;
-  Type() = default;
-  Type(TokenType);
-  Type(const std::string&);
+struct Constant {
+  Type type;
+  Token value;
+  
+  Constant() = delete;
+  Constant(Token);
 };
 
 struct Variable {
-  std::string name;
-  std::vector<Type> type;
+  Token name;
+  Type type;
 
   Variable() = delete;
-  Variable(const std::string&);
+  Variable(Token);
 };
 
 typedef struct BinOp BinOp;
@@ -74,13 +72,13 @@ struct UnOp {
 };
 
 struct FunctionDec {
-  std::string name;
   std::vector<Variable> params;
   std::vector<Statement> body;
   Type returnType;
+  Token name;
 
-  FunctionDec() = default;
-  FunctionDec(const std::string&);
+  FunctionDec() = delete;
+  FunctionDec(Token);
 };
 
 enum class DecType {
@@ -90,7 +88,7 @@ enum class DecType {
 };
 
 struct Declaration {
-  DecType type;
+  DecType decType;
   union{
     std::unique_ptr<FunctionDec> func;
   };

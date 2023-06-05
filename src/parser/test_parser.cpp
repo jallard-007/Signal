@@ -10,21 +10,24 @@ TEST_CASE("Unit Test - getType", "[parser]") {
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
   {
-    std::vector<Type> types;
-    REQUIRE(parser.getType(types) == TokenType::COMMA);
-    REQUIRE(types.size() == 4);
-    CHECK(types[0].tp == TokenType::CHAR_TYPE);
-    CHECK(types[1].str == "customType");
-    CHECK(types[2].tp == TokenType::POINTER);
-    CHECK(types[3].tp == TokenType::POINTER);
+    Type type;
+    REQUIRE(parser.getType(type) == TokenType::COMMA);
+    auto& tokens = type.tokens;
+    REQUIRE(tokens.size() == 4);
+    CHECK(tokens[0].type == TokenType::CHAR_TYPE);
+    CHECK(tokens[1].type == TokenType::IDENTIFIER);
+    CHECK(tokenizer.extractToken(tokens[1]) == "customType");
+    CHECK(tokens[2].type == TokenType::POINTER);
+    CHECK(tokens[3].type == TokenType::POINTER);
   }
   {
-    std::vector<Type> types;
-    REQUIRE(parser.getType(types) == TokenType::CLOSE_PAREN);
-    REQUIRE(types.size() == 3);
-    CHECK(types[0].tp == TokenType::INT_TYPE);
-    CHECK(types[2].tp == TokenType::POINTER);
-    CHECK(types[2].tp == TokenType::POINTER);
+    Type type;
+    REQUIRE(parser.getType(type) == TokenType::CLOSE_PAREN);
+    auto& tokens = type.tokens;
+    REQUIRE(tokens.size() == 3);
+    CHECK(tokens[0].type == TokenType::INT_TYPE);
+    CHECK(tokens[2].type == TokenType::POINTER);
+    CHECK(tokens[2].type == TokenType::POINTER);
   }
 
 }
@@ -37,19 +40,20 @@ TEST_CASE("Unit Test - getParams", "[parser]") {
   REQUIRE(parser.getParams(vars) == true);
   REQUIRE(vars.size() == 3);
 
-  CHECK(vars[0].name == "first");
-  REQUIRE(vars[0].type.size() == 1);
-  CHECK(vars[0].type[0].tp == TokenType::INT_TYPE);
+  CHECK(tokenizer.extractToken(vars[0].name) == "first");
+  REQUIRE(vars[0].type.tokens.size() == 1);
+  CHECK(vars[0].type.tokens[0].type == TokenType::INT_TYPE);
 
-  CHECK(vars[1].name == "second");
-  REQUIRE(vars[1].type.size() == 1);
-  CHECK(vars[1].type[0].tp == TokenType::DOUBLE_TYPE);
+  CHECK(tokenizer.extractToken(vars[1].name) == "second");
+  REQUIRE(vars[1].type.tokens.size() == 1);
+  CHECK(vars[1].type.tokens[0].type == TokenType::DOUBLE_TYPE);
 
-  CHECK(vars[2].name == "third");
-  REQUIRE(vars[2].type.size() == 3);
-  CHECK(vars[2].type[0].str == "customType");
-  CHECK(vars[2].type[1].tp == TokenType::POINTER);
-  CHECK(vars[2].type[2].tp == TokenType::POINTER);
+  CHECK(tokenizer.extractToken(vars[2].name) == "third");
+  REQUIRE(vars[2].type.tokens.size() == 3);
+  CHECK(vars[2].type.tokens[0].type == TokenType::IDENTIFIER);
+  CHECK(tokenizer.extractToken(vars[2].type.tokens[0]) == "customType");
+  CHECK(vars[2].type.tokens[1].type == TokenType::POINTER);
+  CHECK(vars[2].type.tokens[2].type == TokenType::POINTER);
 
 }
 
@@ -60,12 +64,16 @@ TEST_CASE("Unit Test - Parse Function Declaration", "[parser]") {
   parser.parse();
   auto& decs = parser.program.decs;
   REQUIRE(decs.size() == 1);
-  CHECK(decs[0].type == DecType::FUNCTION);
-  CHECK(decs[0].func->name == "funcName");
+  CHECK(decs[0].decType == DecType::FUNCTION);
+  CHECK(tokenizer.extractToken(decs[0].func->name) == "funcName");
+
   REQUIRE(decs[0].func->params.size() == 1);
-  CHECK(decs[0].func->params[0].name == "first");
-  REQUIRE(decs[0].func->params[0].type.size() == 2);
-  CHECK(decs[0].func->params[0].type[0].tp == TokenType::INT_TYPE);
-  CHECK(decs[0].func->params[0].type[1].tp == TokenType::POINTER);
-  CHECK(decs[0].func->returnType.tp == TokenType::INT_TYPE);
+  CHECK(tokenizer.extractToken(decs[0].func->params[0].name) == "first");
+
+  REQUIRE(decs[0].func->params[0].type.tokens.size() == 2);
+  CHECK(decs[0].func->params[0].type.tokens[0].type == TokenType::INT_TYPE);
+  CHECK(decs[0].func->params[0].type.tokens[1].type == TokenType::POINTER);
+  CHECK(decs[0].func->returnType.tokens.size() == 1);
+  CHECK(decs[0].func->returnType.tokens[0].type == TokenType::INT_TYPE);
+
 }

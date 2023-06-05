@@ -20,7 +20,7 @@ void Parser::parse() {
           return;
         }
         Declaration& dec = program.decs.emplace_back(
-          std::make_unique<FunctionDec>(tokenizer.extractToken(token))
+          std::make_unique<FunctionDec>(token)
         );
         if (!getParams(dec.func->params)) {
           // syntax of function parameters is incorrect
@@ -30,13 +30,8 @@ void Parser::parse() {
           // expected a colon
           return;
         }
-        token = tokenizer.tokenizeNext();
-        if (isBuiltInType(token.type)) {
-          dec.func->returnType.tp = token.type;
-        } else if (token.type == TokenType::IDENTIFIER) {
-          dec.func->returnType.str = tokenizer.extractToken(token);
-        } else {
-          // missing return type
+        if (getType(dec.func->returnType) != TokenType::CLOSE_BRACE) {
+          // expected close brace after type
           return;
         }
         break;
@@ -92,7 +87,7 @@ bool Parser::getParams(std::vector<Variable>& params) {
       // expected colon
       return false;
     }
-    Variable& var = params.emplace_back(tokenizer.extractToken(identifier));
+    Variable& var = params.emplace_back(identifier);
     const TokenType typeAfter = getType(var.type);
     if (typeAfter == TokenType::CLOSE_PAREN) {
       return true;
@@ -109,17 +104,15 @@ bool Parser::getParams(std::vector<Variable>& params) {
 /**
  * Returns the next token's type after the type list
 */
-TokenType Parser::getType(std::vector<Type>& type) {
+TokenType Parser::getType(Type& type) {
   Token tp = tokenizer.tokenizeNext();
   while (tp.type != TokenType::END_OF_FILE) {
     if (isTypeDelimeter(tp.type)) {
       return tp.type;
     }
     // TODO: type lookup to see if the type exists yet, or maybe we do that later...
-    if (tp.type == TokenType::IDENTIFIER) {
-      type.emplace_back(tokenizer.extractToken(tp));
-    } else if (isBuiltInType(tp.type)) {
-      type.emplace_back(tp.type);
+    if (isBuiltInType(tp.type) || tp.type == TokenType::IDENTIFIER) {
+      type.tokens.emplace_back(tp);
     } else {
       // unexpected token
       return TokenType::BAD_VALUE;

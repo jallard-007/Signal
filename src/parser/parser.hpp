@@ -11,5 +11,5 @@ struct Parser {
   Parser(Tokenizer& tokenizer);
   void parse();
   bool getParams(std::vector<Variable>&);
-  TokenType getType(std::vector<Type>&);
+  TokenType getType(Type&);
 };

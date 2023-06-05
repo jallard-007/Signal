@@ -31,21 +31,41 @@ std::vector<Token> Tokenizer::tokenizeAll() {
 Token Tokenizer::tokenizeNext() {
   moveToNextNonWhiteSpaceChar();
   if (position >= size) {
-    return {position, TokenType::END_OF_FILE};
+    return {position, 0, TokenType::END_OF_FILE};
   }
 
   const uint32_t tokenStartPos = position;
+  uint16_t length = 0;
   TokenType type = TokenType::BAD_VALUE;
   char c = content[position];
   if (charToType.find(c) != charToType.end()) {
     type = charToType.at(c);
     if (type == TokenType::STRING_LITERAL) {
       movePastLiteral('"');
+      if (position - tokenStartPos > UINT16_MAX) {
+        // error
+        exit(1);
+      }
+      length = static_cast<uint16_t>(position - tokenStartPos);
     }
     else if (type == TokenType::CHAR_LITERAL) {
       movePastLiteral('\'');
+      if (position - tokenStartPos > UINT16_MAX) {
+        // error
+        exit(1);
+      }
+      length = static_cast<uint16_t>(position - tokenStartPos);
+    }
+    else if (type == TokenType::COMMENT) {
+      moveToNewLine();
+      if (position - tokenStartPos > UINT16_MAX) {
+        // error
+        exit(1);
+      }
+      length = static_cast<uint16_t>(position - tokenStartPos);
     }
     else if (++position < size) {
+      // length remains at 0 for these symbols since there is no reason to extract
       const char cNext = content[position++];
       if (c == '|' && cNext == '|') {
         type = TokenType::LOGICAL_OR;
@@ -96,7 +116,6 @@ Token Tokenizer::tokenizeNext() {
           type = TokenType::INCREMENT_PREFIX;
         }
       }
-      
       else {
         --position;
       }
@@ -118,11 +137,21 @@ Token Tokenizer::tokenizeNext() {
       type = TokenType::DECIMAL_NUMBER;
     }
     movePastNumber();
+    if (position - tokenStartPos > UINT16_MAX) {
+      // error
+      exit(1);
+    }
+    length = static_cast<uint16_t>(position - tokenStartPos);
   }
 
   else if (my_isalpha(c) || c == '_') {
     movePastKeywordOrIdentifier();
-    if (position - tokenStartPos >= MIN_CHARS_TO_DISAMBIG) {
+    if (position - tokenStartPos > UINT16_MAX) {
+      // error
+      exit(1);
+    }
+    length = static_cast<uint16_t>(position - tokenStartPos);
+    if (length >= MIN_CHARS_TO_DISAMBIG) {
       type = TokenType::IDENTIFIER;
     } else {
       // + 1 for null termination
@@ -140,7 +169,7 @@ Token Tokenizer::tokenizeNext() {
   }
   
   prevType = type;
-  return {tokenStartPos, type};
+  return {tokenStartPos, length, type};
 }
 
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
@@ -201,55 +230,6 @@ void Tokenizer::moveToNewLine() {
   }
 }
 
-/**
- * Should only be called with types that need to be extracted,
- * otherwise an empty string will be returned.
- * 
- * Valid types include:
- * TokenType::IDENTIFIER, TokenType::DECIMAL_NUMBER, TokenType::HEX_NUMBER,
- * TokenType::BINARY_NUMBER, TokenType::STRING_LITERAL, TokenType::CHAR_LITERAL,
- * and TokenType::COMMENT
-*/
 std::string Tokenizer::extractToken(Token token) {
-  const uint32_t oldPos = position;
-  position = token.position;
-  switch (token.type) {
-    case TokenType::IDENTIFIER:
-      movePastKeywordOrIdentifier();
-      break;
-
-    case TokenType::DECIMAL_NUMBER:
-      movePastNumber();
-      break;
-
-    case TokenType::HEX_NUMBER:
-      ++position;
-      movePastHexNumber();
-      break;
-
-    case TokenType::BINARY_NUMBER:
-      ++position;
-      movePastNumber();
-      break;
-
-    case TokenType::STRING_LITERAL:
-      movePastLiteral('"');
-      break;
-
-    case TokenType::CHAR_LITERAL:
-      movePastLiteral('\'');
-      break;
-
-    case TokenType::COMMENT:
-      moveToNewLine();
-      break;
-
-    default:
-      // should never reach here
-      position = oldPos;
-      return "";
-  }
-  std::string tokenVal = content.substr(token.position, position - token.position);
-  position = oldPos;
-  return tokenVal;
+  return content.substr(token.position, token.length);
 }
