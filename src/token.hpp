@@ -111,6 +111,8 @@ enum class TokenType : uint8_t {
 
 bool isLiteral(TokenType);
 bool isKeyword(TokenType);
+bool isBuiltInType(TokenType);
+bool isTypeDelimeter(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {

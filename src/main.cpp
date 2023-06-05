@@ -2,13 +2,9 @@
 #include <fstream>
 #include "./tokenizer/tokenizer.hpp"
 
-void printUsage() {
-  std::cout << "Usage: ./main <filename>\n";
-}
-
 int main(int argc, char **argv) {
   if (argc != 2) {
-    printUsage();
+    std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;
   }
   std::cout << "Filepath: " << argv[1] << '\n';
@@ -37,3 +33,15 @@ int main(int argc, char **argv) {
   }
   return 0;
 }
+
+// void wtf() {
+//   const char * str = "(first: int, second: double, third: customType ^^)";
+//   Tokenizer tokenizer{str};
+//   std::cout << tokenizer.content << '\n';
+//   std::vector<std::string> params;
+//   std::string st = tokenizer.extractToken({1, TokenType::IDENTIFIER});
+//   params.emplace_back(st);
+//   st = tokenizer.extractToken({13, TokenType::IDENTIFIER});
+//   params.emplace_back(st);
+//   std::cout << tokenizer.content << '\n';
+// }
