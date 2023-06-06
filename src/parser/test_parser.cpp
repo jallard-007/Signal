@@ -2,16 +2,13 @@
 #include "parser.hpp"
 #include <iostream>
 
-// "Unit testing" the parser is not really possible since the parser uses the tokenizer as it goes,
-// regardless, we will call these tests "Unit tests" since they focus on a specific aspect of the parser
-// usually just one or two functions at a time
-TEST_CASE("Unit Test - getType", "[parser]") {
+TEST_CASE("getType", "[parser]") {
   const std::string str = " char customType ^^ , int ^^ )";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
   {
     Type type;
-    REQUIRE(parser.getType(type) == TokenType::COMMA);
+    REQUIRE(parser.getType(type).type == TokenType::COMMA);
     auto& tokens = type.tokens;
     REQUIRE(tokens.size() == 4);
     CHECK(tokens[0].type == TokenType::CHAR_TYPE);
@@ -22,7 +19,7 @@ TEST_CASE("Unit Test - getType", "[parser]") {
   }
   {
     Type type;
-    REQUIRE(parser.getType(type) == TokenType::CLOSE_PAREN);
+    REQUIRE(parser.getType(type).type == TokenType::CLOSE_PAREN);
     auto& tokens = type.tokens;
     REQUIRE(tokens.size() == 3);
     CHECK(tokens[0].type == TokenType::INT_TYPE);
@@ -32,11 +29,11 @@ TEST_CASE("Unit Test - getType", "[parser]") {
 
 }
 
-TEST_CASE("Unit Test - getParams", "[parser]") {
+TEST_CASE("getParams", "[parser]") {
   const std::string str = "(first: int, second: double, third: customType ^^)";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  std::vector<Variable> vars;
+  std::vector<VariableDec> vars;
   REQUIRE(parser.getParams(vars) == true);
   REQUIRE(vars.size() == 3);
 
@@ -57,7 +54,7 @@ TEST_CASE("Unit Test - getParams", "[parser]") {
 
 }
 
-TEST_CASE("Unit Test - Parse Function Declaration", "[parser]") {
+TEST_CASE("Function Declaration", "[parser]") {
   const std::string str = "func funcName(first: int^): int";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
@@ -73,7 +70,89 @@ TEST_CASE("Unit Test - Parse Function Declaration", "[parser]") {
   REQUIRE(decs[0].func->params[0].type.tokens.size() == 2);
   CHECK(decs[0].func->params[0].type.tokens[0].type == TokenType::INT_TYPE);
   CHECK(decs[0].func->params[0].type.tokens[1].type == TokenType::POINTER);
-  CHECK(decs[0].func->returnType.tokens.size() == 1);
+  REQUIRE(decs[0].func->returnType.tokens.size() == 1);
   CHECK(decs[0].func->returnType.tokens[0].type == TokenType::INT_TYPE);
+}
 
+TEST_CASE("Function Call - Base", "[parser]") {
+  const std::string str = "functionName();";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  REQUIRE(statement.type == StatementType::FUNCTION_CALL);
+  CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
+  auto& argsList = statement.funcCall->args.list;
+  REQUIRE(argsList.size() == 0);
+}
+
+TEST_CASE("Function Call - Single Arg", "[parser]") {
+  const std::string str = "functionName(arg1);";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  REQUIRE(statement.type == StatementType::FUNCTION_CALL);
+  CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
+  auto& argsList = statement.funcCall->args.list;
+  REQUIRE(argsList.size() == 1);
+  auto& arg1 = argsList[0];
+  REQUIRE(arg1.type == StatementType::VALUE);
+  CHECK(tokenizer.extractToken(arg1.var) == "arg1");
+}
+
+TEST_CASE("Function Call - Multi Arg", "[parser]") {
+  const std::string str = "functionName(arg1, arg2);";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  REQUIRE(statement.type == StatementType::FUNCTION_CALL);
+  CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
+  auto& argsList = statement.funcCall->args.list;
+  REQUIRE(argsList.size() == 2);
+  auto& arg1 = argsList[0];
+  REQUIRE(arg1.type == StatementType::VALUE);
+  CHECK(tokenizer.extractToken(arg1.var) == "arg1");
+  auto& arg2 = argsList[1];
+  REQUIRE(arg2.type == StatementType::VALUE);
+  CHECK(tokenizer.extractToken(arg2.var) == "arg2");
+}
+
+TEST_CASE("Function Call - Nested", "[parser]") {
+  const std::string str = "functionName(arg1[nested()]);";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+
+  REQUIRE(statement.type == StatementType::FUNCTION_CALL);
+  CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
+  auto& argsList = statement.funcCall->args.list;
+
+  REQUIRE(argsList.size() == 1);
+  auto& arg1 = argsList[0];
+  REQUIRE(arg1.type == StatementType::ARRAY_ACCESS);
+  CHECK(tokenizer.extractToken(arg1.arrAccess->array) == "arg1");
+
+  REQUIRE(arg1.arrAccess->offset.list.size() == 1);
+  auto& arg1_arg1 = arg1.arrAccess->offset.list[0];
+  REQUIRE(arg1_arg1.type == StatementType::FUNCTION_CALL);
+  CHECK(tokenizer.extractToken(arg1_arg1.funcCall->name) == "nested");
+
+  CHECK(arg1_arg1.funcCall->args.list.size() == 0);
+}
+
+TEST_CASE("Binary Operators", "[parser]") {
+  const std::string str = "4 + 2";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement statement ; //= parser.parseStatement(TokenType::SEMICOLON);
+  REQUIRE(statement.type == StatementType::BINARY_OP);
+  auto& binOp = statement.binOp;
+  CHECK(binOp->op == TokenType::ADDITION);
+  
+  REQUIRE(binOp->leftSide->type == StatementType::VALUE);
+  CHECK(binOp->leftSide->var.type == TokenType::DECIMAL_NUMBER);
+  CHECK(tokenizer.extractToken(binOp->leftSide->var) == "4");
+
+  REQUIRE(binOp->rightSide->type == StatementType::VALUE);
+  CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
+  CHECK(tokenizer.extractToken(binOp->rightSide->var) == "2");
 }

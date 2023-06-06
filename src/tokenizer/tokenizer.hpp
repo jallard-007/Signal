@@ -7,6 +7,7 @@
 
 struct Tokenizer {
   const std::string& content;
+  Token peeked;
   const uint32_t size;
   uint32_t position;
   TokenType prevType;
@@ -17,7 +18,8 @@ struct Tokenizer {
 
   std::vector<Token> tokenizeAll();
   Token tokenizeNext();
-
+  Token peekNext();
+  
   void moveToNextNonWhiteSpaceChar();
   void movePastKeywordOrIdentifier();
   void movePastNumber();

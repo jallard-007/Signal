@@ -13,7 +13,7 @@ bool my_isalnum(char c) {
 }
 
 Tokenizer::Tokenizer(const std::string& fileContent):
-  content{fileContent}, size{(uint32_t)fileContent.length()}
+  content{fileContent}, peeked{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -28,7 +28,28 @@ std::vector<Token> Tokenizer::tokenizeAll() {
   return tokens;
 }
 
+/**
+ * Allows peeking to the next token
+ * Successive calls to this function will return the same Token.
+ * The Token must be consumed by calling tokenizeNext before peeking to the next
+*/
+Token Tokenizer::peekNext() {
+  if (peeked.type != TokenType::NOTHING) {
+    return peeked;
+  }
+  peeked = tokenizeNext();
+  // put position back
+  position = peeked.position;
+  return peeked;
+}
+
 Token Tokenizer::tokenizeNext() {
+  if (peeked.type != TokenType::NOTHING) { 
+    Token temp = peeked;
+    peeked.type = TokenType::NOTHING;
+    position = peeked.position + peeked.length;
+    return temp;
+  }
   moveToNextNonWhiteSpaceChar();
   if (position >= size) {
     return {position, 0, TokenType::END_OF_FILE};
@@ -42,30 +63,14 @@ Token Tokenizer::tokenizeNext() {
     type = charToType.at(c);
     if (type == TokenType::STRING_LITERAL) {
       movePastLiteral('"');
-      if (position - tokenStartPos > UINT16_MAX) {
-        // error
-        exit(1);
-      }
-      length = static_cast<uint16_t>(position - tokenStartPos);
     }
     else if (type == TokenType::CHAR_LITERAL) {
       movePastLiteral('\'');
-      if (position - tokenStartPos > UINT16_MAX) {
-        // error
-        exit(1);
-      }
-      length = static_cast<uint16_t>(position - tokenStartPos);
     }
     else if (type == TokenType::COMMENT) {
       moveToNewLine();
-      if (position - tokenStartPos > UINT16_MAX) {
-        // error
-        exit(1);
-      }
-      length = static_cast<uint16_t>(position - tokenStartPos);
     }
     else if (++position < size) {
-      // length remains at 0 for these symbols since there is no reason to extract
       const char cNext = content[position++];
       if (c == '|' && cNext == '|') {
         type = TokenType::LOGICAL_OR;
@@ -120,6 +125,11 @@ Token Tokenizer::tokenizeNext() {
         --position;
       }
     }
+    if (position - tokenStartPos > UINT16_MAX) {
+      // error
+      exit(1);
+    }
+    length = static_cast<uint16_t>(position - tokenStartPos);
   }
 
   else if (c >= '0' && c <= '9') {
@@ -175,7 +185,7 @@ Token Tokenizer::tokenizeNext() {
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
   for (; position < size; ++position) {
     const char c = content[position];
-    if (c != ' ' && c != '\t') {
+    if (c != ' ' && c != '\t' && c != '\n') {
       return;
     }
   }
@@ -208,12 +218,12 @@ void Tokenizer::movePastHexNumber() {
   }
 }
 
-void Tokenizer::movePastLiteral(char delimeter) {
+void Tokenizer::movePastLiteral(char delimiter) {
   char prev = content[position];
   char prevPrev = content[position];
   for (++position; position < size; ++position) {
     const char c = content[position];
-    if (c == delimeter && !(prev == '\\' && prevPrev != '\\')) {
+    if (c == delimiter && !(prev == '\\' && prevPrev != '\\')) {
       ++position;
       return;
     }

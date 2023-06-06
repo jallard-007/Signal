@@ -4,10 +4,13 @@
 #include <vector>
 
 enum class StatementType {
+  NONE,
   BINARY_OP,
   UNARY_OP,
-  CONSTANT,
-  VARIABLE,
+  VALUE,
+  VARIABLE_DEC,
+  FUNCTION_CALL,
+  ARRAY_ACCESS,
 };
 
 struct Type {
@@ -24,61 +27,89 @@ struct Constant {
   Constant(Token);
 };
 
-struct Variable {
-  Token name;
+struct VariableDec {
   Type type;
+  Token name;
 
-  Variable() = delete;
-  Variable(Token);
+  VariableDec() = delete;
+  VariableDec(Token);
 };
 
 typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
+typedef struct FunctionCall FunctionCall;
+typedef struct ArrayAccess ArrayAccess;
 
 struct Statement {
+  StatementType type = StatementType::NONE;
   union {
-    std::unique_ptr<Constant> c;
-    std::unique_ptr<UnOp> uOp;
-    std::unique_ptr<BinOp> bOp;
-    std::unique_ptr<Variable> var;
+    std::unique_ptr<UnOp> unOp;
+    std::unique_ptr<BinOp> binOp;
+    std::unique_ptr<VariableDec> varDec;
+    std::unique_ptr<FunctionCall> funcCall;
+    std::unique_ptr<ArrayAccess> arrAccess;
+    Token var;
   };
 
-  Statement() = delete;
+  Statement();
   Statement(const Statement&) = delete;
-  Statement(std::unique_ptr<Constant>);
+  Statement(Statement&&);
   Statement(std::unique_ptr<UnOp>);
   Statement(std::unique_ptr<BinOp>);
-  Statement(std::unique_ptr<Variable>);
+  Statement(std::unique_ptr<VariableDec>);
+  Statement(std::unique_ptr<FunctionCall>);
+  Statement(std::unique_ptr<ArrayAccess>);
+  Statement(Token);
   ~Statement();
+  void operator=(Statement&&);
+};
 
-  private:
-  enum class unionType {constant, unOp, binOp, var, none} type = unionType::none;
+struct Arguments {
+  std::vector<Statement> list;
+  Arguments() = default;
+};
+
+struct ArrayAccess {
+  Arguments offset;
+  Token array;
+
+  ArrayAccess() = delete;
+  ArrayAccess(Token);
 };
 
 struct BinOp {
   TokenType op;
   std::unique_ptr<Statement> leftSide;
   std::unique_ptr<Statement> rightSide;
-  BinOp() = default;
-  BinOp(const BinOp&) = delete;
 
+  BinOp(TokenType);
+  BinOp(const BinOp&) = delete;
+  BinOp(BinOp&&);
 };
 
 struct UnOp {
   TokenType op;
   std::unique_ptr<Statement> operand;
-  UnOp() = default;
+
+  UnOp(TokenType);
   UnOp(const UnOp&) = delete;
 };
 
 struct FunctionDec {
-  std::vector<Variable> params;
+  std::vector<VariableDec> params;
   std::vector<Statement> body;
   Type returnType;
   Token name;
 
   FunctionDec() = delete;
   FunctionDec(Token);
+};
+
+struct FunctionCall {
+  Arguments args;
+  Token name;
+  FunctionCall() = delete;
+  FunctionCall(Token);
 };
 
 enum class DecType {
@@ -103,4 +134,5 @@ struct Program {
   std::string name;
   std::vector<Declaration> decs;
   Program() = default;
+  Program(Program&&);
 };

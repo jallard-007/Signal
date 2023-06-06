@@ -53,11 +53,11 @@ enum class TokenType : uint8_t {
   BACK_SLASH,
   COLON,
   SEMICOLON,
-  TERNARY,
   COMMA,
-  DOT,
 
   // UNARY
+  DOT,
+  NOT,
   ADDRESS_OF,
   DEREFERENCE,
   INCREMENT_POSTFIX,
@@ -91,7 +91,6 @@ enum class TokenType : uint8_t {
   SHIFT_RIGHT_ASSIGNMENT,
 
   // logical
-  NOT,
   EQUAL,
   NOT_EQUAL,
   LOGICAL_AND,
@@ -100,6 +99,7 @@ enum class TokenType : uint8_t {
   LESS_THAN_EQUAL,
   GREATER_THAN,
   GREATER_THAN_EQUAL,
+  TERNARY,
 
   // types
   CHAR_TYPE,
@@ -112,7 +112,9 @@ enum class TokenType : uint8_t {
 bool isLiteral(TokenType);
 bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
-bool isTypeDelimeter(TokenType);
+bool isTypeDelimiter(TokenType);
+bool isBinaryOp(TokenType);
+bool isUnaryOp(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {

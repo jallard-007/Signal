@@ -12,7 +12,15 @@ bool isBuiltInType(TokenType type) {
   return type >= TokenType::CHAR_TYPE && type <= TokenType::POINTER;
 }
 
-bool isTypeDelimeter(TokenType type) {
+bool isTypeDelimiter(TokenType type) {
   return type == TokenType::COMMA || type == TokenType::CLOSE_PAREN
-    || type == TokenType::OPEN_BRACE;
+    || type == TokenType::OPEN_BRACE || type == TokenType::SEMICOLON;
+}
+
+bool isBinaryOp(TokenType type) {
+  return type >= TokenType::ADDITION && type <= TokenType::TERNARY;
+}
+
+bool isUnaryOp(TokenType type) {
+  return type >= TokenType::DOT && type <= TokenType::NEGATIVE;
 }
