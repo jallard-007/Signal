@@ -5,6 +5,7 @@
 
 enum class StatementType {
   NONE,
+  BAD,
   BINARY_OP,
   UNARY_OP,
   VALUE,
@@ -12,6 +13,8 @@ enum class StatementType {
   FUNCTION_CALL,
   ARRAY_ACCESS,
 };
+
+bool hasData(StatementType);
 
 struct Type {
   std::vector<Token> tokens;
@@ -44,6 +47,7 @@ struct Statement {
   };
 
   Statement();
+  Statement(StatementType);
   Statement(const Statement&) = delete;
   Statement(Statement&&) noexcept ;
   explicit Statement(std::unique_ptr<UnOp>);
@@ -54,6 +58,7 @@ struct Statement {
   explicit Statement(Token);
   ~Statement();
   void operator=(Statement&&) noexcept;
+  bool addLiteralToNode(Statement&&);
 };
 
 struct Arguments {
@@ -62,7 +67,7 @@ struct Arguments {
 };
 
 struct ArrayAccess {
-  Arguments offset;
+  Statement offset;
   Token array;
 
   ArrayAccess() = delete;
@@ -88,7 +93,7 @@ struct UnOp {
 };
 
 struct FunctionDec {
-  std::vector<VariableDec> params;
+  std::vector<Statement> params;
   std::vector<Statement> body;
   Type returnType;
   Token name;

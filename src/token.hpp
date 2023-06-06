@@ -45,18 +45,17 @@ enum class TokenType : uint8_t {
   COMMENT,
   NEWLINE,
   OPEN_PAREN,
-  CLOSE_PAREN,
   OPEN_BRACE,
-  CLOSE_BRACE,
   OPEN_BRACKET,
+  CLOSE_PAREN,
+  CLOSE_BRACE,
   CLOSE_BRACKET,
+  SEMICOLON,
   BACK_SLASH,
   COLON,
-  SEMICOLON,
   COMMA,
 
   // UNARY
-  DOT,
   NOT,
   ADDRESS_OF,
   DEREFERENCE,
@@ -74,6 +73,7 @@ enum class TokenType : uint8_t {
   DIVISION,
   MODULO,
   BITWISE_AND,
+  BITWISE_XOR,
   BITWISE_OR,
   SHIFT_LEFT,
   SHIFT_RIGHT,
@@ -86,6 +86,7 @@ enum class TokenType : uint8_t {
   DIVISION_ASSIGNMENT,
   MODULO_ASSIGNMENT,
   BITWISE_OR_ASSIGNMENT,
+  BITWISE_XOR_ASSIGNMENT,
   BITWISE_AND_ASSIGNMENT,
   SHIFT_LEFT_ASSIGNMENT,
   SHIFT_RIGHT_ASSIGNMENT,
@@ -99,6 +100,7 @@ enum class TokenType : uint8_t {
   LESS_THAN_EQUAL,
   GREATER_THAN,
   GREATER_THAN_EQUAL,
+  DOT,
   TERNARY,
 
   // types
@@ -112,9 +114,9 @@ enum class TokenType : uint8_t {
 bool isLiteral(TokenType);
 bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
-bool isTypeDelimiter(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
+bool isAssignment(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {
@@ -124,7 +126,7 @@ const std::unordered_map<char, TokenType> charToType {
   {'!', TokenType::NOT},
   {'@', TokenType::ADDRESS_OF},
   {'#', TokenType::COMMENT},
-  // {'$', TokenType::DOLLAR},
+  {'$', TokenType::BITWISE_XOR},
   {'%', TokenType::MODULO},
   {'^', TokenType::POINTER},
   {'&', TokenType::BITWISE_AND},
@@ -185,6 +187,7 @@ const std::unordered_map<std::string, TokenType> stringToType {
 
 const std::unordered_map<char, TokenType> charWithEqualToType {
   {'!', TokenType::NOT_EQUAL},
+  {'$', TokenType::BITWISE_XOR_ASSIGNMENT},
   {'%', TokenType::MODULO_ASSIGNMENT},
   {'&', TokenType::BITWISE_AND_ASSIGNMENT},
   {'*', TokenType::MULTIPLICATION_ASSIGNMENT},
@@ -224,6 +227,8 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::NOT_EQUAL, "!="},
   {TokenType::ADDRESS_OF, "@"},
   {TokenType::COMMENT, "#"},
+  {TokenType::BITWISE_XOR, "&"},
+  {TokenType::BITWISE_XOR_ASSIGNMENT, "&="},
   {TokenType::MODULO, "%"},
   {TokenType::MODULO_ASSIGNMENT, "%="},
   {TokenType::POINTER, "^"},

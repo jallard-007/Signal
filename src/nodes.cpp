@@ -1,8 +1,14 @@
 #include "nodes.hpp"
 
+bool hasData(StatementType type) {
+  return type >= StatementType::VALUE && type <= StatementType::ARRAY_ACCESS;
+}
+
 VariableDec::VariableDec(Token token): name{token} {}
 
-Statement::Statement() {}
+Statement::Statement(): unOp{nullptr} {}
+
+Statement::Statement(StatementType type): type{type}, unOp{nullptr} {}
 
 void Statement::operator=(Statement&& st) noexcept {
   type = st.type;
@@ -22,6 +28,7 @@ void Statement::operator=(Statement&& st) noexcept {
     default:
       break;
   }
+  st.type = StatementType::NONE;
 }
 
 Statement::Statement(Statement&& st)  noexcept {
@@ -65,6 +72,14 @@ Statement::~Statement() {
     case StatementType::FUNCTION_CALL: funcCall.~unique_ptr<FunctionCall>(); break;
     case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
     default: break;
+  }
+}
+
+bool Statement::addLiteralToNode(Statement&& st) {
+  switch (type) {
+    case StatementType::UNARY_OP: unOp->operand = std::make_unique<Statement>(std::move(st)); return true;
+    case StatementType::BINARY_OP: binOp->rightSide = std::make_unique<Statement>(std::move(st)); return true;
+    default: return false;
   }
 }
 

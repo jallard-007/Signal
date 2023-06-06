@@ -42,6 +42,11 @@ Token Tokenizer::peekNext() {
   return peeked;
 }
 
+void Tokenizer::consumePeek() {
+  peeked.type = TokenType::NOTHING;
+  position = peeked.position + peeked.length;
+}
+
 Token Tokenizer::tokenizeNext() {
   if (peeked.type != TokenType::NOTHING) { 
     Token temp = peeked;
@@ -51,7 +56,7 @@ Token Tokenizer::tokenizeNext() {
   }
   moveToNextNonWhiteSpaceChar();
   if (position >= size) {
-    return {position, 0, TokenType::END_OF_FILE};
+    return {size, 0, TokenType::END_OF_FILE};
   }
 
   const uint32_t tokenStartPos = position;

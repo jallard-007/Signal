@@ -15,7 +15,6 @@ TokenType tokenAtN(const char* c, uint32_t n) {
 }
 
 TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {
-   CHECK(firstToken("$") == TokenType::BAD_VALUE);
    CHECK(firstToken("`") == TokenType::BAD_VALUE);
    CHECK(firstToken("") == TokenType::END_OF_FILE);
 }
@@ -98,6 +97,7 @@ TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
    CHECK(firstToken("*") == TokenType::MULTIPLICATION);
    CHECK(firstToken("/") == TokenType::DIVISION);
    CHECK(firstToken("%") == TokenType::MODULO);
+   CHECK(firstToken("$") == TokenType::BITWISE_XOR);
    CHECK(firstToken("&") == TokenType::BITWISE_AND);
    CHECK(firstToken("|") == TokenType::BITWISE_OR);
    CHECK(firstToken("<<") == TokenType::SHIFT_LEFT);
@@ -113,6 +113,7 @@ TEST_CASE("Unit Test - Assignments", "[tokenizer][tokenType]") {
    CHECK(firstToken("%=") == TokenType::MODULO_ASSIGNMENT);
    CHECK(firstToken("|=") == TokenType::BITWISE_OR_ASSIGNMENT);
    CHECK(firstToken("&=") == TokenType::BITWISE_AND_ASSIGNMENT);
+   CHECK(firstToken("$=") == TokenType::BITWISE_XOR_ASSIGNMENT);
    CHECK(firstToken("<<=") == TokenType::SHIFT_LEFT_ASSIGNMENT);
    CHECK(firstToken(">>=") == TokenType::SHIFT_RIGHT_ASSIGNMENT);
 }

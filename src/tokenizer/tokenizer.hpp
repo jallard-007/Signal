@@ -19,7 +19,8 @@ struct Tokenizer {
   std::vector<Token> tokenizeAll();
   Token tokenizeNext();
   Token peekNext();
-  
+  void consumePeek();
+
   void moveToNextNonWhiteSpaceChar();
   void movePastKeywordOrIdentifier();
   void movePastNumber();
