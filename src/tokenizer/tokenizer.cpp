@@ -1,5 +1,4 @@
 #include <vector>
-#include <string>
 #include <cctype>
 #include "../token.hpp"
 #include "tokenizer.hpp"
@@ -135,18 +134,22 @@ Token Tokenizer::tokenizeNext() {
   else if (c >= '0' && c <= '9') {
     if (c == '0' && position + 1 < size) {
       c = content[++position];
-      if (c == 'b') {
-        type = TokenType::BINARY_NUMBER;
-      } else if (c == 'x') {
+      if (c == 'x') {
         type = TokenType::HEX_NUMBER;
+        movePastHexNumber();
       } else {
-        type = TokenType::DECIMAL_NUMBER;
-        --position;
+        if (c == 'b') {
+          type = TokenType::BINARY_NUMBER;
+        } else {
+          type = TokenType::DECIMAL_NUMBER;
+          --position;
+        }
+        movePastNumber();
       }
     } else {
       type = TokenType::DECIMAL_NUMBER;
+      movePastNumber();
     }
-    movePastNumber();
     if (position - tokenStartPos > UINT16_MAX) {
       // error
       exit(1);
@@ -212,7 +215,7 @@ void Tokenizer::movePastNumber() {
 void Tokenizer::movePastHexNumber() {
   for (++position; position < size; ++position) {
     const char c = content[position];
-    if (!(c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c >= 'f')) {
+    if (!(c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f')) {
       return;
     }
   }

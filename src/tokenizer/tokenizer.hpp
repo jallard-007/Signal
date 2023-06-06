@@ -14,7 +14,7 @@ struct Tokenizer {
 
   Tokenizer() = delete;
 
-  Tokenizer(const std::string&);
+  explicit Tokenizer(const std::string&);
 
   std::vector<Token> tokenizeAll();
   Token tokenizeNext();

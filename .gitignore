@@ -1,8 +1,10 @@
 .vscode
+.idea
 main
 test
 out
 Makefile
-CMakeFiles
-CMakeCache.txt
-cmake_install.cmake
+cmake*
+CMake*
+!CMakeLists.txt
+Testing

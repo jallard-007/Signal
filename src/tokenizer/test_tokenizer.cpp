@@ -89,9 +89,9 @@ TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
    // BINARY
    CHECK(firstToken(" + ") == TokenType::ADDITION);
    CHECK(tokenAtN("id - ", 1) == TokenType::SUBTRACTION);
-   CHECK(tokenAtN("0 - ", 1) == TokenType::SUBTRACTION);
-   CHECK(tokenAtN("0b - ", 1) == TokenType::SUBTRACTION);
-   CHECK(tokenAtN("0x - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("10 - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("0b10 - ", 1) == TokenType::SUBTRACTION);
+   CHECK(tokenAtN("0xFA - ", 1) == TokenType::SUBTRACTION);
    CHECK(tokenAtN("'0' - ", 1) == TokenType::SUBTRACTION);
    CHECK(tokenAtN("\"0\" - ", 1) == TokenType::SUBTRACTION);
 
@@ -137,6 +137,7 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 }
 
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
+   {
    const std::string str = "func functionName(content:char^, size:int)\n# this is a comment\nnotAComment  ";
    Tokenizer tokenizer{str};
    auto tokens = tokenizer.tokenizeAll();
@@ -149,4 +150,16 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    CHECK(tokenizer.extractToken(tokens[10]) == "int");
    CHECK(tokenizer.extractToken(tokens[12]) == "# this is a comment");
    CHECK(tokenizer.extractToken(tokens[13]) == "notAComment");
+   }
+
+   {
+   const std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
+   Tokenizer tokenizer{str};
+   auto tokens = tokenizer.tokenizeAll();
+   REQUIRE(tokens.size() == 4);
+   CHECK(tokenizer.extractToken(tokens[0]) == "0xFFF");
+   CHECK(tokenizer.extractToken(tokens[1]) == "0b10101101");
+   CHECK(tokenizer.extractToken(tokens[2]) == "0xFABDECAAaaffbceda1010199747393");
+   }
+
 }

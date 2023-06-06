@@ -1,12 +1,10 @@
 #include "nodes.hpp"
 
-Constant::Constant(Token token): value{token} {}
-
 VariableDec::VariableDec(Token token): name{token} {}
 
 Statement::Statement() {}
 
-void Statement::operator=(Statement&& st) {
+void Statement::operator=(Statement&& st) noexcept {
   type = st.type;
   switch (st.type) {
     case StatementType::UNARY_OP:
@@ -26,7 +24,7 @@ void Statement::operator=(Statement&& st) {
   }
 }
 
-Statement::Statement(Statement&& st) {
+Statement::Statement(Statement&& st)  noexcept {
   operator=(std::move(st));
 }
 
@@ -74,7 +72,7 @@ ArrayAccess::ArrayAccess(Token token): array{token} {}
 
 BinOp::BinOp(TokenType op): op{op} {}
 
-BinOp::BinOp(BinOp&& binOp): op{binOp.op} {
+BinOp::BinOp(BinOp&& binOp) noexcept : op{binOp.op} {
   leftSide = std::move(binOp.leftSide);
   rightSide = std::move(binOp.rightSide);
 }
@@ -88,7 +86,7 @@ FunctionCall::FunctionCall(Token token): name{token} {}
 
 Declaration::Declaration(): decType{DecType::NONE} {}
 
-Declaration::Declaration(Declaration&& dec): decType{dec.decType} {
+Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
   new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
 }
 
@@ -103,4 +101,4 @@ Declaration::~Declaration() {
   }
 }
 
-Program::Program(Program&& prog): name{std::move(prog.name)}, decs{std::move(prog.decs)} {}
+Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std::move(prog.decs)} {}

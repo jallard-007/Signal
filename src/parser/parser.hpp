@@ -10,7 +10,7 @@ struct Parser {
   Program program;
   Tokenizer& tokenizer;
   Parser() = delete;
-  Parser(Tokenizer& tokenizer);
+  explicit Parser(Tokenizer& tokenizer);
   void parse();
   bool functionDec();
   Statement parseStatement(TokenType);

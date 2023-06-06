@@ -19,20 +19,12 @@ struct Type {
   Type() = default;
 };
 
-struct Constant {
-  Type type;
-  Token value;
-  
-  Constant() = delete;
-  Constant(Token);
-};
-
 struct VariableDec {
   Type type;
   Token name;
 
   VariableDec() = delete;
-  VariableDec(Token);
+  explicit VariableDec(Token);
 };
 
 typedef struct BinOp BinOp;
@@ -53,15 +45,15 @@ struct Statement {
 
   Statement();
   Statement(const Statement&) = delete;
-  Statement(Statement&&);
-  Statement(std::unique_ptr<UnOp>);
-  Statement(std::unique_ptr<BinOp>);
-  Statement(std::unique_ptr<VariableDec>);
-  Statement(std::unique_ptr<FunctionCall>);
-  Statement(std::unique_ptr<ArrayAccess>);
-  Statement(Token);
+  Statement(Statement&&) noexcept ;
+  explicit Statement(std::unique_ptr<UnOp>);
+  explicit Statement(std::unique_ptr<BinOp>);
+  explicit Statement(std::unique_ptr<VariableDec>);
+  explicit Statement(std::unique_ptr<FunctionCall>);
+  explicit Statement(std::unique_ptr<ArrayAccess>);
+  explicit Statement(Token);
   ~Statement();
-  void operator=(Statement&&);
+  void operator=(Statement&&) noexcept;
 };
 
 struct Arguments {
@@ -74,7 +66,7 @@ struct ArrayAccess {
   Token array;
 
   ArrayAccess() = delete;
-  ArrayAccess(Token);
+  explicit ArrayAccess(Token);
 };
 
 struct BinOp {
@@ -82,16 +74,16 @@ struct BinOp {
   std::unique_ptr<Statement> leftSide;
   std::unique_ptr<Statement> rightSide;
 
-  BinOp(TokenType);
+  explicit BinOp(TokenType);
   BinOp(const BinOp&) = delete;
-  BinOp(BinOp&&);
+  BinOp(BinOp&&) noexcept;
 };
 
 struct UnOp {
   TokenType op;
   std::unique_ptr<Statement> operand;
 
-  UnOp(TokenType);
+  explicit UnOp(TokenType);
   UnOp(const UnOp&) = delete;
 };
 
@@ -102,14 +94,14 @@ struct FunctionDec {
   Token name;
 
   FunctionDec() = delete;
-  FunctionDec(Token);
+  explicit FunctionDec(Token);
 };
 
 struct FunctionCall {
   Arguments args;
   Token name;
   FunctionCall() = delete;
-  FunctionCall(Token);
+  explicit FunctionCall(Token);
 };
 
 enum class DecType {
@@ -125,8 +117,8 @@ struct Declaration {
   };
 
   Declaration();
-  Declaration(Declaration&&);
-  Declaration(std::unique_ptr<FunctionDec>);
+  Declaration(Declaration&&) noexcept;
+  explicit Declaration(std::unique_ptr<FunctionDec>);
   ~Declaration();
 };
 
@@ -134,5 +126,5 @@ struct Program {
   std::string name;
   std::vector<Declaration> decs;
   Program() = default;
-  Program(Program&&);
+  Program(Program&&) noexcept;
 };

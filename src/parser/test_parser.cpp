@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 #include "parser.hpp"
-#include <iostream>
 
 TEST_CASE("getType", "[parser]") {
   const std::string str = " char customType ^^ , int ^^ )";

@@ -1,5 +1,4 @@
 #include "parser.hpp"
-#include <iostream>
 
 Parser::Parser(Tokenizer& tokenizer): tokenizer{tokenizer} {
   program.name = "ProgName";
@@ -46,8 +45,6 @@ void Parser::parse() {
     }
     token = tokenizer.tokenizeNext();
   }
-
-  return;
 }
 
 bool Parser::functionDec() {
@@ -97,7 +94,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
   while (token.type != TokenType::END_OF_FILE) {
     if (isBinaryOp(token.type)) {
       if (!stack.empty()) {
-        auto& prevStatement = stack.back();
+        auto prevStatement = std::move(stack.back());
         stack.pop_back();
         auto& statement = stack.emplace_back(std::make_unique<BinOp>(token.type));
         statement.binOp->leftSide = std::make_unique<Statement>(std::move(prevStatement));
@@ -108,7 +105,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
 
     else if (isUnaryOp(token.type)) {
       if ((token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) && !stack.empty()) {
-        auto& prevStatement = stack.back();
+        auto prevStatement = std::move(stack.back());
         stack.pop_back();
         auto& statement = stack.emplace_back(std::make_unique<UnOp>(token.type));
         statement.unOp->operand = std::make_unique<Statement>(std::move(prevStatement));

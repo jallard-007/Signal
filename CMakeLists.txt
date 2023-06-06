@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 find_package(Catch2 3 REQUIRED)
-project(main, CXX)
+project(main CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(tokenizer STATIC ./src/tokenizer/tokenizer.cpp ./src/token.cpp)
