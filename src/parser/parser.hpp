@@ -9,15 +9,15 @@ bool isTypeDelimiter(TokenType);
 
 struct Parser {
   Program program;
-  std::vector<Token> unexpectedToken;
-  std::vector<Token> expectedToken;
+  std::vector<Token> unexpectedTokens;
+  std::vector<Expected> expectedStatement;
   Tokenizer& tokenizer;
   Parser() = delete;
   explicit Parser(Tokenizer& tokenizer);
   void parse();
   bool functionDec();
   Statement parseStatement(TokenType);
-  bool getStatements(std::vector<Statement>&, TokenType);
+  bool getStatements(std::vector<Statement>&, TokenType, TokenType);
   Token getType(Type&);
 };
 

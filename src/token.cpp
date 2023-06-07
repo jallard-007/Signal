@@ -20,6 +20,6 @@ bool isUnaryOp(TokenType type) {
   return type >= TokenType::DOT && type <= TokenType::NEGATIVE;
 }
 
-bool isAssignment(TokenType type) {
-  return type >= TokenType::ASSIGNMENT && type <= TokenType::SHIFT_RIGHT_ASSIGNMENT;
+bool Token::operator==(const Token& tk) const {
+  return position == tk.position && length == tk.length && type == tk.type;
 }

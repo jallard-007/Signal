@@ -116,7 +116,6 @@ bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
-bool isAssignment(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {
@@ -307,4 +306,5 @@ struct Token {
   Token() = delete;
   Token(const Token& tok) = default;
   Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
+  bool operator==(const Token&) const;
 };

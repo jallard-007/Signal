@@ -35,7 +35,7 @@ TEST_CASE("getParams", "[parser]") {
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
   std::vector<Statement> vars;
-  REQUIRE(parser.getStatements(vars, TokenType::CLOSE_PAREN) == true);
+  REQUIRE(parser.getStatements(vars, TokenType::COMMA, TokenType::CLOSE_PAREN) == true);
   REQUIRE(vars.size() == 3);
 
   REQUIRE(vars[0].type == StatementType::VARIABLE_DEC);
@@ -157,6 +157,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
 }
 
 TEST_CASE("Binary Operators", "[parser]") {
+  // basic bin op
   {
     const std::string str = " 4 + 4 ;";
     Tokenizer tokenizer{str};
@@ -178,13 +179,13 @@ TEST_CASE("Binary Operators", "[parser]") {
     CHECK(tokenizer.extractToken(binOp->rightSide->var) == "4");
   }
 
+  // operator with higher precedence on right node
   {
     const std::string str = " x - function(var) * 9;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
     Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
-    CHECK(parser.unexpectedToken.empty());
-    CHECK(parser.expectedToken.empty());
+    CHECK(parser.expectedStatement.empty());
 
     REQUIRE(statement.type == StatementType::BINARY_OP);
     auto &binOp = statement.binOp;
@@ -214,5 +215,83 @@ TEST_CASE("Binary Operators", "[parser]") {
     CHECK(rr->type == StatementType::VALUE);
     CHECK(rr->var.type == TokenType::DECIMAL_NUMBER);
 
+  }
+
+  // operator with higher precedence on left node
+  {
+    const std::string str = " x * function(var) - 9;";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    CHECK(parser.expectedStatement.empty());
+
+    REQUIRE(statement.type == StatementType::BINARY_OP);
+    auto &binOp = statement.binOp;
+    REQUIRE(binOp);
+    CHECK(binOp->op == TokenType::SUBTRACTION);
+
+    REQUIRE(binOp->rightSide);
+    REQUIRE(binOp->rightSide->type == StatementType::VALUE);
+    CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
+
+    REQUIRE(binOp->leftSide);
+    REQUIRE(binOp->leftSide->type == StatementType::BINARY_OP);
+    CHECK(binOp->leftSide->binOp->op == TokenType::MULTIPLICATION);
+
+    auto& ll = binOp->leftSide->binOp->leftSide;
+    REQUIRE(ll);
+    REQUIRE(ll->type == StatementType::VALUE);
+    CHECK(ll->var.type == TokenType::IDENTIFIER);
+
+    auto& lr = binOp->leftSide->binOp->rightSide;
+    REQUIRE(lr->type == StatementType::FUNCTION_CALL);
+    REQUIRE(lr->funcCall);
+    CHECK(tokenizer.extractToken(lr->funcCall->name) == "function");
+    REQUIRE(lr->funcCall->args.list.size() == 1);
+    CHECK(lr->funcCall->args.list[0].type == StatementType::VALUE);
+    CHECK(lr->funcCall->args.list[0].var.type == TokenType::IDENTIFIER);
+  }
+}
+
+TEST_CASE("Expected tokens", "[parser]") {
+  {
+    const std::string str = " x var - 9;";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    REQUIRE(parser.expectedStatement.size() == 1);
+    CHECK(parser.expectedStatement[0].position == 3);
+    CHECK(parser.expectedStatement[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::END_OF_STATEMENT);
+  }
+
+  {
+    const std::string str = " var - 9 thing() ; ";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    REQUIRE(parser.expectedStatement.size() == 1);
+    CHECK(parser.expectedStatement[0].position == 9);
+    CHECK(parser.expectedStatement[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::END_OF_STATEMENT);
+  }
+
+  {
+    const std::string str = " var - ; ";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    REQUIRE(parser.expectedStatement.size() == 1);
+    CHECK(parser.expectedStatement[0].position == 7);
+    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  {
+    // this generates the correct tree
+    const std::string str = " var: int = thing; var += 3; var_p:char^ = callFunction(var);}";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer};
+    std::vector<Statement> s;
+    parser.getStatements(s, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   }
 }
