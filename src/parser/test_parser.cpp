@@ -179,7 +179,7 @@ TEST_CASE("Binary Operators", "[parser]") {
   }
 
   {
-    const std::string str = " x - func(var) * 9;";
+    const std::string str = " x - function(var) * 9;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
     Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
@@ -204,7 +204,7 @@ TEST_CASE("Binary Operators", "[parser]") {
     REQUIRE(rl);
     REQUIRE(rl->type == StatementType::FUNCTION_CALL);
     REQUIRE(rl->funcCall);
-    REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "func");
+    REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "function");
     REQUIRE(rl->funcCall->args.list.size() == 1);
     REQUIRE(rl->funcCall->args.list[0].type == StatementType::VALUE);
     REQUIRE(rl->funcCall->args.list[0].var.type == TokenType::IDENTIFIER);

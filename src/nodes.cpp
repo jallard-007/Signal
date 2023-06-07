@@ -31,7 +31,7 @@ void Statement::operator=(Statement&& st) noexcept {
   st.type = StatementType::NONE;
 }
 
-Statement::Statement(Statement&& st)  noexcept {
+Statement::Statement(Statement&& st) noexcept {
   operator=(std::move(st));
 }
 
@@ -72,6 +72,17 @@ Statement::~Statement() {
     case StatementType::FUNCTION_CALL: funcCall.~unique_ptr<FunctionCall>(); break;
     case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
     default: break;
+  }
+}
+
+std::unique_ptr<Statement>* Statement::getChild() {
+  switch (type) {
+    case StatementType::UNARY_OP:
+      return &unOp->operand;
+    case StatementType::BINARY_OP:
+      return &binOp->rightSide;
+    default:
+      return nullptr;
   }
 }
 

@@ -158,12 +158,17 @@ Statement Parser::parseStatement(const TokenType delimiter) {
                 *list.front() = std::move(statement);
                 list.erase(++list.begin(), list.end());
               }
+              prev = nullptr;
               break;
             }
             prev = *list_iter;
             ++list_iter;
           }
-          if (list_iter == list.end() && !prev) {
+          if (list_iter == list.end() && prev) {
+            std::unique_ptr<Statement>* childOfPrev = prev->getChild();
+            if (childOfPrev) {
+              statement.binOp->leftSide = std::move(*childOfPrev);
+            }
             Statement* addedStatement = prev->addStatementToNode(std::move(statement));
             list.emplace_back(addedStatement);
           }

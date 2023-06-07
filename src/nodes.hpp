@@ -60,6 +60,7 @@ struct Statement {
   ~Statement();
   void operator=(Statement&&) noexcept;
   Statement* addStatementToNode(Statement&&);
+  std::unique_ptr<Statement>* getChild();
 };
 
 struct Arguments {
