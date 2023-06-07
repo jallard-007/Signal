@@ -3,6 +3,7 @@
 main
 test
 out
+build
 Makefile
 cmake*
 CMake*

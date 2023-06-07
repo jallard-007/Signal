@@ -43,8 +43,10 @@ Token Tokenizer::peekNext() {
 }
 
 void Tokenizer::consumePeek() {
-  peeked.type = TokenType::NOTHING;
-  position = peeked.position + peeked.length;
+  if (peeked.type != TokenType::NOTHING) { 
+    peeked.type = TokenType::NOTHING;
+    position = peeked.position + peeked.length;
+  }
 }
 
 Token Tokenizer::tokenizeNext() {

@@ -1,5 +1,6 @@
 #include "parser.hpp"
 #include <list>
+#include <memory>
 
 Parser::Parser(Tokenizer& tokenizer): tokenizer{tokenizer} {
   program.name = "ProgName";
@@ -124,7 +125,6 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       else {
         const StatementType sType = list.front()->type;
         if (hasData(sType)) {
-            assert(list.size() == 1);
             // first "value" token in statement, take it
             // we also include unary op in here even though it is not valid
             statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));

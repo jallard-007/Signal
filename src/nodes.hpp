@@ -2,6 +2,7 @@
 
 #include "token.hpp"
 #include <vector>
+#include <memory>
 
 enum class StatementType {
   NONE,
