@@ -124,11 +124,49 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       
       else {
         const StatementType sType = list.front()->type;
-        if (hasData(sType)) {
-            // first "value" token in statement, take it
-            // we also include unary op in here even though it is not valid
-            statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));
-            *list.front() = std::move(statement);
+        if (sType == StatementType::BAD || sType == StatementType::NONE) {
+          // idk man
+        }
+        else if (hasData(sType)) {
+          // first "value" token in statement, take it
+          // we also include unary op in here even though it is not valid
+          statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));
+          *list.front() = std::move(statement);
+        } 
+        
+        else {
+          Statement* prev = nullptr;
+          auto list_iter = list.begin();
+          while (list_iter != list.end()) {
+            TokenType op;
+            if ((*list_iter)->type == StatementType::BINARY_OP) {
+              op = (*list_iter)->binOp->op;
+            } else if ((*list_iter)->type == StatementType::UNARY_OP) {
+              op = (*list_iter)->unOp->op;
+            } else {
+              // unexpected
+              break;
+            }
+            if (operatorPrecedence.at(token.type) <= operatorPrecedence.at(op)) {
+              // place it above
+              statement.binOp->leftSide = std::make_unique<Statement>(std::move(*(*list_iter)));
+              if (prev) {
+                Statement* addedStatement = prev->addStatementToNode(std::move(statement));
+                list.erase(list_iter, list.end());
+                list.emplace_back(addedStatement);
+              } else {
+                *list.front() = std::move(statement);
+                list.erase(++list.begin(), list.end());
+              }
+              break;
+            }
+            prev = *list_iter;
+            ++list_iter;
+          }
+          if (list_iter == list.end() && !prev) {
+            Statement* addedStatement = prev->addStatementToNode(std::move(statement));
+            list.emplace_back(addedStatement);
+          }
         }
       }
     }
@@ -195,7 +233,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       if (list.empty()) {
         list.emplace_back(new Statement{std::move(statement)});
       } else {
-        if (!list.back()->addLiteralToNode(std::move(statement))) {
+        if (!list.back()->addStatementToNode(std::move(statement))) {
           // could not add the node; node does not accept Literal
           // place token in unexpectedTokens since it cannot fit in the tree
           unexpectedToken.emplace_back(token);
@@ -207,7 +245,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       if (list.empty()) {
         list.emplace_back(new Statement{token});
       } else {
-        if (!list.back()->addLiteralToNode(Statement{token})) {
+        if (!list.back()->addStatementToNode(Statement{token})) {
           // could not add the node; node does not accept Literal
           // place token in unexpectedTokens since it cannot fit in the tree
           unexpectedToken.emplace_back(token);

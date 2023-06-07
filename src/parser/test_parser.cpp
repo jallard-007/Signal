@@ -183,6 +183,9 @@ TEST_CASE("Binary Operators", "[parser]") {
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
     Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    CHECK(parser.unexpectedToken.empty());
+    CHECK(parser.expectedToken.empty());
+
     REQUIRE(statement.type == StatementType::BINARY_OP);
     auto &binOp = statement.binOp;
     REQUIRE(binOp);

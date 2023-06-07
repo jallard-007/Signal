@@ -75,11 +75,22 @@ Statement::~Statement() {
   }
 }
 
-bool Statement::addLiteralToNode(Statement&& st) {
+Statement* Statement::addStatementToNode(Statement&& st) {
   switch (type) {
-    case StatementType::UNARY_OP: unOp->operand = std::make_unique<Statement>(std::move(st)); return true;
-    case StatementType::BINARY_OP: binOp->rightSide = std::make_unique<Statement>(std::move(st)); return true;
-    default: return false;
+    case StatementType::UNARY_OP:
+      if (unOp->operand) {
+        return nullptr;
+      }
+      unOp->operand = std::make_unique<Statement>(std::move(st));
+      return unOp->operand.get();
+    case StatementType::BINARY_OP:
+      if (binOp->rightSide) {
+        return nullptr;
+      }
+      binOp->rightSide = std::make_unique<Statement>(std::move(st));
+      return binOp->rightSide.get();
+    default:
+      return nullptr;
   }
 }
 

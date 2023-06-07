@@ -59,7 +59,7 @@ struct Statement {
   explicit Statement(Token);
   ~Statement();
   void operator=(Statement&&) noexcept;
-  bool addLiteralToNode(Statement&&);
+  Statement* addStatementToNode(Statement&&);
 };
 
 struct Arguments {
