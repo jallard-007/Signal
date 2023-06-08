@@ -86,12 +86,6 @@ struct Statement {
   ExpectedType isValid() const;
 };
 
-struct Arguments {
-  std::vector<Statement> list;
-  Arguments() = default;
-  bool operator==(const Arguments&) const;
-};
-
 struct ArrayAccess {
   Statement offset;
   Token array;
@@ -123,7 +117,7 @@ struct UnOp {
 
 struct FunctionDec {
   std::vector<Statement> params;
-  std::vector<Statement> body;
+  std::vector<Statement> bodyStatements;
   Type returnType;
   Token name;
 
@@ -132,7 +126,7 @@ struct FunctionDec {
 };
 
 struct FunctionCall {
-  Arguments args;
+  std::vector<Statement> args;
   Token name;
   FunctionCall() = delete;
   explicit FunctionCall(Token);

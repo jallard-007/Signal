@@ -95,7 +95,7 @@ TEST_CASE("Function Call - Base", "[parser]") {
   REQUIRE(statement.funcCall);
 
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
-  auto& argsList = statement.funcCall->args.list;
+  auto& argsList = statement.funcCall->args;
   REQUIRE(argsList.empty());
 }
 
@@ -108,7 +108,7 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
   REQUIRE(statement.funcCall);
 
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
-  auto& argsList = statement.funcCall->args.list;
+  auto& argsList = statement.funcCall->args;
   REQUIRE(argsList.size() == 1);
   auto& arg1 = argsList[0];
   REQUIRE(arg1.type == StatementType::VALUE);
@@ -123,7 +123,7 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
-  auto& argsList = statement.funcCall->args.list;
+  auto& argsList = statement.funcCall->args;
   REQUIRE(argsList.size() == 2);
   auto& arg1 = argsList[0];
   REQUIRE(arg1.type == StatementType::VALUE);
@@ -142,7 +142,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
-  auto& argsList = statement.funcCall->args.list;
+  auto& argsList = statement.funcCall->args;
 
   REQUIRE(argsList.size() == 1);
   auto& arg1 = argsList[0];
@@ -153,7 +153,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   auto& arg1_arg1 = arg1.arrAccess->offset.funcCall;
   REQUIRE(arg1_arg1);
   CHECK(tokenizer.extractToken(arg1_arg1->name) == "nested");
-  CHECK(arg1_arg1->args.list.empty());
+  CHECK(arg1_arg1->args.empty());
 }
 
 TEST_CASE("Binary Operators", "[parser]") {
@@ -206,9 +206,9 @@ TEST_CASE("Binary Operators", "[parser]") {
     REQUIRE(rl->type == StatementType::FUNCTION_CALL);
     REQUIRE(rl->funcCall);
     REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "function");
-    REQUIRE(rl->funcCall->args.list.size() == 1);
-    REQUIRE(rl->funcCall->args.list[0].type == StatementType::VALUE);
-    REQUIRE(rl->funcCall->args.list[0].var.type == TokenType::IDENTIFIER);
+    REQUIRE(rl->funcCall->args.size() == 1);
+    REQUIRE(rl->funcCall->args[0].type == StatementType::VALUE);
+    REQUIRE(rl->funcCall->args[0].var.type == TokenType::IDENTIFIER);
 
     auto& rr = binOp->rightSide->binOp->rightSide;
     REQUIRE(rr);
@@ -247,9 +247,9 @@ TEST_CASE("Binary Operators", "[parser]") {
     REQUIRE(lr->type == StatementType::FUNCTION_CALL);
     REQUIRE(lr->funcCall);
     CHECK(tokenizer.extractToken(lr->funcCall->name) == "function");
-    REQUIRE(lr->funcCall->args.list.size() == 1);
-    CHECK(lr->funcCall->args.list[0].type == StatementType::VALUE);
-    CHECK(lr->funcCall->args.list[0].var.type == TokenType::IDENTIFIER);
+    REQUIRE(lr->funcCall->args.size() == 1);
+    CHECK(lr->funcCall->args[0].type == StatementType::VALUE);
+    CHECK(lr->funcCall->args[0].var.type == TokenType::IDENTIFIER);
   }
 }
 

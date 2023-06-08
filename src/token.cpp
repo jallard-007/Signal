@@ -13,11 +13,11 @@ bool isBuiltInType(TokenType type) {
 }
 
 bool isBinaryOp(TokenType type) {
-  return type >= TokenType::ADDITION && type <= TokenType::TERNARY;
+  return type >= TokenType::DOT && type <= TokenType::TERNARY;
 }
 
 bool isUnaryOp(TokenType type) {
-  return type >= TokenType::DOT && type <= TokenType::NEGATIVE;
+  return type >= TokenType::NOT && type <= TokenType::NEGATIVE;
 }
 
 bool Token::operator==(const Token& tk) const {

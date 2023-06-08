@@ -204,10 +204,6 @@ ExpectedType Statement::isValid() const {
   return ExpectedType::NOTHING;
 }
 
-bool Arguments::operator==(const Arguments& args) const {
-  return args.list == list;
-}
-
 ArrayAccess::ArrayAccess(Token token): array{token} {}
 
 bool ArrayAccess::operator==(const ArrayAccess& arrAcc) const {

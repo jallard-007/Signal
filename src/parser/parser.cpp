@@ -91,6 +91,9 @@ bool Parser::functionDec() {
   }
   // consume open brace
   tokenizer.consumePeek();
+  if (!getStatements(func->bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
+
+  }
   return true;
 }
 
@@ -104,16 +107,25 @@ Statement Parser::parseStatement(const TokenType delimiter) {
     return {StatementType::NONE};
   }
 
-  // nodes at the end of the list have higher precedence
-  // the list has ownership of the first node, but the rest are linked to the first node
-  // need to free or move ownership of the first node before destruction
+  /**
+   * The first node in the list is the root node of the whole statement
+   *  - root node has ownership over the rest
+   * 
+   * Nodes should be placed in ascending precedence
+   *  - lowest precedence operator in the whole statement should be at the top
+   * 
+   * The list has no ownership over the root statement, hence the raw pointer type,
+   * so be sure to free the memory at the 0 index before returning the statement
+   * 
+   * When a node is placed in the list/tree, we clear nodes with higher precedence from the list
+   *  - they cannot be accessed anymore since they are to the left of the new node
+  */
   std::list<Statement*> list;
 
   tokenizer.consumePeek();
   Token lookAhead = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
 
-    // TODO : take into account parentheses in the statement
     if (isBinaryOp(token.type) || isUnaryOp(token.type)) {
       Statement statement;
       if (isBinaryOp(token.type)) {
@@ -132,7 +144,6 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       else {
         const StatementType sType = list.front()->type;
         if (sType == StatementType::BAD || sType == StatementType::NONE) {
-          // idk man
           // never will be a node of this type in the list
           exit(1);
         }
@@ -144,7 +155,8 @@ Statement Parser::parseStatement(const TokenType delimiter) {
           } else {
             statement.unOp->operand = std::make_unique<Statement>(std::move(*list.front()));
           }
-          *list.front() = std::move(statement);
+          // move the statement to the tree root
+          new (list.front()) Statement{std::move(statement)};
         } 
         
         else {
@@ -190,13 +202,14 @@ Statement Parser::parseStatement(const TokenType delimiter) {
                 list.erase(list_iter, list.end());
                 list.emplace_back(addedStatement);
               } else {
-                // front node
+                // root node
                 if (statement.type == StatementType::BINARY_OP) {
                   statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));
                 } else {
                   statement.unOp->operand = std::make_unique<Statement>(std::move(*list.front()));
                 }
-                *list.front() = std::move(statement);
+                // move the statement to the root
+                new (list.front()) Statement{std::move(statement)};
                 list.erase(++list.begin(), list.end());
               }
               prev = nullptr;
@@ -232,12 +245,13 @@ Statement Parser::parseStatement(const TokenType delimiter) {
 
     else if (token.type == TokenType::IDENTIFIER) {
       Statement statement;
-      // function call
+
+      // function call: identifier (
       if (lookAhead.type == TokenType::OPEN_PAREN) {
         statement.funcCall = std::make_unique<FunctionCall>(token);
         statement.type = StatementType::FUNCTION_CALL;
         tokenizer.tokenizeNext();
-        if (!getStatements(statement.funcCall->args.list, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
+        if (!getStatements(statement.funcCall->args, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
           break;
         }
         lookAhead = tokenizer.peekNext();
@@ -250,7 +264,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         }
       }
 
-      // pointer access with offset, array[x]
+      // pointer access with offset: identifier [
       else if (lookAhead.type == TokenType::OPEN_BRACKET) {
         statement.arrAccess = std::make_unique<ArrayAccess>(token);
         statement.type = StatementType::ARRAY_ACCESS;
@@ -265,7 +279,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         }
       }
 
-      // variable declaration
+      // variable declaration: identifier :
       else if (lookAhead.type == TokenType::COLON) {
         statement.varDec = std::make_unique<VariableDec>(token);
         statement.type = StatementType::VARIABLE_DEC;
@@ -278,11 +292,13 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         }
       }
 
+      // we are using the identifier's actual value
       else {
         statement.type = StatementType::VALUE;
         statement.var = token;
       }
 
+      // DUP CODE: adding leaf node to the tree by move
       if (list.empty()) {
         list.emplace_back(new Statement{std::move(statement)});
       } else {
@@ -293,9 +309,11 @@ Statement Parser::parseStatement(const TokenType delimiter) {
           new (list.front()) Statement{std::move(statement)};
         }
       }
+      // END DUP CODE
     }
 
     else if (isLiteral(token.type)) {
+      // DUP CODE: adding leaf node to the tree in place
       if (list.empty()) {
         list.emplace_back(new Statement{token});
       } else {
@@ -306,17 +324,48 @@ Statement Parser::parseStatement(const TokenType delimiter) {
           new (list.front()) Statement{token};
         }
       }
-    }
-    
-    else if (isKeyword(token.type)) {
-
+      // END DUP CODE
     }
 
     else if (token.type == TokenType::OPEN_PAREN) {
-      // wrapped value
-      Statement statement;
+      Statement statement{std::make_unique<Statement>(parseStatement(TokenType::CLOSE_PAREN))};
+      // DUP CODE: adding leaf node to the tree by move
+      if (list.empty()) {
+        list.emplace_back(new Statement{std::move(statement)});
+      } else {
+        if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
+          // restart the statement parse, discard everything previously
+          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, token.position, delimiter);
+          list.front()->~Statement();
+          new (list.front()) Statement{std::move(statement)};
+        }
+      }
+      // END DUP CODE
     }
 
+    else if (isKeyword(token.type)) {
+      // handling all keywords in separate functions would prevent this mess of a function from getting worse
+    }
+
+    // skip comments
+    else if (token.type == TokenType::COMMENT) {
+    }
+
+    // scope
+    else if (token.type ==TokenType::OPEN_BRACE) {
+
+    }
+
+    // array literals? type?
+    else if (token.type == TokenType::OPEN_BRACKET) {
+
+    }
+  
+    else {
+      // unexpected, i guess...
+      unexpectedTokens.emplace_back(token);
+    }
+    
     if (lookAhead.type == delimiter || isStatementDelimiter(lookAhead.type)){
       break;
     }
