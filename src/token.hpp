@@ -308,7 +308,6 @@ struct Token {
   uint16_t length;
   TokenType type;
   Token() = delete;
-  Token(const Token& tok) = default;
   Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
   bool operator==(const Token&) const;
 };

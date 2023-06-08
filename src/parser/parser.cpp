@@ -26,20 +26,18 @@ void Parser::parse() {
         // template declaration
         break;
       }
-        
 
       case TokenType::CREATE: {
         // template creation
         break;
       }
-       
 
       case TokenType::IDENTIFIER: {
         // global variable declaration
+        
         break;
       }
         
-      
       default:
         // error, unexpected token
         break;
@@ -53,6 +51,7 @@ bool Parser::functionDec() {
   const Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
     return false;
   }
   // add function declaration node
@@ -69,41 +68,40 @@ bool Parser::functionDec() {
   }
   if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
     // expected close paren
-    expectedStatement.emplace_back(ExpectedType::SYMBOL, tokenizer.peeked.position, TokenType::COLON);
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::COLON);
     return false;
   }
   // consume close paren
   tokenizer.consumePeek();
   if (tokenizer.peekNext().type != TokenType::COLON) {
     // expected a colon
-    expectedStatement.emplace_back(ExpectedType::SYMBOL, tokenizer.peeked.position, TokenType::COLON);
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::COLON);
   } else {
     // consume colon
     tokenizer.consumePeek();
   }
   // get return type
-  {
-    Token t = getType(func->returnType);
-    if (t.type != TokenType::OPEN_BRACE) {
-      // expected open brace after type
-      expectedStatement.emplace_back(ExpectedType::SYMBOL, tokenizer.peeked.position, TokenType::OPEN_BRACE);
-    }
+  if (getType(func->returnType).type != TokenType::OPEN_BRACE) {
+    // expected open brace after type
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::OPEN_BRACE);
   }
   // consume open brace
   tokenizer.consumePeek();
-  if (!getStatements(func->bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
-
-  }
-  return true;
+  return getStatements(func->bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+  // leave next token to be consumed by caller
 }
 
 /**
  * Extracts tokens until it reaches the specified delimiter, forming a Statement.
+ * Two delimiters can be specified to accommodate enclosed lists, leave one as NOTHING if only one is needed
  * Does NOT consume the delimiter, you must do this after 
 */
-Statement Parser::parseStatement(const TokenType delimiter) {
+Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiterB) {
+  if (delimiterA == TokenType::NOTHING) {
+    delimiterA = delimiterB;
+  }
   Token token = tokenizer.peekNext();
-  if (token.type == delimiter || isStatementDelimiter(token.type)) {
+  if (token.type == delimiterA || token.type == delimiterB) {
     return {StatementType::NONE};
   }
 
@@ -121,7 +119,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
    *  - they cannot be accessed anymore since they are to the left of the new node
   */
   std::list<Statement*> list;
-
+  uint32_t lineNum = tokenizer.lineNum, lineStart = tokenizer.lineStart;
   tokenizer.consumePeek();
   Token lookAhead = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
@@ -137,7 +135,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       }
       if (list.empty()) {
         // expected expression before binary operator
-        expectedStatement.emplace_back(ExpectedType::EXPRESSION, token.position);
+        expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
         list.emplace_back(new Statement{std::move(statement)});
       }
       
@@ -183,7 +181,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
                 if (!childOfPrev) {
                   if (statement.type == StatementType::BINARY_OP) {
                     // expected token between operators
-                    expectedStatement.emplace_back(ExpectedType::EXPRESSION, token.position);
+                    expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
                   }
                 } else {
                   if (statement.type == StatementType::BINARY_OP) {
@@ -225,7 +223,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
             if (!childOfPrev) {
               if (statement.type == StatementType::BINARY_OP) {
                 // expected expression between operators
-                expectedStatement.emplace_back(ExpectedType::EXPRESSION, token.position);
+                expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
               }
             } else {
               if (statement.type == StatementType::BINARY_OP) {
@@ -254,14 +252,9 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         if (!getStatements(statement.funcCall->args, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
           break;
         }
+        // consume close paren
+        tokenizer.consumePeek();
         lookAhead = tokenizer.peekNext();
-        if (lookAhead.type != TokenType::CLOSE_PAREN) {
-          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, lookAhead.position);
-        } else {
-          // consume the CLOSE::PAREN
-          tokenizer.consumePeek();
-          lookAhead = tokenizer.peekNext();
-        }
       }
 
       // pointer access with offset: identifier [
@@ -269,14 +262,12 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         statement.arrAccess = std::make_unique<ArrayAccess>(token);
         statement.type = StatementType::ARRAY_ACCESS;
         tokenizer.tokenizeNext();
-        statement.arrAccess->offset = parseStatement(TokenType::CLOSE_BRACKET);
+        statement.arrAccess->offset = parseStatement(TokenType::NOTHING, TokenType::CLOSE_BRACKET);
         lookAhead = tokenizer.peekNext();
-        if (lookAhead.type != TokenType::CLOSE_BRACKET) {
-
-        } else {
+        if (lookAhead.type == TokenType::CLOSE_BRACKET) {
           tokenizer.consumePeek();
-          lookAhead = tokenizer.peekNext();
         }
+        lookAhead = tokenizer.peekNext();
       }
 
       // variable declaration: identifier :
@@ -288,7 +279,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
         lookAhead = getType(statement.varDec->type);
         if (lookAhead.type == TokenType::END_OF_FILE) {
           // never reached a type delimiter
-          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, lookAhead.position, delimiter);
+          expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position - tokenizer.lineStart, delimiterA);
         }
       }
 
@@ -304,7 +295,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, token.position, delimiter);
+          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
           list.front()->~Statement();
           new (list.front()) Statement{std::move(statement)};
         }
@@ -319,7 +310,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(Statement{token})) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, token.position, delimiter);
+          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
           list.front()->~Statement();
           new (list.front()) Statement{token};
         }
@@ -328,19 +319,35 @@ Statement Parser::parseStatement(const TokenType delimiter) {
     }
 
     else if (token.type == TokenType::OPEN_PAREN) {
-      Statement statement{std::make_unique<Statement>(parseStatement(TokenType::CLOSE_PAREN))};
+      Statement inner = parseStatement(TokenType::NOTHING, TokenType::CLOSE_PAREN);
+      lookAhead = tokenizer.peekNext();
+      Statement statement;
+      if (inner.type != StatementType::NONE) {
+        statement.wrapped = std::make_unique<Statement>(std::move(inner));
+        statement.type = StatementType::WRAPPED_VALUE;
+      } else {
+        expectedStatement.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+      }
       // DUP CODE: adding leaf node to the tree by move
       if (list.empty()) {
         list.emplace_back(new Statement{std::move(statement)});
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::END_OF_STATEMENT, token.position, delimiter);
+          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
           list.front()->~Statement();
           new (list.front()) Statement{std::move(statement)};
         }
       }
       // END DUP CODE
+      if (lookAhead.type != TokenType::CLOSE_PAREN) {
+        // expected close paren
+        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+      } else {
+        // consume the close paren
+        tokenizer.consumePeek();
+        lookAhead = tokenizer.peekNext();
+      }
     }
 
     else if (isKeyword(token.type)) {
@@ -352,25 +359,57 @@ Statement Parser::parseStatement(const TokenType delimiter) {
     }
 
     // scope
-    else if (token.type ==TokenType::OPEN_BRACE) {
-
+    else if (token.type == TokenType::OPEN_BRACE) {
+      if (delimiterB != TokenType::CLOSE_BRACE) {
+        // naughty naughty naughty
+        expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterB);
+      }
+      Statement statement{std::make_unique<Scope>()};
+      getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+      lookAhead = tokenizer.peekNext();
+      // DUP CODE: adding leaf node to the tree by move
+      if (list.empty()) {
+        list.emplace_back(new Statement{std::move(statement)});
+      } else {
+        if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
+          // restart the statement parse, discard everything previously
+          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterA);
+          list.front()->~Statement();
+          new (list.front()) Statement{std::move(statement)};
+        }
+      }
+      // END DUP CODE
+      if (lookAhead.type != TokenType::CLOSE_BRACE) {
+        // expected close brace
+        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
+      } else {
+        // consume the close brace
+        tokenizer.consumePeek();
+        lookAhead = tokenizer.peekNext();
+      }
     }
 
-    // array literals? type?
+    // array literals
     else if (token.type == TokenType::OPEN_BRACKET) {
+    }
 
+    else if (token.type == TokenType::SEMICOLON && delimiterA != TokenType::SEMICOLON && delimiterB != TokenType::SEMICOLON) {
+      expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterB);
+      break;
     }
   
     else {
       // unexpected, i guess...
-      unexpectedTokens.emplace_back(token);
+      unexpectedTokens.emplace_back(token, lineNum, token.position - lineStart);
     }
     
-    if (lookAhead.type == delimiter || isStatementDelimiter(lookAhead.type)){
+    if (lookAhead.type == delimiterA || lookAhead.type == delimiterB) {
       break;
     }
     
     token = tokenizer.tokenizeNext();
+    lineNum = tokenizer.lineNum;
+    lineStart  =tokenizer.lineStart;
     lookAhead = tokenizer.peekNext();
   }
 
@@ -380,7 +419,7 @@ Statement Parser::parseStatement(const TokenType delimiter) {
 
   // validate statement, list.back() should be filled
   if (list.back()->isValid() == ExpectedType::EXPRESSION) {
-    expectedStatement.emplace_back(ExpectedType::EXPRESSION, lookAhead.position);
+    expectedStatement.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
   }
   Statement* front = list.front();
   Statement r_statement{std::move(*front)};
@@ -390,24 +429,20 @@ Statement Parser::parseStatement(const TokenType delimiter) {
 
 /**
  * Extracts delimiterMinor delimited statements until it reaches the delimiterMajor delimiter
- * hard delimiters include TokenType::CLOSE_PAREN, TokenType::CLOSE_BRACKET, and TokenType::CLOSE_BRACE
  * Does NOT consume the final delimiter
- * Returns true on a successful parse (when it reaches the delimiterMajor), false otherwise
+ * Returns true on a successful parse (when it reaches the delimiterMajor), false otherwise (EOF)
 */
 bool Parser::getStatements(std::vector<Statement>& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
   Token token = tokenizer.peekNext();
 
   while (token.type != TokenType::END_OF_FILE) {
-    Statement s = parseStatement(delimiterMinor);
+    Statement s = parseStatement(delimiterMinor, delimiterMajor);
     if (s.type != StatementType::NONE) {
       statements.emplace_back(std::move(s));
     }
     token = tokenizer.peekNext();
     if (token.type == delimiterMajor) {
       return true;
-    } else if (isStatementDelimiter(token.type)) {
-      // if blockType and close brace, skip this, dont need delimiter on blockType statements
-      unexpectedTokens.emplace_back(token);
     }
     tokenizer.consumePeek();
   }

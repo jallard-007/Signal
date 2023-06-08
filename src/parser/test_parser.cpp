@@ -61,7 +61,7 @@ TEST_CASE("getParams", "[parser]") {
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
-  const std::string str = "funcName(first: int^): int {";
+  const std::string str = "funcName(first: int^): int {}";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
   REQUIRE(parser.functionDec());
@@ -90,7 +90,7 @@ TEST_CASE("Function Call - Base", "[parser]") {
   const std::string str = "functionName();";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
 
@@ -103,7 +103,7 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
   const std::string str = "functionName(arg1);";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
 
@@ -119,7 +119,7 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   const std::string str = "functionName(arg1, arg2);";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
@@ -137,7 +137,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   const std::string str = "functionName(arg1[nested()]);";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  Statement statement = parser.parseStatement(TokenType::SEMICOLON);
+  Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
 
   REQUIRE(statement.type == StatementType::FUNCTION_CALL);
   REQUIRE(statement.funcCall);
@@ -162,7 +162,7 @@ TEST_CASE("Binary Operators", "[parser]") {
     const std::string str = " 4 + 4 ;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     REQUIRE(statement.type == StatementType::BINARY_OP);
     auto &binOp = statement.binOp;
     REQUIRE(binOp);
@@ -184,7 +184,7 @@ TEST_CASE("Binary Operators", "[parser]") {
     const std::string str = " x - function(var) * 9;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     CHECK(parser.expectedStatement.empty());
 
     REQUIRE(statement.type == StatementType::BINARY_OP);
@@ -222,7 +222,7 @@ TEST_CASE("Binary Operators", "[parser]") {
     const std::string str = " x * function(var) - 9;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     CHECK(parser.expectedStatement.empty());
 
     REQUIRE(statement.type == StatementType::BINARY_OP);
@@ -258,40 +258,52 @@ TEST_CASE("Expected tokens", "[parser]") {
     const std::string str = " x var - 9;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     REQUIRE(parser.expectedStatement.size() == 1);
-    CHECK(parser.expectedStatement[0].position == 3);
+    CHECK(parser.expectedStatement[0].line == 1);
+    CHECK(parser.expectedStatement[0].column == 4);
     CHECK(parser.expectedStatement[0].tokenType == TokenType::SEMICOLON);
-    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::END_OF_STATEMENT);
+    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::TOKEN);
   }
 
   {
     const std::string str = " var - 9 thing() ; ";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     REQUIRE(parser.expectedStatement.size() == 1);
-    CHECK(parser.expectedStatement[0].position == 9);
+    CHECK(parser.expectedStatement[0].column == 10);
     CHECK(parser.expectedStatement[0].tokenType == TokenType::SEMICOLON);
-    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::END_OF_STATEMENT);
+    CHECK(parser.expectedStatement[0].expectedType == ExpectedType::TOKEN);
   }
 
   {
     const std::string str = " var - ; ";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON)};
+    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     REQUIRE(parser.expectedStatement.size() == 1);
-    CHECK(parser.expectedStatement[0].position == 7);
+    CHECK(parser.expectedStatement[0].column == 8);
     CHECK(parser.expectedStatement[0].expectedType == ExpectedType::EXPRESSION);
   }
 
   {
-    // this generates the correct tree
-    const std::string str = " var: int = thing; var += 3; var_p:char^ = callFunction(var);}";
+    const std::string str = "\n\n x + () \n4 ;";
     Tokenizer tokenizer{str};
     Parser parser{tokenizer};
-    std::vector<Statement> s;
-    parser.getStatements(s, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    
+    Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    auto& ex = parser.expectedStatement;
+    REQUIRE(ex.size() == 2);
+    CHECK(ex[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(ex[0].line == 3);
+    CHECK(ex[0].column == 7);
+    CHECK(ex[1].expectedType == ExpectedType::TOKEN);
+    CHECK(ex[1].line == 4);
+    CHECK(ex[1].column == 1);
+    CHECK(ex[1].tokenType == TokenType::SEMICOLON);
   }
+}
+
+TEST_CASE("Unexpected tokens", "[parser]") {
 }

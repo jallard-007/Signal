@@ -10,6 +10,8 @@ struct Tokenizer {
   Token peeked;
   const uint32_t size;
   uint32_t position;
+  uint32_t lineNum;
+  uint32_t lineStart;
   TokenType prevType;
 
   Tokenizer() = delete;

@@ -4,12 +4,14 @@ bool hasData(StatementType type) {
   return type >= StatementType::VALUE && type <= StatementType::WRAPPED_VALUE;
 }
 
-Expected::Expected(ExpectedType type, uint32_t position):
-  position{position}, expectedType{type}, tokenType{TokenType::NOTHING} {}
+Unexpected::Unexpected(Token token, uint32_t line, uint32_t column):
+  token{token}, line{line}, column{column} {}
 
-Expected::Expected(ExpectedType type, uint32_t position, TokenType tokenType):
-  position{position}, expectedType{type}, tokenType{tokenType} {}
+Expected::Expected(ExpectedType type, uint32_t line, uint32_t column):
+  line{line}, column{column}, tokenType{TokenType::NOTHING}, expectedType{type} {}
 
+Expected::Expected(ExpectedType type, uint32_t line, uint32_t column, TokenType tokenType):
+  line{line}, column{column}, tokenType{tokenType}, expectedType{type} {}
 
 bool Type::operator==(const Type& tk) const {
   return tk.tokens == tokens;
@@ -23,7 +25,7 @@ bool VariableDec::operator==(const VariableDec& varDec) const {
 
 Statement::Statement(): unOp{nullptr} {}
 
-Statement::Statement(StatementType type): type{type}, unOp{nullptr} {}
+Statement::Statement(StatementType type): unOp{nullptr}, type{type} {}
 
 void Statement::operator=(Statement&& st) noexcept {
   type = st.type;
@@ -40,6 +42,8 @@ void Statement::operator=(Statement&& st) noexcept {
       new (&arrAccess) std::unique_ptr<ArrayAccess>{std::move(st.arrAccess)}; break;
     case StatementType::WRAPPED_VALUE:
       new (&wrapped) std::unique_ptr<Statement>{std::move(st.wrapped)}; break;
+    case StatementType::SCOPE:
+      new (&scope) std::unique_ptr<Scope>{std::move(st.scope)}; break;
     case StatementType::VALUE:
       var = st.var; break;
     default:
@@ -101,6 +105,14 @@ bool Statement::operator==(const Statement& st) const {
         return false;
       }
       return *wrapped == *st.wrapped;
+    case StatementType::SCOPE:
+      if (!scope && !st.scope) {
+        return true;
+      }
+      if (!scope || !st.scope) {
+        return false;
+      }
+      return *scope == *st.scope;
     case StatementType::VALUE:
       return var == st.var;
     default:
@@ -142,6 +154,11 @@ Statement::Statement(std::unique_ptr<Statement> ptr) {
   type = StatementType::WRAPPED_VALUE;
 }
 
+Statement::Statement(std::unique_ptr<Scope> ptr) {
+  new (&scope) std::unique_ptr<Scope>{std::move(ptr)};
+  type = StatementType::SCOPE;
+}
+
 Statement::Statement(Token tok): var{tok} {
   type = StatementType::VALUE;
 }
@@ -154,6 +171,7 @@ Statement::~Statement() {
     case StatementType::FUNCTION_CALL: funcCall.~unique_ptr<FunctionCall>(); break;
     case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
     case StatementType::WRAPPED_VALUE: wrapped.~unique_ptr<Statement>(); break;
+    case StatementType::SCOPE: scope.~unique_ptr<Scope>(); break;
     default: break;
   }
 }
@@ -210,6 +228,10 @@ bool ArrayAccess::operator==(const ArrayAccess& arrAcc) const {
   return array == arrAcc.array && offset == arrAcc.offset;
 }
 
+bool Scope::operator==(const Scope& sp) const {
+  return sp.scopeStatements == scopeStatements;
+}
+
 BinOp::BinOp(TokenType op): op{op} {}
 
 BinOp::BinOp(BinOp&& binOp) noexcept : op{binOp.op} {
@@ -264,6 +286,10 @@ FunctionCall::FunctionCall(Token token): name{token} {}
 bool FunctionCall::operator==(const FunctionCall& fc) const {
   return name == fc.name && args == fc.args;
 }
+
+Struct::Struct(Token tok): name{tok} {}
+
+Template::Template(Token tok): name{tok} {}
 
 Declaration::Declaration(): decType{DecType::NONE} {}
 

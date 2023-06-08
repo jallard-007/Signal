@@ -17,6 +17,9 @@ Tokenizer::Tokenizer(const std::string& fileContent):
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
   }
+  lineNum = 1;
+  lineStart = 0;
+
   position = 0;
   prevType = TokenType::NOTHING;
 }
@@ -51,7 +54,7 @@ void Tokenizer::consumePeek() {
 
 Token Tokenizer::tokenizeNext() {
   if (peeked.type != TokenType::NOTHING) { 
-    Token temp = peeked;
+    const Token temp = peeked;
     peeked.type = TokenType::NOTHING;
     position = peeked.position + peeked.length;
     return temp;
@@ -75,6 +78,11 @@ Token Tokenizer::tokenizeNext() {
     }
     else if (type == TokenType::COMMENT) {
       moveToNewLine();
+    }
+    else if (type == TokenType::NEWLINE) {
+      ++lineNum;
+      lineStart = ++position;
+      return tokenizeNext();
     }
     else if (++position < size) {
       const char cNext = content[position++];
@@ -195,7 +203,7 @@ Token Tokenizer::tokenizeNext() {
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
   for (; position < size; ++position) {
     const char c = content[position];
-    if (c != ' ' && c != '\t' && c != '\n') {
+    if (c != ' ' && c != '\t') {
       return;
     }
   }
@@ -222,7 +230,7 @@ void Tokenizer::movePastNumber() {
 void Tokenizer::movePastHexNumber() {
   for (++position; position < size; ++position) {
     const char c = content[position];
-    if (!(c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f')) {
+    if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
       return;
     }
   }
@@ -245,6 +253,8 @@ void Tokenizer::movePastLiteral(char delimiter) {
 void Tokenizer::moveToNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
+      ++lineNum;
+      lineStart = position + 1;
       return;
     }
   }

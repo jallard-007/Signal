@@ -8,7 +8,7 @@ TokenType firstToken(const char* c) {
 
 TokenType tokenAtN(const char* c, uint32_t n) {
    Tokenizer tokenizer{c};
-   for (int i = 0; i < n; ++i) {
+   for (uint32_t i = 0; i < n; ++i) {
       tokenizer.tokenizeNext();
    }
    return tokenizer.tokenizeNext().type;
