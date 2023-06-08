@@ -19,7 +19,6 @@ Tokenizer::Tokenizer(const std::string& fileContent):
   }
   lineNum = 1;
   lineStart = 0;
-
   position = 0;
   prevType = TokenType::NOTHING;
 }

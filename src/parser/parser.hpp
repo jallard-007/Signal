@@ -15,7 +15,9 @@ struct Parser {
   Parser() = delete;
   explicit Parser(Tokenizer& tokenizer);
   void parse();
-  bool functionDec();
+  bool functionDec(Declaration&);
+  bool structDec(Declaration&);
+  bool templateDec(Declaration&);
   Statement parseStatement(TokenType, TokenType);
   bool getStatements(std::vector<Statement>&, TokenType, TokenType);
   Token getType(Type&);

@@ -1,6 +1,7 @@
 #include "parser.hpp"
 #include <list>
 #include <memory>
+#include <iostream>
 
 Parser::Parser(Tokenizer& tokenizer): tokenizer{tokenizer} {
   program.name = "ProgName";
@@ -11,23 +12,43 @@ void Parser::parse() {
   while (token.type != TokenType::END_OF_FILE) {
     switch (token.type) {
       case TokenType::INCLUDE: {
+        tokenizer.consumePeek();
         // include statement
         break;
       }
-        
+
       case TokenType::FUNC: {
-        if (!functionDec()) {
+        tokenizer.consumePeek();
+        auto& funcDec = program.decs.emplace_back();
+        if (!functionDec(funcDec)) {
+          // try to recover?
+          return;
+        }
+        break;
+      }
+
+      case TokenType::STRUCT: {
+        tokenizer.consumePeek();
+        auto& sDec = program.decs.emplace_back();
+        if (!structDec(sDec)) {
+          // try to recover?
           return;
         }
         break;
       }
 
       case TokenType::TEMPLATE: {
-        // template declaration
+        tokenizer.consumePeek();
+        auto& tempDec = program.decs.emplace_back();
+        if (!templateDec(tempDec)) {
+          // try to recover?
+          return;
+        }
         break;
       }
 
       case TokenType::CREATE: {
+        tokenizer.consumePeek();
         // template creation
         break;
       }
@@ -40,55 +61,133 @@ void Parser::parse() {
         
       default:
         // error, unexpected token
+        unexpectedTokens.emplace_back(token, tokenizer.lineNum, token.position - tokenizer.lineStart);
         break;
 
     }
-    token = tokenizer.tokenizeNext();
+    token = tokenizer.peekNext();
   }
 }
 
-bool Parser::functionDec() {
+bool Parser::functionDec(Declaration& dec) {
   const Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
     expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
     return false;
   }
-  // add function declaration node
-  auto& func = program.decs.emplace_back(std::make_unique<FunctionDec>(token)).func;
-
   if (tokenizer.peekNext().type != TokenType::OPEN_PAREN) {
     // expected open paren
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_PAREN);
     return false;
   }
+  FunctionDec funDec{token};
   // get parameters
   tokenizer.consumePeek();
-  if (!getStatements(func->params, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
-    return false;
-  }
-  if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
-    // expected close paren
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::COLON);
+  if (!getStatements(funDec.params, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_PAREN);
     return false;
   }
   // consume close paren
   tokenizer.consumePeek();
   if (tokenizer.peekNext().type != TokenType::COLON) {
     // expected a colon
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::COLON);
-  } else {
-    // consume colon
-    tokenizer.consumePeek();
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::COLON);
+    return false;
   }
+  tokenizer.consumePeek();
   // get return type
-  if (getType(func->returnType).type != TokenType::OPEN_BRACE) {
+  if (getType(funDec.returnType).type != TokenType::OPEN_BRACE) {
     // expected open brace after type
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.lineStart - tokenizer.peeked.position, TokenType::OPEN_BRACE);
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    return false;
   }
   // consume open brace
   tokenizer.consumePeek();
-  return getStatements(func->bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
-  // leave next token to be consumed by caller
+  if (!getStatements(funDec.bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
+    return false;
+  }
+
+  // consume close brace
+  tokenizer.consumePeek();
+  dec.func = std::make_unique<FunctionDec>(std::move(funDec));
+  dec.decType = DecType::FUNCTION;
+  return true;
+}
+
+bool Parser::structDec(Declaration& dec) {
+  Token token = tokenizer.tokenizeNext();
+  if (token.type != TokenType::IDENTIFIER) {
+    // expected identifier
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
+    return false;
+  }
+  if (tokenizer.tokenizeNext().type != TokenType::OPEN_BRACE) {
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    return false;
+  }
+  // now parse struct body
+  // can consist of variables and functions at the top level, nothing else
+  Struct sDec{token};
+  token = tokenizer.peekNext();
+  while (token.type != TokenType::END_OF_FILE) {
+    // variable dec
+    if (token.type == TokenType::IDENTIFIER) {
+      sDec.decs.emplace_back(std::make_unique<Statement>(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)));
+      if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position - tokenizer.lineStart, TokenType::SEMICOLON);
+        return false;
+      }
+    }
+    // function dec
+    else if (token.type == TokenType::FUNC) {
+      auto& funcDec = sDec.decs.emplace_back();
+      if (!functionDec(funcDec)) {
+        return false;
+      }
+    }
+    // end of struct
+    else if (token.type == TokenType::CLOSE_BRACE) {
+      tokenizer.consumePeek();
+      dec.decType = DecType::STRUCT;
+      dec.struc = std::make_unique<Struct>(std::move(sDec));
+      return true;
+    }
+    // invalid token
+    else { 
+      unexpectedTokens.emplace_back(token, tokenizer.lineNum, token.position - tokenizer.lineStart);
+      return false;
+    }
+    token = tokenizer.peekNext();
+  }
+  return false;
+}
+
+bool Parser::templateDec(Declaration& dec) {
+  Token token = tokenizer.tokenizeNext();
+  if (token.type != TokenType::OPEN_BRACKET) {
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACKET);
+    return false;
+  }
+  Template temp;
+  if (!getStatements(temp.templateIdentifiers, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
+    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
+  }
+  token = tokenizer.tokenizeNext();
+  if (token.type == TokenType::STRUCT) {
+    if (!structDec(temp.dec)) {
+      return false;
+    }
+  } else if (token.type == TokenType::FUNC) {
+    if (!functionDec(temp.dec)) {
+      return false;
+    }
+  } else {
+    return false;
+  }
+  dec.temp = std::make_unique<Template>(std::move(temp));
+  dec.decType = DecType::TEMPLATE;
+  return true;
 }
 
 /**
@@ -429,8 +528,8 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
 /**
  * Extracts delimiterMinor delimited statements until it reaches the delimiterMajor delimiter
- * Does NOT consume the final delimiter
  * Returns true on a successful parse (when it reaches the delimiterMajor), false otherwise (EOF)
+ * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimterMajor on true)
 */
 bool Parser::getStatements(std::vector<Statement>& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
   Token token = tokenizer.peekNext();
@@ -451,6 +550,7 @@ bool Parser::getStatements(std::vector<Statement>& statements, const TokenType d
 
 /**
  * Returns the next token after the type list, adding tokens to Type as it goes
+ * Does NOT consume the final token
 */
 Token Parser::getType(Type& type) {
   Token tp = tokenizer.peekNext();

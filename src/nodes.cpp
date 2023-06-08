@@ -234,10 +234,8 @@ bool Scope::operator==(const Scope& sp) const {
 
 BinOp::BinOp(TokenType op): op{op} {}
 
-BinOp::BinOp(BinOp&& binOp) noexcept : op{binOp.op} {
-  leftSide = std::move(binOp.leftSide);
-  rightSide = std::move(binOp.rightSide);
-}
+BinOp::BinOp(BinOp&& binOp) noexcept:
+  leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {}
 
 bool BinOp::operator==(const BinOp& bo) const {
   if (op != bo.op) {
@@ -268,6 +266,8 @@ bool BinOp::operator==(const BinOp& bo) const {
 
 UnOp::UnOp(TokenType op): op{op} {}
 
+UnOp::UnOp(UnOp&& unOp) noexcept : operand{std::move(unOp.operand)} , op{unOp.op} {}
+
 bool UnOp::operator==(const UnOp& uo) const {
   if (operand && uo.operand) {
     if (!(operand == uo.operand)) {
@@ -281,6 +281,10 @@ bool UnOp::operator==(const UnOp& uo) const {
 
 FunctionDec::FunctionDec(Token token): name{token} {}
 
+FunctionDec::FunctionDec(FunctionDec&& fd):
+  params{std::move(fd.params)}, bodyStatements{std::move(fd.bodyStatements)},
+  returnType{std::move(fd.returnType)}, name{fd.name} {}
+
 FunctionCall::FunctionCall(Token token): name{token} {}
 
 bool FunctionCall::operator==(const FunctionCall& fc) const {
@@ -289,21 +293,52 @@ bool FunctionCall::operator==(const FunctionCall& fc) const {
 
 Struct::Struct(Token tok): name{tok} {}
 
-Template::Template(Token tok): name{tok} {}
 
-Declaration::Declaration(): decType{DecType::NONE} {}
+
+Declaration::Declaration(): func{nullptr}, decType{DecType::NONE} {}
 
 Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
-  new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
+  switch (dec.decType) {
+    case DecType::FUNCTION:
+      new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
+      break;
+    case DecType::STATEMENT:
+      new (&statement) std::unique_ptr<Statement>{std::move(dec.statement)};
+      break;
+    case DecType::STRUCT:
+      new (&struc) std::unique_ptr<Struct>{std::move(dec.struc)};
+      break;
+    case DecType::TEMPLATE:
+      new (&temp) std::unique_ptr<Template>{std::move(dec.temp)};
+      break;
+    default:
+      break;
+  }
+  dec.decType = DecType::NONE;
 }
 
 Declaration::Declaration(std::unique_ptr<FunctionDec> funcDec): decType{DecType::FUNCTION} {
   new (&func) std::unique_ptr<FunctionDec>{std::move(funcDec)};
 }
 
+Declaration::Declaration(std::unique_ptr<Statement> st): decType{DecType::STATEMENT} {
+  new (&statement) std::unique_ptr<Statement>{std::move(st)};
+}
+
+Declaration::Declaration(std::unique_ptr<Template> tDec): decType{DecType::TEMPLATE} {
+  new (&temp) std::unique_ptr<Template>{std::move(tDec)};
+}
+
+Declaration::Declaration(std::unique_ptr<Struct> sDec): decType{DecType::STRUCT} {
+  new (&struc) std::unique_ptr<Struct>{std::move(sDec)};
+}
+
 Declaration::~Declaration() {
   switch(decType) {
     case DecType::FUNCTION: func.~unique_ptr<FunctionDec>(); break;
+    case DecType::STATEMENT: statement.~unique_ptr<Statement>(); break;
+    case DecType::TEMPLATE: temp.~unique_ptr<Template>(); break;
+    case DecType::STRUCT: struc.~unique_ptr<Struct>(); break;
     default: break;
   }
 }

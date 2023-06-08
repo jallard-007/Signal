@@ -61,20 +61,18 @@ TEST_CASE("getParams", "[parser]") {
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
-  const std::string str = "funcName(first: int^): int {}";
+  const std::string str = "func funcName(first: int^): int {}";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer};
-  REQUIRE(parser.functionDec());
+  parser.parse();
   auto& decs = parser.program.decs;
+  REQUIRE(parser.expectedStatement.empty());
+  REQUIRE(parser.unexpectedTokens.empty());
   REQUIRE(decs.size() == 1);
-  CHECK(decs[0].decType == DecType::FUNCTION);
+  REQUIRE(decs[0].decType == DecType::FUNCTION);
   auto& func = decs[0].func;
-  REQUIRE(func);
+  REQUIRE(func.get());
   CHECK(tokenizer.extractToken(func->name) == "funcName");
-
-  // check return type
-  REQUIRE(func->returnType.tokens.size() == 1);
-  CHECK(func->returnType.tokens[0].type == TokenType::INT_TYPE);
 
   // check parameters
   REQUIRE(func->params.size() == 1);
@@ -84,6 +82,12 @@ TEST_CASE("Function Declaration", "[parser]") {
   REQUIRE(func->params[0].varDec->type.tokens.size() == 2);
   CHECK(func->params[0].varDec->type.tokens[0].type == TokenType::INT_TYPE);
   CHECK(func->params[0].varDec->type.tokens[1].type == TokenType::POINTER);
+
+  // check return type
+  REQUIRE(func->returnType.tokens.size() == 1);
+  CHECK(func->returnType.tokens[0].type == TokenType::INT_TYPE);
+
+  CHECK(func->bodyStatements.empty());
 }
 
 TEST_CASE("Function Call - Base", "[parser]") {

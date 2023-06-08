@@ -47,15 +47,16 @@ struct Type {
   std::vector<Token> tokens;
   
   Type() = default;
+  Type(Type&&) = default;
   bool operator==(const Type&) const;
 };
 
 struct VariableDec {
   Type type;
   Token name;
-
   VariableDec() = delete;
   explicit VariableDec(Token);
+  VariableDec(VariableDec&&) = default;
   bool operator==(const VariableDec&) const;
 };
 
@@ -128,6 +129,7 @@ struct UnOp {
   TokenType op;
   explicit UnOp(TokenType);
   UnOp(const UnOp&) = delete;
+  UnOp(UnOp&&) noexcept;
   bool operator==(const UnOp&) const;
 };
 
@@ -136,9 +138,9 @@ struct FunctionDec {
   std::vector<Statement> bodyStatements;
   Type returnType;
   Token name;
-
   FunctionDec() = delete;
   explicit FunctionDec(Token);
+  FunctionDec(FunctionDec&&);
 };
 
 struct FunctionCall {
@@ -149,44 +151,47 @@ struct FunctionCall {
   bool operator==(const FunctionCall&) const;
 };
 
-typedef struct Declaration Declaration;
+enum class DecType {
+  NONE,
+  FUNCTION,
+  STATEMENT,
+  TEMPLATE,
+  STRUCT
+};
+
+typedef struct Template Template;
+typedef struct Struct Struct;
+
+struct Declaration {
+  union{
+    std::unique_ptr<FunctionDec> func;
+    std::unique_ptr<Statement> statement;
+    std::unique_ptr<Template> temp;
+    std::unique_ptr<Struct> struc;
+  };
+  DecType decType;
+  Declaration();
+  Declaration(Declaration&&) noexcept;
+  explicit Declaration(std::unique_ptr<FunctionDec>);
+  explicit Declaration(std::unique_ptr<Statement>);
+  explicit Declaration(std::unique_ptr<Template>);
+  explicit Declaration(std::unique_ptr<Struct>);
+  ~Declaration();
+};
 
 struct Struct {
   std::vector<Declaration> decs;
   Token name;
   Struct(Token);
+  Struct(Struct&&) = default;
 };
 
 struct Template {
-  union {
-    std::unique_ptr<FunctionDec> func;
-    std::unique_ptr<Struct> struc;
-  };
-  Token name;
-  Template(Token);
-};
-
-enum class DecType {
-  NONE,
-  FUNCTION,
-  VARIABLE,
-  TEMPLATE,
-  STRUCT
-};
-
-struct Declaration {
-  DecType decType;
-  union{
-    std::unique_ptr<FunctionDec> func;
-    std::unique_ptr<VariableDec> var;
-    std::unique_ptr<Template> temp;
-    std::unique_ptr<Struct> struc;
-  };
-
-  Declaration();
-  Declaration(Declaration&&) noexcept;
-  explicit Declaration(std::unique_ptr<FunctionDec>);
-  ~Declaration();
+  std::vector<Statement> templateIdentifiers;
+  Declaration dec;
+  Template() = default;
+  Template(const Template&) = delete;
+  Template(Template&&) = default;
 };
 
 struct Program {

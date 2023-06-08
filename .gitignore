@@ -5,7 +5,7 @@ test
 out
 build
 Makefile
-cmake*
-CMake*
+*cmake*
+*CMake*
 !CMakeLists.txt
 Testing
