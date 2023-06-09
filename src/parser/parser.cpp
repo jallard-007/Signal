@@ -8,7 +8,7 @@ Parser::Parser(Tokenizer& tokenizer): tokenizer{tokenizer} {
 }
 
 void Parser::parse() {
-  Token token = tokenizer.tokenizeNext();
+  Token token = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
     switch (token.type) {
       case TokenType::INCLUDE: {
@@ -21,6 +21,7 @@ void Parser::parse() {
         tokenizer.consumePeek();
         auto& funcDec = program.decs.emplace_back();
         if (!functionDec(funcDec)) {
+          program.decs.pop_back();
           // try to recover?
           return;
         }
@@ -31,6 +32,7 @@ void Parser::parse() {
         tokenizer.consumePeek();
         auto& sDec = program.decs.emplace_back();
         if (!structDec(sDec)) {
+          program.decs.pop_back();
           // try to recover?
           return;
         }
@@ -41,6 +43,7 @@ void Parser::parse() {
         tokenizer.consumePeek();
         auto& tempDec = program.decs.emplace_back();
         if (!templateDec(tempDec)) {
+          program.decs.pop_back();
           // try to recover?
           return;
         }
@@ -55,13 +58,18 @@ void Parser::parse() {
 
       case TokenType::IDENTIFIER: {
         // global variable declaration
-        
+        program.decs.emplace_back(std::make_unique<Statement>(parseStatement(TokenType::NOTHING, TokenType::SEMICOLON)));
+        if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+        } else {
+          tokenizer.consumePeek();
+        }
         break;
       }
         
       default:
         // error, unexpected token
-        unexpectedTokens.emplace_back(token, tokenizer.lineNum, token.position - tokenizer.lineStart);
+        unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
         break;
 
     }
@@ -73,33 +81,33 @@ bool Parser::functionDec(Declaration& dec) {
   const Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
     return false;
   }
   if (tokenizer.peekNext().type != TokenType::OPEN_PAREN) {
     // expected open paren
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_PAREN);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_PAREN);
     return false;
   }
   FunctionDec funDec{token};
   // get parameters
   tokenizer.consumePeek();
   if (!getStatements(funDec.params, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_PAREN);
     return false;
   }
   // consume close paren
   tokenizer.consumePeek();
   if (tokenizer.peekNext().type != TokenType::COLON) {
     // expected a colon
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::COLON);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::COLON);
     return false;
   }
   tokenizer.consumePeek();
   // get return type
   if (getType(funDec.returnType).type != TokenType::OPEN_BRACE) {
     // expected open brace after type
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
     return false;
   }
   // consume open brace
@@ -119,11 +127,11 @@ bool Parser::structDec(Declaration& dec) {
   Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::IDENTIFIER);
     return false;
   }
   if (tokenizer.tokenizeNext().type != TokenType::OPEN_BRACE) {
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position - tokenizer.lineStart, TokenType::OPEN_BRACE);
     return false;
   }
   // now parse struct body
@@ -135,14 +143,23 @@ bool Parser::structDec(Declaration& dec) {
     if (token.type == TokenType::IDENTIFIER) {
       sDec.decs.emplace_back(std::make_unique<Statement>(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)));
       if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
-        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position - tokenizer.lineStart, TokenType::SEMICOLON);
         return false;
       }
+      tokenizer.consumePeek();
     }
     // function dec
     else if (token.type == TokenType::FUNC) {
       auto& funcDec = sDec.decs.emplace_back();
+      tokenizer.consumePeek();
       if (!functionDec(funcDec)) {
+        return false;
+      }
+    }
+    // struct
+    else if (token.type == TokenType::STRUCT) {
+      auto& subSDec = sDec.decs.emplace_back();
+      tokenizer.consumePeek();
+      if (!structDec(subSDec)) {
         return false;
       }
     }
@@ -155,7 +172,7 @@ bool Parser::structDec(Declaration& dec) {
     }
     // invalid token
     else { 
-      unexpectedTokens.emplace_back(token, tokenizer.lineNum, token.position - tokenizer.lineStart);
+      unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
       return false;
     }
     token = tokenizer.peekNext();
@@ -166,23 +183,27 @@ bool Parser::structDec(Declaration& dec) {
 bool Parser::templateDec(Declaration& dec) {
   Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::OPEN_BRACKET) {
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACKET);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACKET);
     return false;
   }
   Template temp;
   if (!getStatements(temp.templateIdentifiers, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
-    expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
   }
-  token = tokenizer.tokenizeNext();
+  tokenizer.consumePeek();
+  token = tokenizer.peekNext();
   if (token.type == TokenType::STRUCT) {
+    tokenizer.consumePeek();
     if (!structDec(temp.dec)) {
       return false;
     }
   } else if (token.type == TokenType::FUNC) {
+    tokenizer.consumePeek();
     if (!functionDec(temp.dec)) {
       return false;
     }
   } else {
+    unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
     return false;
   }
   dec.temp = std::make_unique<Template>(std::move(temp));
@@ -234,7 +255,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
       if (list.empty()) {
         // expected expression before binary operator
-        expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+        expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
         list.emplace_back(new Statement{std::move(statement)});
       }
       
@@ -280,7 +301,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
                 if (!childOfPrev) {
                   if (statement.type == StatementType::BINARY_OP) {
                     // expected token between operators
-                    expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                    expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
                   }
                 } else {
                   if (statement.type == StatementType::BINARY_OP) {
@@ -322,7 +343,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             if (!childOfPrev) {
               if (statement.type == StatementType::BINARY_OP) {
                 // expected expression between operators
-                expectedStatement.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
               }
             } else {
               if (statement.type == StatementType::BINARY_OP) {
@@ -378,7 +399,14 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         lookAhead = getType(statement.varDec->type);
         if (lookAhead.type == TokenType::END_OF_FILE) {
           // never reached a type delimiter
-          expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position - tokenizer.lineStart, delimiterA);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position - tokenizer.lineStart, delimiterB);
+          break;
+        } 
+        // cant be keyword, unary op, 
+        // can be binary op, delimiter
+        else if (lookAhead.type != delimiterA && lookAhead.type != delimiterB && !isBinaryOp(lookAhead.type)) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, delimiterA);
+          break;
         }
       }
 
@@ -394,9 +422,8 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          list.front()->~Statement();
-          new (list.front()) Statement{std::move(statement)};
+          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+          break;
         }
       }
       // END DUP CODE
@@ -409,9 +436,8 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(Statement{token})) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          list.front()->~Statement();
-          new (list.front()) Statement{token};
+          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+          break;
         }
       }
       // END DUP CODE
@@ -425,7 +451,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.wrapped = std::make_unique<Statement>(std::move(inner));
         statement.type = StatementType::WRAPPED_VALUE;
       } else {
-        expectedStatement.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
       }
       // DUP CODE: adding leaf node to the tree by move
       if (list.empty()) {
@@ -433,15 +459,15 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          list.front()->~Statement();
-          new (list.front()) Statement{std::move(statement)};
+          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+          break;
         }
       }
       // END DUP CODE
       if (lookAhead.type != TokenType::CLOSE_PAREN) {
         // expected close paren
-        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+        break;
       } else {
         // consume the close paren
         tokenizer.consumePeek();
@@ -449,9 +475,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
     }
 
-    else if (isKeyword(token.type)) {
-      // handling all keywords in separate functions would prevent this mess of a function from getting worse
-    }
+    // else if (isKeyword(token.type)) {
+    //   // handling all keywords in separate functions would prevent this mess of a function from getting worse
+    // }
 
     // skip comments
     else if (token.type == TokenType::COMMENT) {
@@ -461,7 +487,8 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     else if (token.type == TokenType::OPEN_BRACE) {
       if (delimiterB != TokenType::CLOSE_BRACE) {
         // naughty naughty naughty
-        expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterB);
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterB);
+        break;
       }
       Statement statement{std::make_unique<Scope>()};
       getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
@@ -472,15 +499,15 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       } else {
         if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
           // restart the statement parse, discard everything previously
-          expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterA);
-          list.front()->~Statement();
-          new (list.front()) Statement{std::move(statement)};
+          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+          break;
         }
       }
       // END DUP CODE
       if (lookAhead.type != TokenType::CLOSE_BRACE) {
         // expected close brace
-        expectedStatement.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
+        break;
       } else {
         // consume the close brace
         tokenizer.consumePeek();
@@ -493,13 +520,14 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     }
 
     else if (token.type == TokenType::SEMICOLON && delimiterA != TokenType::SEMICOLON && delimiterB != TokenType::SEMICOLON) {
-      expectedStatement.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterB);
+      expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position - lineStart, delimiterB);
       break;
     }
   
     else {
       // unexpected, i guess...
-      unexpectedTokens.emplace_back(token, lineNum, token.position - lineStart);
+      unexpected.emplace_back(token, lineNum, token.position - lineStart);
+      break;
     }
     
     if (lookAhead.type == delimiterA || lookAhead.type == delimiterB) {
@@ -518,7 +546,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
   // validate statement, list.back() should be filled
   if (list.back()->isValid() == ExpectedType::EXPRESSION) {
-    expectedStatement.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+    expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
   }
   Statement* front = list.front();
   Statement r_statement{std::move(*front)};
@@ -529,15 +557,21 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 /**
  * Extracts delimiterMinor delimited statements until it reaches the delimiterMajor delimiter
  * Returns true on a successful parse (when it reaches the delimiterMajor), false otherwise (EOF)
- * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimterMajor on true)
+ * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimiterMajor on true)
 */
 bool Parser::getStatements(std::vector<Statement>& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
   Token token = tokenizer.peekNext();
-
+  size_t prevExpectedSize = expected.size();
   while (token.type != TokenType::END_OF_FILE) {
     Statement s = parseStatement(delimiterMinor, delimiterMajor);
     if (s.type != StatementType::NONE) {
       statements.emplace_back(std::move(s));
+    }
+    if (expected.size() > prevExpectedSize) {
+      if (expected.back().tokenType == delimiterMajor) {
+        break;
+      }
+      prevExpectedSize = expected.size();
     }
     token = tokenizer.peekNext();
     if (token.type == delimiterMajor) {
