@@ -24,21 +24,21 @@ enum class TokenType : uint8_t {
   CONTINUE,
   CREATE,
   DEFAULT,
+  IF,
   ELIF,
   ELSE,
+  FOR,
+  SWITCH,
+  WHILE,
   ENUM,
   FALSE,
-  FOR,
   FUNC,
-  IF,
   INCLUDE,
   NULL_,
   RETURN,
   STRUCT,
-  SWITCH,
   TEMPLATE,
   TRUE,
-  WHILE,
 
   // general
   IDENTIFIER,
@@ -53,13 +53,12 @@ enum class TokenType : uint8_t {
   SEMICOLON,
   BACK_SLASH,
   COLON,
-  COMMA,
-
 
 
   // BINARY
   // general
   DOT,
+  COMMA,
 
   // arithmetic
   ADDITION,
@@ -120,6 +119,7 @@ bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
+bool isKeywordWithBody(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {

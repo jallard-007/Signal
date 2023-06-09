@@ -39,6 +39,8 @@ enum class StatementType {
   ARRAY_ACCESS,
   WRAPPED_VALUE,
   SCOPE,
+  KEY_W_BODY,
+  LIST
 };
 
 bool hasData(StatementType);
@@ -65,6 +67,8 @@ typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
 typedef struct Scope Scope;
+typedef struct List List;
+typedef struct KeywordWithBody KeywordWithBody;
 
 struct Statement {
   union {
@@ -75,6 +79,8 @@ struct Statement {
     std::unique_ptr<ArrayAccess> arrAccess;
     std::unique_ptr<Statement> wrapped;
     std::unique_ptr<Scope> scope;
+    std::unique_ptr<List> list;
+    std::unique_ptr<KeywordWithBody> keywBody;
     Token var;
   };
   StatementType type = StatementType::NONE;
@@ -90,6 +96,9 @@ struct Statement {
   explicit Statement(std::unique_ptr<ArrayAccess>);
   explicit Statement(std::unique_ptr<Statement>);
   explicit Statement(std::unique_ptr<Scope>);
+  explicit Statement(std::unique_ptr<KeywordWithBody>);
+  explicit Statement(std::unique_ptr<List>);
+
   explicit Statement(Token);
   ~Statement();
   void operator=(Statement&&) noexcept;
@@ -97,6 +106,21 @@ struct Statement {
   Statement* addStatementToNode(Statement&&);
   std::unique_ptr<Statement>* getChild();
   ExpectedType isValid() const;
+};
+
+struct List {
+  std::vector<Statement> list;
+  List() = default;
+  List(List&&) = default;
+};
+
+struct KeywordWithBody {
+  std::unique_ptr<Statement> body;
+  std::unique_ptr<Statement> header;
+  TokenType keyword;
+  KeywordWithBody() = delete;
+  KeywordWithBody(TokenType);
+  KeywordWithBody(KeywordWithBody&&) = default;
 };
 
 struct Scope {

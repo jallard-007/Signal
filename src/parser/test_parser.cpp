@@ -387,3 +387,21 @@ TEST_CASE("Variable Declaration", "[parser]") {
   REQUIRE(d.statement->binOp->leftSide.get());
   CHECK(d.statement->binOp->leftSide->type == StatementType::VARIABLE_DEC);
 }
+
+TEST_CASE("Keywords", "[parser]") {
+  const std::string str = "if (1) {} }";
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer};
+  Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+  CHECK(parser.unexpected.empty());
+  CHECK(parser.expected.empty());
+  CHECK(s.type == StatementType::KEY_W_BODY);
+  REQUIRE(s.keywBody.get());
+  CHECK(s.keywBody->keyword == TokenType::IF);
+  REQUIRE(s.keywBody->header.get());
+  CHECK(s.keywBody->header->type == StatementType::WRAPPED_VALUE);
+  REQUIRE(s.keywBody->header->wrapped.get());
+  CHECK(s.keywBody->header->wrapped->type == StatementType::VALUE);
+  REQUIRE(s.keywBody->body.get());
+  CHECK(s.keywBody->body->type == StatementType::SCOPE);
+}

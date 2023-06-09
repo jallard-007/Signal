@@ -20,6 +20,10 @@ bool isUnaryOp(TokenType type) {
   return type >= TokenType::NOT && type <= TokenType::NEGATIVE;
 }
 
+bool isKeywordWithBody(TokenType type) {
+  return type >= TokenType::IF && type <= TokenType::WHILE;
+}
+
 bool Token::operator==(const Token& tk) const {
   return position == tk.position && length == tk.length && type == tk.type;
 }

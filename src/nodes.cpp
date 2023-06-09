@@ -44,6 +44,10 @@ void Statement::operator=(Statement&& st) noexcept {
       new (&wrapped) std::unique_ptr<Statement>{std::move(st.wrapped)}; break;
     case StatementType::SCOPE:
       new (&scope) std::unique_ptr<Scope>{std::move(st.scope)}; break;
+    case StatementType::LIST:
+      new (&list) std::unique_ptr<List>{std::move(st.list)}; break;
+    case StatementType::KEY_W_BODY:
+      new (&keywBody) std::unique_ptr<KeywordWithBody>{std::move(st.keywBody)}; break;
     case StatementType::VALUE:
       var = st.var; break;
     default:
@@ -159,6 +163,16 @@ Statement::Statement(std::unique_ptr<Scope> ptr) {
   type = StatementType::SCOPE;
 }
 
+Statement::Statement(std::unique_ptr<List> ptr) {
+  new (&list) std::unique_ptr<List>{std::move(ptr)};
+  type = StatementType::LIST;
+}
+
+Statement::Statement(std::unique_ptr<KeywordWithBody> ptr) {
+  new (&keywBody) std::unique_ptr<KeywordWithBody>{std::move(ptr)};
+  type = StatementType::KEY_W_BODY;
+}
+
 Statement::Statement(Token tok): var{tok} {
   type = StatementType::VALUE;
 }
@@ -172,6 +186,8 @@ Statement::~Statement() {
     case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
     case StatementType::WRAPPED_VALUE: wrapped.~unique_ptr<Statement>(); break;
     case StatementType::SCOPE: scope.~unique_ptr<Scope>(); break;
+    case StatementType::LIST: list.~unique_ptr<List>(); break;
+    case StatementType::KEY_W_BODY: keywBody.~unique_ptr<KeywordWithBody>(); break;
     default: break;
   }
 }
@@ -201,6 +217,19 @@ Statement* Statement::addStatementToNode(Statement&& st) {
       }
       binOp->rightSide = std::make_unique<Statement>(std::move(st));
       return binOp->rightSide.get();
+    case StatementType::KEY_W_BODY:
+      if (keywBody->body) {
+        return nullptr;
+      }
+      if (st.type == StatementType::WRAPPED_VALUE && !keywBody->header) {
+        keywBody->header = std::make_unique<Statement>(std::move(st));
+        return keywBody->header.get();
+      }
+      else if (st.type == StatementType::SCOPE && keywBody->header) {
+        keywBody->body = std::make_unique<Statement>(std::move(st));
+        return keywBody->body.get();
+      }
+      return nullptr;
     default:
       return nullptr;
   }
@@ -220,6 +249,14 @@ ExpectedType Statement::isValid() const {
       break;
   }
   return ExpectedType::NOTHING;
+}
+
+KeywordWithBody::KeywordWithBody(TokenType type): keyword{type} {
+  if (type == TokenType::ELSE) {
+    // this is kinda stupid, but its so that we can pretend the else already has a condition by default
+    // just dont dereference the header field when the keyword is else lol
+    *((size_t*)&header) = (size_t)0xFFFFFFF;
+  }
 }
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}

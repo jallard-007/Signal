@@ -277,7 +277,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
           new (list.front()) Statement{std::move(statement)};
         } 
         
-        else {
+        else if (sType == StatementType::UNARY_OP || sType == StatementType::BINARY_OP) {
           Statement* prev = nullptr;
           auto list_iter = list.begin();
           while (list_iter != list.end()) {
@@ -357,6 +357,8 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             Statement* addedStatement = prev->addStatementToNode(std::move(statement));
             list.emplace_back(addedStatement);
           }
+        } else {
+          unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
         }
       }
     }
@@ -475,9 +477,27 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
     }
 
-    // else if (isKeyword(token.type)) {
-    //   // handling all keywords in separate functions would prevent this mess of a function from getting worse
-    // }
+    else if (isKeyword(token.type)) {
+      // handling all keywords in separate functions would prevent this mess of a function from getting worse
+      // but i dont care
+      Statement statement;
+      // these parse the same: keyword (statement) {statements}
+      // exception is else, but wutever
+      if (isKeywordWithBody(token.type)) {
+        KeywordWithBody keyWBody{token.type};
+        // DUP CODE: adding leaf node to the tree in place
+        if (list.empty()) {
+          list.emplace_back(new Statement{std::make_unique<KeywordWithBody>(std::move(keyWBody))});
+        } else {
+          if (hasData(list.front()->type) || !list.back()->addStatementToNode(Statement{std::make_unique<KeywordWithBody>(std::move(keyWBody))})) {
+            // restart the statement parse, discard everything previously
+            expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+            break;
+          }
+        }
+        // END DUP CODE
+      }
+    }
 
     // skip comments
     else if (token.type == TokenType::COMMENT) {
