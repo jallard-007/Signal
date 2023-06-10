@@ -1,8 +1,16 @@
 #include <iostream>
 #include <fstream>
+#include <string>
 #include "./parser/parser.hpp"
 
-int main(int argc, char **argv) {
+int main() {
+  const std::string s = "func here(): int {}";
+  Tokenizer tk{s};
+  Parser p{tk};
+  return 0;
+}
+
+int main1(int argc, char **argv) {
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;

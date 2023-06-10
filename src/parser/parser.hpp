@@ -3,9 +3,7 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../token.hpp"
 #include "../nodes.hpp"
-
-bool isStatementDelimiter(TokenType);
-bool isTypeDelimiter(TokenType);
+#include "../sTest.hpp"
 
 struct Parser {
   Program program;
@@ -13,8 +11,9 @@ struct Parser {
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
   Parser() = delete;
+  MemPoolS s;
   explicit Parser(Tokenizer& tokenizer);
-  void parse();
+  bool parse();
   bool functionDec(Declaration&);
   bool structDec(Declaration&);
   bool templateDec(Declaration&);

@@ -28,7 +28,7 @@ struct Expected {
   Expected(ExpectedType, uint32_t, uint32_t, TokenType);
 };
 
-enum class StatementType {
+enum class StatementType: uint8_t {
   NONE,
   BAD,
   BINARY_OP,
@@ -39,6 +39,7 @@ enum class StatementType {
   ARRAY_ACCESS,
   WRAPPED_VALUE,
   SCOPE,
+  KEYWORD,
   KEY_W_BODY,
   LIST
 };
@@ -77,11 +78,12 @@ struct Statement {
     std::unique_ptr<VariableDec> varDec;
     std::unique_ptr<FunctionCall> funcCall;
     std::unique_ptr<ArrayAccess> arrAccess;
-    std::unique_ptr<Statement> wrapped;
+    Statement *wrapped;
     std::unique_ptr<Scope> scope;
     std::unique_ptr<List> list;
     std::unique_ptr<KeywordWithBody> keywBody;
     Token var;
+    TokenType key;
   };
   StatementType type = StatementType::NONE;
 
@@ -94,7 +96,7 @@ struct Statement {
   explicit Statement(std::unique_ptr<VariableDec>);
   explicit Statement(std::unique_ptr<FunctionCall>);
   explicit Statement(std::unique_ptr<ArrayAccess>);
-  explicit Statement(std::unique_ptr<Statement>);
+  explicit Statement(Statement *);
   explicit Statement(std::unique_ptr<Scope>);
   explicit Statement(std::unique_ptr<KeywordWithBody>);
   explicit Statement(std::unique_ptr<List>);
@@ -105,7 +107,7 @@ struct Statement {
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
   ExpectedType addStatementToNode(Statement&&);
-  std::unique_ptr<Statement>* getChild();
+  Statement **getChild();
   ExpectedType isValid() const;
 };
 
@@ -116,8 +118,8 @@ struct List {
 };
 
 struct KeywordWithBody {
-  std::unique_ptr<Statement> body;
-  std::unique_ptr<Statement> header;
+  Statement *body;
+  Statement *header;
   TokenType keyword;
   KeywordWithBody() = delete;
   KeywordWithBody(TokenType);
@@ -140,8 +142,8 @@ struct ArrayAccess {
 };
 
 struct BinOp {
-  std::unique_ptr<Statement> leftSide;
-  std::unique_ptr<Statement> rightSide;
+  Statement *leftSide;
+  Statement *rightSide;
   TokenType op;
   explicit BinOp(TokenType);
   BinOp(const BinOp&) = delete;
@@ -150,7 +152,7 @@ struct BinOp {
 };
 
 struct UnOp {
-  std::unique_ptr<Statement> operand;
+  Statement *operand;
   TokenType op;
   explicit UnOp(TokenType);
   UnOp(const UnOp&) = delete;
@@ -176,12 +178,19 @@ struct FunctionCall {
   bool operator==(const FunctionCall&) const;
 };
 
-enum class DecType {
+enum class DecType: uint8_t {
   NONE,
   FUNCTION,
   STATEMENT,
   TEMPLATE,
-  STRUCT
+  STRUCT,
+  ENUM
+};
+
+struct Enum {
+  std::vector<Token> members;
+  Token name;
+  Enum();
 };
 
 typedef struct Template Template;
@@ -190,17 +199,19 @@ typedef struct Struct Struct;
 struct Declaration {
   union{
     std::unique_ptr<FunctionDec> func;
-    std::unique_ptr<Statement> statement;
+    Statement *statement;
     std::unique_ptr<Template> temp;
     std::unique_ptr<Struct> struc;
+    std::unique_ptr<Enum> enm;
   };
   DecType decType;
   Declaration();
   Declaration(Declaration&&) noexcept;
   explicit Declaration(std::unique_ptr<FunctionDec>);
-  explicit Declaration(std::unique_ptr<Statement>);
+  explicit Declaration(Statement *);
   explicit Declaration(std::unique_ptr<Template>);
   explicit Declaration(std::unique_ptr<Struct>);
+  explicit Declaration(std::unique_ptr<Enum>);
   ~Declaration();
 };
 

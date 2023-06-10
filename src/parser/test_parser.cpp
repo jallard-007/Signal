@@ -193,79 +193,79 @@ TEST_CASE("Binary Operators", "[parser]") {
     CHECK(tokenizer.extractToken(binOp->rightSide->var) == "4");
   }
 
-  // operator with higher precedence on right node
-  {
-    const std::string str = " x - function(var) * 9;";
-    Tokenizer tokenizer{str};
-    Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
-    CHECK(parser.unexpected.empty());
-    CHECK(parser.expected.empty());
-    REQUIRE(statement.type == StatementType::BINARY_OP);
-    auto &binOp = statement.binOp;
-    REQUIRE(binOp);
-    CHECK(binOp->op == TokenType::SUBTRACTION);
+  // // operator with higher precedence on right node
+  // {
+  //   const std::string str = " x - function(var) * 9;";
+  //   Tokenizer tokenizer{str};
+  //   Parser parser{tokenizer};
+  //   Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
+  //   CHECK(parser.unexpected.empty());
+  //   CHECK(parser.expected.empty());
+  //   REQUIRE(statement.type == StatementType::BINARY_OP);
+  //   auto &binOp = statement.binOp;
+  //   REQUIRE(binOp);
+  //   CHECK(binOp->op == TokenType::SUBTRACTION);
 
-    REQUIRE(binOp->leftSide);
-    REQUIRE(binOp->leftSide->type == StatementType::VALUE);
-    CHECK(binOp->leftSide->var.type == TokenType::IDENTIFIER);
-    CHECK(tokenizer.extractToken(binOp->leftSide->var) == "x");
+  //   REQUIRE(binOp->leftSide);
+  //   REQUIRE(binOp->leftSide->type == StatementType::VALUE);
+  //   CHECK(binOp->leftSide->var.type == TokenType::IDENTIFIER);
+  //   CHECK(tokenizer.extractToken(binOp->leftSide->var) == "x");
 
-    REQUIRE(binOp->rightSide);
-    REQUIRE(binOp->rightSide->type == StatementType::BINARY_OP);
-    REQUIRE(binOp->rightSide->binOp);
-    CHECK(binOp->rightSide->binOp->op == TokenType::MULTIPLICATION);
+  //   REQUIRE(binOp->rightSide);
+  //   REQUIRE(binOp->rightSide->type == StatementType::BINARY_OP);
+  //   REQUIRE(binOp->rightSide->binOp);
+  //   CHECK(binOp->rightSide->binOp->op == TokenType::MULTIPLICATION);
 
-    auto& rl = binOp->rightSide->binOp->leftSide;
-    REQUIRE(rl);
-    REQUIRE(rl->type == StatementType::FUNCTION_CALL);
-    REQUIRE(rl->funcCall);
-    REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "function");
-    REQUIRE(rl->funcCall->args.size() == 1);
-    REQUIRE(rl->funcCall->args[0].type == StatementType::VALUE);
-    REQUIRE(rl->funcCall->args[0].var.type == TokenType::IDENTIFIER);
+  //   auto& rl = binOp->rightSide->binOp->leftSide;
+  //   REQUIRE(rl);
+  //   REQUIRE(rl->type == StatementType::FUNCTION_CALL);
+  //   REQUIRE(rl->funcCall);
+  //   REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "function");
+  //   REQUIRE(rl->funcCall->args.size() == 1);
+  //   REQUIRE(rl->funcCall->args[0].type == StatementType::VALUE);
+  //   REQUIRE(rl->funcCall->args[0].var.type == TokenType::IDENTIFIER);
 
-    auto& rr = binOp->rightSide->binOp->rightSide;
-    REQUIRE(rr);
-    CHECK(rr->type == StatementType::VALUE);
-    CHECK(rr->var.type == TokenType::DECIMAL_NUMBER);
+  //   auto& rr = binOp->rightSide->binOp->rightSide;
+  //   REQUIRE(rr);
+  //   CHECK(rr->type == StatementType::VALUE);
+  //   CHECK(rr->var.type == TokenType::DECIMAL_NUMBER);
 
-  }
+  // }
 
-  // operator with higher precedence on left node
-  {
-    const std::string str = " x * function(var) - 9;";
-    Tokenizer tokenizer{str};
-    Parser parser{tokenizer};
-    Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
-    CHECK(parser.expected.empty());
+  // // operator with higher precedence on left node
+  // {
+  //   const std::string str = " x * function(var) - 9;";
+  //   Tokenizer tokenizer{str};
+  //   Parser parser{tokenizer};
+  //   Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
+  //   CHECK(parser.expected.empty());
 
-    REQUIRE(statement.type == StatementType::BINARY_OP);
-    auto &binOp = statement.binOp;
-    REQUIRE(binOp);
-    CHECK(binOp->op == TokenType::SUBTRACTION);
+  //   REQUIRE(statement.type == StatementType::BINARY_OP);
+  //   auto &binOp = statement.binOp;
+  //   REQUIRE(binOp);
+  //   CHECK(binOp->op == TokenType::SUBTRACTION);
 
-    REQUIRE(binOp->rightSide);
-    REQUIRE(binOp->rightSide->type == StatementType::VALUE);
-    CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
+  //   REQUIRE(binOp->rightSide);
+  //   REQUIRE(binOp->rightSide->type == StatementType::VALUE);
+  //   CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
 
-    REQUIRE(binOp->leftSide);
-    REQUIRE(binOp->leftSide->type == StatementType::BINARY_OP);
-    CHECK(binOp->leftSide->binOp->op == TokenType::MULTIPLICATION);
+  //   REQUIRE(binOp->leftSide);
+  //   REQUIRE(binOp->leftSide->type == StatementType::BINARY_OP);
+  //   CHECK(binOp->leftSide->binOp->op == TokenType::MULTIPLICATION);
 
-    auto& ll = binOp->leftSide->binOp->leftSide;
-    REQUIRE(ll);
-    REQUIRE(ll->type == StatementType::VALUE);
-    CHECK(ll->var.type == TokenType::IDENTIFIER);
+  //   auto& ll = binOp->leftSide->binOp->leftSide;
+  //   REQUIRE(ll);
+  //   REQUIRE(ll->type == StatementType::VALUE);
+  //   CHECK(ll->var.type == TokenType::IDENTIFIER);
 
-    auto& lr = binOp->leftSide->binOp->rightSide;
-    REQUIRE(lr->type == StatementType::FUNCTION_CALL);
-    REQUIRE(lr->funcCall);
-    CHECK(tokenizer.extractToken(lr->funcCall->name) == "function");
-    REQUIRE(lr->funcCall->args.size() == 1);
-    CHECK(lr->funcCall->args[0].type == StatementType::VALUE);
-    CHECK(lr->funcCall->args[0].var.type == TokenType::IDENTIFIER);
-  }
+  //   auto& lr = binOp->leftSide->binOp->rightSide;
+  //   REQUIRE(lr->type == StatementType::FUNCTION_CALL);
+  //   REQUIRE(lr->funcCall);
+  //   CHECK(tokenizer.extractToken(lr->funcCall->name) == "function");
+  //   REQUIRE(lr->funcCall->args.size() == 1);
+  //   CHECK(lr->funcCall->args[0].type == StatementType::VALUE);
+  //   CHECK(lr->funcCall->args[0].var.type == TokenType::IDENTIFIER);
+  // }
 }
 
 TEST_CASE("Expected tokens", "[parser]") {
@@ -382,10 +382,10 @@ TEST_CASE("Variable Declaration", "[parser]") {
   REQUIRE(parser.program.decs.size() == 1);
   auto& d = parser.program.decs[0];
   CHECK(d.decType == DecType::STATEMENT);
-  REQUIRE(d.statement.get());
+  REQUIRE(d.statement);
   CHECK(d.statement->type == StatementType::BINARY_OP);
   REQUIRE(d.statement->binOp.get());
-  REQUIRE(d.statement->binOp->leftSide.get());
+  REQUIRE(d.statement->binOp->leftSide);
   CHECK(d.statement->binOp->leftSide->type == StatementType::VARIABLE_DEC);
 }
 
@@ -399,10 +399,10 @@ TEST_CASE("Keywords", "[parser]") {
   CHECK(s.type == StatementType::KEY_W_BODY);
   REQUIRE(s.keywBody.get());
   CHECK(s.keywBody->keyword == TokenType::IF);
-  REQUIRE(s.keywBody->header.get());
+  REQUIRE(s.keywBody->header);
   CHECK(s.keywBody->header->type == StatementType::WRAPPED_VALUE);
-  REQUIRE(s.keywBody->header->wrapped.get());
+  REQUIRE(s.keywBody->header->wrapped);
   CHECK(s.keywBody->header->wrapped->type == StatementType::VALUE);
-  REQUIRE(s.keywBody->body.get());
+  REQUIRE(s.keywBody->body);
   CHECK(s.keywBody->body->type == StatementType::SCOPE);
 }

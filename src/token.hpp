@@ -16,13 +16,16 @@ enum class TokenType : uint8_t {
   DECIMAL_NUMBER,
   BINARY_NUMBER,
   HEX_NUMBER,
+  FALSE, //
+  TRUE, //
+  NULL_, //
 
   // keywords
-  AS,
+  AS, //
   BREAK,
   CASE,
   CONTINUE,
-  CREATE,
+  CREATE, //
   DEFAULT,
   IF,
   ELIF,
@@ -31,14 +34,11 @@ enum class TokenType : uint8_t {
   SWITCH,
   WHILE,
   ENUM,
-  FALSE,
   FUNC,
-  INCLUDE,
-  NULL_,
-  RETURN,
+  INCLUDE, //
+  RETURN, //
   STRUCT,
   TEMPLATE,
-  TRUE,
 
   // general
   IDENTIFIER,
@@ -120,6 +120,8 @@ bool isBuiltInType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
 bool isKeywordWithBody(TokenType);
+bool isStatementDelimiter(TokenType);
+bool isTypeDelimiter(TokenType);
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<char, TokenType> charToType {
@@ -230,8 +232,8 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::NOT_EQUAL, "!="},
   {TokenType::ADDRESS_OF, "@"},
   {TokenType::COMMENT, "#"},
-  {TokenType::BITWISE_XOR, "&"},
-  {TokenType::BITWISE_XOR_ASSIGNMENT, "&="},
+  {TokenType::BITWISE_XOR, "$"},
+  {TokenType::BITWISE_XOR_ASSIGNMENT, "$="},
   {TokenType::MODULO, "%"},
   {TokenType::MODULO_ASSIGNMENT, "%="},
   {TokenType::POINTER, "^"},

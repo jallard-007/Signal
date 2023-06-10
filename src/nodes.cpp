@@ -1,4 +1,5 @@
 #include "nodes.hpp"
+#include <iostream>
 
 bool hasData(StatementType type) {
   return type >= StatementType::VALUE && type <= StatementType::WRAPPED_VALUE;
@@ -23,7 +24,7 @@ bool VariableDec::operator==(const VariableDec& varDec) const {
   return name == varDec.name && type == varDec.type;
 }
 
-Statement::Statement(): unOp{nullptr} {}
+Statement::Statement(): unOp{nullptr}, type{StatementType::NONE} {}
 
 Statement::Statement(StatementType type): unOp{nullptr}, type{type} {}
 
@@ -41,7 +42,7 @@ void Statement::operator=(Statement&& st) noexcept {
     case StatementType::ARRAY_ACCESS:
       new (&arrAccess) std::unique_ptr<ArrayAccess>{std::move(st.arrAccess)}; break;
     case StatementType::WRAPPED_VALUE:
-      new (&wrapped) std::unique_ptr<Statement>{std::move(st.wrapped)}; break;
+      wrapped = st.wrapped; st.wrapped = nullptr; break;
     case StatementType::SCOPE:
       new (&scope) std::unique_ptr<Scope>{std::move(st.scope)}; break;
     case StatementType::LIST:
@@ -153,8 +154,8 @@ Statement::Statement(std::unique_ptr<ArrayAccess> ptr) {
   type = StatementType::ARRAY_ACCESS;
 }
 
-Statement::Statement(std::unique_ptr<Statement> ptr) {
-  new (&wrapped) std::unique_ptr<Statement>{std::move(ptr)};
+Statement::Statement(Statement *ptr) {
+  wrapped = ptr;
   type = StatementType::WRAPPED_VALUE;
 }
 
@@ -184,7 +185,6 @@ Statement::~Statement() {
     case StatementType::VARIABLE_DEC: varDec.~unique_ptr<VariableDec>(); break;
     case StatementType::FUNCTION_CALL: funcCall.~unique_ptr<FunctionCall>(); break;
     case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
-    case StatementType::WRAPPED_VALUE: wrapped.~unique_ptr<Statement>(); break;
     case StatementType::SCOPE: scope.~unique_ptr<Scope>(); break;
     case StatementType::LIST: list.~unique_ptr<List>(); break;
     case StatementType::KEY_W_BODY: keywBody.~unique_ptr<KeywordWithBody>(); break;
@@ -192,7 +192,7 @@ Statement::~Statement() {
   }
 }
 
-std::unique_ptr<Statement>* Statement::getChild() {
+Statement **Statement::getChild() {
   switch (type) {
     case StatementType::UNARY_OP:
       return &unOp->operand;
@@ -209,13 +209,19 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (unOp->operand) {
         return ExpectedType::TOKEN;
       }
-      unOp->operand = std::make_unique<Statement>(std::move(st));
+      unOp->operand = st.unOp->operand;
       return ExpectedType::NOTHING;
+
     case StatementType::BINARY_OP:
+    std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+    std::cout << binOp->rightSide << '\n';
+    std::cout << wrapped << '\n';
+
       if (binOp->rightSide) {
         return ExpectedType::TOKEN;
       }
-      binOp->rightSide = std::make_unique<Statement>(std::move(st));
+
+      binOp->rightSide = st.binOp->rightSide;
       return ExpectedType::NOTHING;
 
     case StatementType::KEY_W_BODY:
@@ -223,11 +229,11 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
         return ExpectedType::TOKEN;
       }
       if (st.type == StatementType::WRAPPED_VALUE && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
-        keywBody->header = std::make_unique<Statement>(std::move(st));
+        keywBody->header = st.keywBody->header;
         return ExpectedType::NOTHING;
       }
       else if (st.type == StatementType::SCOPE && keywBody->header) {
-        keywBody->body = std::make_unique<Statement>(std::move(st));
+        keywBody->body = st.keywBody->body;
         return ExpectedType::NOTHING;
       }
       return ExpectedType::TOKEN;
@@ -267,10 +273,14 @@ bool Scope::operator==(const Scope& sp) const {
   return sp.scopeStatements == scopeStatements;
 }
 
-BinOp::BinOp(TokenType op): op{op} {}
+BinOp::BinOp(TokenType op): leftSide{nullptr}, rightSide{nullptr}, op{op} {}
 
 BinOp::BinOp(BinOp&& binOp) noexcept:
-  leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {}
+leftSide{binOp.leftSide}, rightSide{binOp.rightSide}, op{binOp.op} {
+  binOp.leftSide = nullptr;
+  binOp.rightSide = nullptr;
+  binOp.op = TokenType::NOTHING;
+}
 
 bool BinOp::operator==(const BinOp& bo) const {
   if (op != bo.op) {
@@ -301,7 +311,7 @@ bool BinOp::operator==(const BinOp& bo) const {
 
 UnOp::UnOp(TokenType op): op{op} {}
 
-UnOp::UnOp(UnOp&& unOp) noexcept : operand{std::move(unOp.operand)} , op{unOp.op} {}
+UnOp::UnOp(UnOp&& unOp) noexcept : operand{unOp.operand} , op{unOp.op} {}
 
 bool UnOp::operator==(const UnOp& uo) const {
   if (operand && uo.operand) {
@@ -313,6 +323,8 @@ bool UnOp::operator==(const UnOp& uo) const {
   }
   return true;
 }
+
+Enum::Enum(): name{0,0,TokenType::NOTHING} {}
 
 FunctionDec::FunctionDec(Token token): name{token} {}
 
@@ -336,13 +348,17 @@ Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
       new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
       break;
     case DecType::STATEMENT:
-      new (&statement) std::unique_ptr<Statement>{std::move(dec.statement)};
+      statement = dec.statement;
+      dec.statement = nullptr;
       break;
     case DecType::STRUCT:
       new (&struc) std::unique_ptr<Struct>{std::move(dec.struc)};
       break;
     case DecType::TEMPLATE:
       new (&temp) std::unique_ptr<Template>{std::move(dec.temp)};
+      break;
+    case DecType::ENUM:
+      new (&enm) std::unique_ptr<Enum>{std::move(dec.enm)};
       break;
     default:
       break;
@@ -354,9 +370,7 @@ Declaration::Declaration(std::unique_ptr<FunctionDec> funcDec): decType{DecType:
   new (&func) std::unique_ptr<FunctionDec>{std::move(funcDec)};
 }
 
-Declaration::Declaration(std::unique_ptr<Statement> st): decType{DecType::STATEMENT} {
-  new (&statement) std::unique_ptr<Statement>{std::move(st)};
-}
+Declaration::Declaration(Statement *st): statement{st}, decType{DecType::STATEMENT} {}
 
 Declaration::Declaration(std::unique_ptr<Template> tDec): decType{DecType::TEMPLATE} {
   new (&temp) std::unique_ptr<Template>{std::move(tDec)};
@@ -366,12 +380,16 @@ Declaration::Declaration(std::unique_ptr<Struct> sDec): decType{DecType::STRUCT}
   new (&struc) std::unique_ptr<Struct>{std::move(sDec)};
 }
 
+Declaration::Declaration(std::unique_ptr<Enum> sDec): decType{DecType::ENUM} {
+  new (&enm) std::unique_ptr<Enum>{std::move(sDec)};
+}
+
 Declaration::~Declaration() {
   switch(decType) {
     case DecType::FUNCTION: func.~unique_ptr<FunctionDec>(); break;
-    case DecType::STATEMENT: statement.~unique_ptr<Statement>(); break;
     case DecType::TEMPLATE: temp.~unique_ptr<Template>(); break;
     case DecType::STRUCT: struc.~unique_ptr<Struct>(); break;
+    case DecType::ENUM: enm.~unique_ptr<Enum>(); break;
     default: break;
   }
 }

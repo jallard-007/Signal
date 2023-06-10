@@ -1,11 +1,11 @@
 #include "token.hpp"
 
 bool isLiteral(TokenType type) {
-  return type >= TokenType::CHAR_LITERAL && type <= TokenType::HEX_NUMBER;
+  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_;
 }
 
 bool isKeyword(TokenType type) {
-  return type >= TokenType::AS && type <= TokenType::WHILE;
+  return type >= TokenType::AS && type <= TokenType::TEMPLATE;
 }
 
 bool isBuiltInType(TokenType type) {
@@ -22,6 +22,14 @@ bool isUnaryOp(TokenType type) {
 
 bool isKeywordWithBody(TokenType type) {
   return type >= TokenType::IF && type <= TokenType::WHILE;
+}
+
+bool isStatementDelimiter(TokenType type) {
+  return type >= TokenType::CLOSE_PAREN && type <= TokenType::CLOSE_BRACKET;
+}
+
+bool isTypeDelimiter(TokenType type) {
+  return type != TokenType::IDENTIFIER && !isBuiltInType(type);
 }
 
 bool Token::operator==(const Token& tk) const {
