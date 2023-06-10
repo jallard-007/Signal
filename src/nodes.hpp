@@ -38,10 +38,11 @@ enum class StatementType: uint8_t {
   FUNCTION_CALL,
   ARRAY_ACCESS,
   WRAPPED_VALUE,
+  ARRAY_OR_STRUCT_LITERAL,
+  LIST,
   SCOPE,
   KEYWORD,
   KEY_W_BODY,
-  LIST
 };
 
 bool hasData(StatementType);
@@ -114,6 +115,7 @@ struct List {
   std::vector<Statement> list;
   List() = default;
   List(List&&) = default;
+  bool operator==(const List&) const;
 };
 
 struct KeywordWithBody {
@@ -122,7 +124,7 @@ struct KeywordWithBody {
   TokenType keyword;
   KeywordWithBody() = delete;
   KeywordWithBody(TokenType);
-  KeywordWithBody(KeywordWithBody&&) = default;
+  KeywordWithBody(KeywordWithBody&&);
 };
 
 struct Scope {

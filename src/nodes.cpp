@@ -2,7 +2,7 @@
 #include <iostream>
 
 bool hasData(StatementType type) {
-  return type >= StatementType::VALUE && type <= StatementType::WRAPPED_VALUE;
+  return type >= StatementType::BINARY_OP && type <= StatementType::LIST;
 }
 
 Unexpected::Unexpected(Token token, uint32_t line, uint32_t column):
@@ -45,6 +45,7 @@ void Statement::operator=(Statement&& st) noexcept {
       wrapped = st.wrapped; st.wrapped = nullptr; break;
     case StatementType::SCOPE:
       scope = st.scope; st.scope = nullptr; break;
+    case StatementType::ARRAY_OR_STRUCT_LITERAL:
     case StatementType::LIST:
       list = st.list; st.list = nullptr; break;
     case StatementType::KEY_W_BODY:
@@ -109,6 +110,15 @@ bool Statement::operator==(const Statement& st) const {
         return false;
       }
       return *wrapped == *st.wrapped;
+    case StatementType::ARRAY_OR_STRUCT_LITERAL:
+    case StatementType::LIST:
+      if (!list && !st.list) {
+        return true;
+      }
+      if (!list || !st.list) {
+        return false;
+      }
+      return *list == *st.list;
     case StatementType::SCOPE:
       if (!scope && !st.scope) {
         return true;
@@ -209,11 +219,11 @@ ExpectedType Statement::addStatementToNode(Statement *st) {
       if (keywBody->body) {
         return ExpectedType::TOKEN;
       }
-      if (st->type == StatementType::WRAPPED_VALUE && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
+      if (hasData(st->type) && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
         keywBody->header = st;
         return ExpectedType::NOTHING;
       }
-      else if (st->type == StatementType::SCOPE && keywBody->header) {
+      else if (st->type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN && keywBody->header) {
         keywBody->body = st;
         return ExpectedType::NOTHING;
       }
@@ -243,6 +253,12 @@ ExpectedType Statement::isValid() const {
 }
 
 KeywordWithBody::KeywordWithBody(TokenType type): body{}, header{}, keyword{type} {}
+
+KeywordWithBody::KeywordWithBody(KeywordWithBody&& rval): body{rval.body}, header{rval.header}, keyword{rval.keyword} {
+  rval.body = nullptr;
+  rval.header = nullptr;
+  rval.keyword = TokenType::NOTHING;
+}
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}
 
@@ -351,3 +367,7 @@ Declaration::Declaration(Struct *ptr): struc{ptr}, decType{DecType::STRUCT} {}
 Declaration::Declaration(Enum *ptr): enm{ptr}, decType{DecType::ENUM} {}
 
 Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std::move(prog.decs)} {}
+
+bool List::operator==(const List & l) const {
+  return list == l.list;
+}

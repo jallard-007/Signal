@@ -23,20 +23,21 @@ enum class TokenType : uint8_t {
   // keywords
   AS, //
   BREAK,
-  CASE,
+  CASE, //
   CONTINUE,
   CREATE, //
-  DEFAULT,
+  DEFAULT, //
   IF,
   ELIF,
   ELSE,
   FOR,
-  SWITCH,
+  SWITCH, //
+  RETURN,
   WHILE,
   ENUM,
   FUNC,
   INCLUDE, //
-  RETURN, //
+  EXTERN,
   STRUCT,
   TEMPLATE,
 
@@ -181,6 +182,7 @@ const std::unordered_map<std::string, TokenType> stringToType {
   {"if", TokenType::IF},
   {"int", TokenType::INT_TYPE},
   {"include", TokenType::INCLUDE},
+  {"extern", TokenType::EXTERN},
   {"null", TokenType::NULL_},
   {"return", TokenType::RETURN},
   {"struct", TokenType::STRUCT},
