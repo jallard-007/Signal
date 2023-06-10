@@ -1,5 +1,4 @@
 #include "parser.hpp"
-#include <list>
 #include <memory>
 #include <iostream>
 
@@ -220,25 +219,13 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
   if (delimiterA == TokenType::NOTHING) {
     delimiterA = delimiterB;
   }
+  Statement rootStatement;
   Token token = tokenizer.peekNext();
   if (token.type == delimiterA || token.type == delimiterB) {
-    return {StatementType::NONE};
+    return rootStatement;
   }
 
-  /**
-   * The first node in the list is the root node of the whole statement
-   *  - root node has ownership over the rest
-   * 
-   * Nodes should be placed in ascending precedence
-   *  - lowest precedence operator in the whole statement should be at the top
-   * 
-   * The list has no ownership over the root statement, hence the raw pointer type,
-   * so be sure to free the memory at the 0 index before returning the statement
-   * 
-   * When a node is placed in the list/tree, we clear nodes with higher precedence from the list
-   *  - they cannot be accessed anymore since they are to the left of the new node
-  */
-  std::list<Statement*> list;
+  Statement *bottom = nullptr;
   uint32_t lineNum = tokenizer.lineNum, lineStart = tokenizer.lineStart;
   tokenizer.consumePeek();
   Token lookAhead = tokenizer.peekNext();
@@ -253,98 +240,106 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.type = StatementType::UNARY_OP;
         statement.unOp = std::make_unique<UnOp>(token.type);
       }
-      if (list.empty()) {
+      if (!bottom) {
         // expected expression before binary operator
         expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
-        list.emplace_back(new Statement{std::move(statement)});
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
       }
       
       else {
-        const StatementType sType = list.front()->type;
+        const StatementType sType = rootStatement.type;
         if (sType == StatementType::BAD || sType == StatementType::NONE) {
           // never will be a node of this type in the list
           exit(1);
         }
+        
         else if (hasData(sType)) {
           // first "value" token in statement: take it
           // this is the only node in the list (list.size == 1)
           if (statement.type == StatementType::BINARY_OP) {
-            statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));
+            statement.binOp->leftSide = std::make_unique<Statement>(std::move(rootStatement));
           } else {
-            statement.unOp->operand = std::make_unique<Statement>(std::move(*list.front()));
+            statement.unOp->operand = std::make_unique<Statement>(std::move(rootStatement));
           }
           // move the statement to the tree root
-          new (list.front()) Statement{std::move(statement)};
-        } 
+          rootStatement = std::move(statement);
+        }
         
         else if (sType == StatementType::UNARY_OP || sType == StatementType::BINARY_OP) {
           Statement* prev = nullptr;
-          auto list_iter = list.begin();
-          while (list_iter != list.end()) {
+          Statement* list_iter = &rootStatement;
+          while (list_iter) {
+            Statement* next;
             TokenType op;
-            if ((*list_iter)->type == StatementType::BINARY_OP) {
-              op = (*list_iter)->binOp->op;
-            } else if ((*list_iter)->type == StatementType::UNARY_OP) {
-              op = (*list_iter)->unOp->op;
+            if (list_iter->type == StatementType::BINARY_OP) {
+              op = list_iter->binOp->op;
+              next = list_iter->binOp->rightSide.get();
+            } else if (list_iter->type == StatementType::UNARY_OP) {
+              op = list_iter->unOp->op;
+              next = list_iter->unOp->operand.get();
             } else {
-              // not possible to reach here:
-              // there should never be a different statement type placed in the list
-              // if there is, the code is incorrect
-              exit(1);
+              if (prev != bottom) {
+                std::cerr << "Only \'other\' nodes should be at the bottom\n";
+                std::cerr << "Statement Type: " << (int)list_iter->type << '\n';
+                std::cerr << "Bottom Statement Type: " << (int)bottom->type << '\n';
+                exit(1);
+              }
+              // cant insert the node
+              list_iter = nullptr;
+              break;
             }
+            
             if (operatorPrecedence.at(token.type) <= operatorPrecedence.at(op)) {
-              // place it above
+              // place it between prev and current
               if (prev) {
                 std::unique_ptr<Statement>* childOfPrev = prev->getChild();
 
                 // DUP CODE: moving child node
-                if (!childOfPrev) {
-                  if (statement.type == StatementType::BINARY_OP) {
-                    // expected token between operators
-                    expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
-                  }
+                if (!childOfPrev && statement.type == StatementType::BINARY_OP) {
+                  // expected token between operators
+                  expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
                 } else {
                   if (statement.type == StatementType::BINARY_OP) {
-                    statement.binOp->leftSide = std::move(*childOfPrev);
+                    statement.binOp->leftSide = std::move(prev->binOp->rightSide);
                   } else {
                     statement.unOp->operand = std::move(*childOfPrev);
                   }
                 }
                 // END DUP CODE
 
-                Statement* addedStatement = prev->addStatementToNode(std::move(statement));
-                if (!addedStatement) {
-                  prev = nullptr;
-                  break;
+                if (prev->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
                 }
-                list.erase(list_iter, list.end());
-                list.emplace_back(addedStatement);
-              } else {
-                // root node
+                prev = nullptr;
+              }
+              
+              // root node
+              else {
                 if (statement.type == StatementType::BINARY_OP) {
-                  statement.binOp->leftSide = std::make_unique<Statement>(std::move(*list.front()));
+                  statement.binOp->leftSide = std::make_unique<Statement>(std::move(rootStatement));
                 } else {
-                  statement.unOp->operand = std::make_unique<Statement>(std::move(*list.front()));
+                  statement.unOp->operand = std::make_unique<Statement>(std::move(rootStatement));
                 }
                 // move the statement to the root
-                new (list.front()) Statement{std::move(statement)};
-                list.erase(++list.begin(), list.end());
+                rootStatement = std::move(statement);
               }
-              prev = nullptr;
+              
+              // exit the list loop, we inserted the node
               break;
             }
-            prev = *list_iter;
-            ++list_iter;
+            
+            prev = list_iter;
+            list_iter = next;
           }
-          if (list_iter == list.end() && prev) {
+
+          // we went through the whole list, so add it to the bottom
+          if (!list_iter && prev) {
             std::unique_ptr<Statement>* childOfPrev = prev->getChild();
             
             // DUP CODE: moving child node
-            if (!childOfPrev) {
-              if (statement.type == StatementType::BINARY_OP) {
-                // expected expression between operators
-                expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
-              }
+            if (!childOfPrev && statement.type == StatementType::BINARY_OP) {
+              // expected token between operators
+              expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
             } else {
               if (statement.type == StatementType::BINARY_OP) {
                 statement.binOp->leftSide = std::move(*childOfPrev);
@@ -354,10 +349,22 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             }
             // END DUP CODE
 
-            Statement* addedStatement = prev->addStatementToNode(std::move(statement));
-            list.emplace_back(addedStatement);
+            if (prev->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+              expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+              break;
+            } else {
+              if (prev->type == StatementType::BINARY_OP) {
+                bottom = prev->binOp->rightSide.get();
+              } else {
+                bottom = prev->unOp->operand.get();
+              }
+            }
+          } else {
+            unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
           }
-        } else {
+        }
+        
+        else {
           unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
         }
       }
@@ -419,28 +426,42 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
 
       // DUP CODE: adding leaf node to the tree by move
-      if (list.empty()) {
-        list.emplace_back(new Statement{std::move(statement)});
-      } else {
-        if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
-          // restart the statement parse, discard everything previously
-          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          break;
-        }
+      if (!bottom) {
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
+      } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        break;
       }
       // END DUP CODE
     }
 
     else if (isLiteral(token.type)) {
-      // DUP CODE: adding leaf node to the tree in place
-      if (list.empty()) {
-        list.emplace_back(new Statement{token});
-      } else {
-        if (hasData(list.front()->type) || !list.back()->addStatementToNode(Statement{token})) {
-          // restart the statement parse, discard everything previously
-          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          break;
-        }
+      Statement statement{token};
+      // DUP CODE: adding leaf node to the tree by move
+      if (!bottom) {
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
+      } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        break;
+      }
+      // END DUP CODE
+    }
+
+    else if (isKeyword(token.type)) {
+      Statement statement;
+      if (isKeywordWithBody(token.type)) {
+        statement.keywBody = std::make_unique<KeywordWithBody>(token.type);
+        statement.type = StatementType::KEY_W_BODY;
+      }
+      // DUP CODE: adding leaf node to the tree by move
+      if (!bottom) {
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
+      } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        break;
       }
       // END DUP CODE
     }
@@ -456,14 +477,12 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
       }
       // DUP CODE: adding leaf node to the tree by move
-      if (list.empty()) {
-        list.emplace_back(new Statement{std::move(statement)});
-      } else {
-        if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
-          // restart the statement parse, discard everything previously
-          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          break;
-        }
+      if (!bottom) {
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
+      } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        break;
       }
       // END DUP CODE
       if (lookAhead.type != TokenType::CLOSE_PAREN) {
@@ -477,32 +496,6 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
     }
 
-    else if (isKeyword(token.type)) {
-      // handling all keywords in separate functions would prevent this mess of a function from getting worse
-      // but i dont care
-      Statement statement;
-      // these parse the same: keyword (statement) {statements}
-      // exception is else, but wutever
-      if (isKeywordWithBody(token.type)) {
-        KeywordWithBody keyWBody{token.type};
-        // DUP CODE: adding leaf node to the tree in place
-        if (list.empty()) {
-          list.emplace_back(new Statement{std::make_unique<KeywordWithBody>(std::move(keyWBody))});
-        } else {
-          if (hasData(list.front()->type) || !list.back()->addStatementToNode(Statement{std::make_unique<KeywordWithBody>(std::move(keyWBody))})) {
-            // restart the statement parse, discard everything previously
-            expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-            break;
-          }
-        }
-        // END DUP CODE
-      }
-    }
-
-    // skip comments
-    else if (token.type == TokenType::COMMENT) {
-    }
-
     // scope
     else if (token.type == TokenType::OPEN_BRACE) {
       if (delimiterB != TokenType::CLOSE_BRACE) {
@@ -514,14 +507,12 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
       lookAhead = tokenizer.peekNext();
       // DUP CODE: adding leaf node to the tree by move
-      if (list.empty()) {
-        list.emplace_back(new Statement{std::move(statement)});
-      } else {
-        if (hasData(list.front()->type) || !list.back()->addStatementToNode(std::move(statement))) {
-          // restart the statement parse, discard everything previously
-          expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
-          break;
-        }
+      if (!bottom) {
+        rootStatement = std::move(statement);
+        bottom = &rootStatement;
+      } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
+        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        break;
       }
       // END DUP CODE
       if (lookAhead.type != TokenType::CLOSE_BRACE) {
@@ -535,7 +526,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       }
     }
 
-    // array literals
+    // array literals, structs
     else if (token.type == TokenType::OPEN_BRACKET) {
     }
 
@@ -544,10 +535,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       break;
     }
   
-    else {
+    else if (token.type != TokenType::COMMENT) {
       // unexpected, i guess...
       unexpected.emplace_back(token, lineNum, token.position - lineStart);
-      break;
     }
     
     if (lookAhead.type == delimiterA || lookAhead.type == delimiterB) {
@@ -556,22 +546,18 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     
     token = tokenizer.tokenizeNext();
     lineNum = tokenizer.lineNum;
-    lineStart  =tokenizer.lineStart;
+    lineStart = tokenizer.lineStart;
     lookAhead = tokenizer.peekNext();
   }
 
-  if (list.empty()) {
-    return {StatementType::NONE};
+  if (bottom) {
+    ExpectedType exType = bottom->isValid();
+    if (exType != ExpectedType::NOTHING) {
+      expected.emplace_back(exType, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+    }
   }
 
-  // validate statement, list.back() should be filled
-  if (list.back()->isValid() == ExpectedType::EXPRESSION) {
-    expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
-  }
-  Statement* front = list.front();
-  Statement r_statement{std::move(*front)};
-  delete front;
-  return r_statement;
+  return rootStatement;
 }
 
 /**

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include "./tokenizer/tokenizer.hpp"
+#include "./parser/parser.hpp"
 
 int main(int argc, char **argv) {
   if (argc != 2) {
@@ -21,16 +21,8 @@ int main(int argc, char **argv) {
   t.read(&buffer[0], size);
   t.close();
   Tokenizer lex(buffer);
-  auto vec = lex.tokenizeAll();
-  if (vec.back().type == TokenType::BAD_VALUE) {
-    std::cerr << "Unknown symbol\n";
-    return 1;
-  }
-  for (auto v : vec) {
-    if (typeToString.find(v.type) != typeToString.end()) {
-      std::cout << typeToString.at(v.type);
-    }
-  }
+  Parser p{lex};
+  p.parse();
   return 0;
 }
 

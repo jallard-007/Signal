@@ -203,35 +203,37 @@ std::unique_ptr<Statement>* Statement::getChild() {
   }
 }
 
-Statement* Statement::addStatementToNode(Statement&& st) {
+ExpectedType Statement::addStatementToNode(Statement&& st) {
   switch (type) {
     case StatementType::UNARY_OP:
       if (unOp->operand) {
-        return nullptr;
+        return ExpectedType::TOKEN;
       }
       unOp->operand = std::make_unique<Statement>(std::move(st));
-      return unOp->operand.get();
+      return ExpectedType::NOTHING;
     case StatementType::BINARY_OP:
       if (binOp->rightSide) {
-        return nullptr;
+        return ExpectedType::TOKEN;
       }
       binOp->rightSide = std::make_unique<Statement>(std::move(st));
-      return binOp->rightSide.get();
+      return ExpectedType::NOTHING;
+
     case StatementType::KEY_W_BODY:
       if (keywBody->body) {
-        return nullptr;
+        return ExpectedType::TOKEN;
       }
-      if (st.type == StatementType::WRAPPED_VALUE && !keywBody->header) {
+      if (st.type == StatementType::WRAPPED_VALUE && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
         keywBody->header = std::make_unique<Statement>(std::move(st));
-        return keywBody->header.get();
+        return ExpectedType::NOTHING;
       }
       else if (st.type == StatementType::SCOPE && keywBody->header) {
         keywBody->body = std::make_unique<Statement>(std::move(st));
-        return keywBody->body.get();
+        return ExpectedType::NOTHING;
       }
-      return nullptr;
+      return ExpectedType::TOKEN;
+
     default:
-      return nullptr;
+      return ExpectedType::TOKEN;
   }
 }
 
@@ -241,23 +243,19 @@ ExpectedType Statement::isValid() const {
       if (unOp->operand == nullptr) {
         return ExpectedType::EXPRESSION;
       }
+      break;
     case StatementType::BINARY_OP:
       if (binOp->rightSide == nullptr) {
         return ExpectedType::EXPRESSION;
       }
+      break;
     default:
       break;
   }
   return ExpectedType::NOTHING;
 }
 
-KeywordWithBody::KeywordWithBody(TokenType type): keyword{type} {
-  if (type == TokenType::ELSE) {
-    // this is kinda stupid, but its so that we can pretend the else already has a condition by default
-    // just dont dereference the header field when the keyword is else lol
-    *((size_t*)&header) = (size_t)0xFFFFFFF;
-  }
-}
+KeywordWithBody::KeywordWithBody(TokenType type): keyword{type} {}
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}
 
@@ -329,8 +327,6 @@ bool FunctionCall::operator==(const FunctionCall& fc) const {
 }
 
 Struct::Struct(Token tok): name{tok} {}
-
-
 
 Declaration::Declaration(): func{nullptr}, decType{DecType::NONE} {}
 

@@ -102,8 +102,9 @@ struct Statement {
   explicit Statement(Token);
   ~Statement();
   void operator=(Statement&&) noexcept;
+  void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
-  Statement* addStatementToNode(Statement&&);
+  ExpectedType addStatementToNode(Statement&&);
   std::unique_ptr<Statement>* getChild();
   ExpectedType isValid() const;
 };
