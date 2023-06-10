@@ -18,7 +18,7 @@ bool Type::operator==(const Type& tk) const {
   return tk.tokens == tokens;
 }
 
-VariableDec::VariableDec(Token token): name{token} {}
+VariableDec::VariableDec(Token token): type{}, name{token} {}
 
 bool VariableDec::operator==(const VariableDec& varDec) const {
   return name == varDec.name && type == varDec.type;
@@ -257,7 +257,7 @@ ExpectedType Statement::isValid() const {
   return ExpectedType::NOTHING;
 }
 
-KeywordWithBody::KeywordWithBody(TokenType type): keyword{type} {}
+KeywordWithBody::KeywordWithBody(TokenType type): body{}, header{}, keyword{type} {}
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}
 

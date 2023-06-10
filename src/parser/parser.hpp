@@ -3,7 +3,7 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../token.hpp"
 #include "../nodes.hpp"
-#include "../sTest.hpp"
+#include "../memPool.hpp"
 
 struct Parser {
   Program program;
@@ -11,7 +11,7 @@ struct Parser {
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
   Parser() = delete;
-  MemPoolS memPoolS;
+  MemPool<Statement> memPoolS;
   explicit Parser(Tokenizer& tokenizer);
   bool parse();
   bool functionDec(Declaration&);

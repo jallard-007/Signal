@@ -325,15 +325,18 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
                 Statement** childOfPrev = prev->getChild();
 
                 // DUP CODE: moving child node
-                if (!childOfPrev && statement.type == StatementType::BINARY_OP) {
+                if (!*childOfPrev ) {
                   // expected token between operators
-                  expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                  if (statement.type == StatementType::BINARY_OP) {
+                    expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                  }
                 } else {
                   if (statement.type == StatementType::BINARY_OP) {
-                    statement.binOp->leftSide = std::move(prev->binOp->rightSide);
+                    statement.binOp->leftSide = *childOfPrev;
                   } else {
-                    statement.unOp->operand = std::move(*childOfPrev);
+                    statement.unOp->operand = *childOfPrev;
                   }
+                  *childOfPrev = nullptr;
                 }
                 // END DUP CODE
 
@@ -368,7 +371,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             Statement **childOfPrev = prev->getChild();
             
             // DUP CODE: moving child node
-            if (!childOfPrev ) {
+            if (!*childOfPrev ) {
               // expected token between operators
               if (statement.type == StatementType::BINARY_OP) {
                 expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
@@ -379,6 +382,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
               } else {
                 statement.unOp->operand = *childOfPrev;
               }
+              *childOfPrev = nullptr;
             }
             // END DUP CODE
 
