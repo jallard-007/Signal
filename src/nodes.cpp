@@ -203,37 +203,33 @@ Statement **Statement::getChild() {
   }
 }
 
-ExpectedType Statement::addStatementToNode(Statement&& st) {
+ExpectedType Statement::addStatementToNode(Statement *st) {
   switch (type) {
     case StatementType::UNARY_OP:
       if (unOp->operand) {
         return ExpectedType::TOKEN;
       }
-      unOp->operand = st.unOp->operand;
+      unOp->operand = st;
       return ExpectedType::NOTHING;
 
     case StatementType::BINARY_OP:
-    std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-    std::cout << binOp->rightSide << '\n';
-    std::cout << wrapped << '\n';
-
       if (binOp->rightSide) {
         return ExpectedType::TOKEN;
       }
 
-      binOp->rightSide = st.binOp->rightSide;
+      binOp->rightSide = st;
       return ExpectedType::NOTHING;
 
     case StatementType::KEY_W_BODY:
       if (keywBody->body) {
         return ExpectedType::TOKEN;
       }
-      if (st.type == StatementType::WRAPPED_VALUE && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
-        keywBody->header = st.keywBody->header;
+      if (st->type == StatementType::WRAPPED_VALUE && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
+        keywBody->header = st;
         return ExpectedType::NOTHING;
       }
-      else if (st.type == StatementType::SCOPE && keywBody->header) {
-        keywBody->body = st.keywBody->body;
+      else if (st->type == StatementType::SCOPE && keywBody->header) {
+        keywBody->body = st;
         return ExpectedType::NOTHING;
       }
       return ExpectedType::TOKEN;

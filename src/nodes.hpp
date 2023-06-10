@@ -106,7 +106,7 @@ struct Statement {
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
-  ExpectedType addStatementToNode(Statement&&);
+  ExpectedType addStatementToNode(Statement*);
   Statement **getChild();
   ExpectedType isValid() const;
 };

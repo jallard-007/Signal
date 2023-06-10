@@ -22,6 +22,7 @@ struct MemPoolS {
   MemPoolS(uint32_t listSize = 50): n{0}, mainListSize{1}, listSize{listSize} {
     mem = (Obj**)malloc(sizeof (Obj*) * mainListSize);
     mem[0] = (Obj*)malloc(sizeof (Obj) * (listSize));
+    initializeList(mem[0]);
     freeObj = mem[0];
   }
 

@@ -11,7 +11,7 @@ struct Parser {
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
   Parser() = delete;
-  MemPoolS s;
+  MemPoolS memPoolS;
   explicit Parser(Tokenizer& tokenizer);
   bool parse();
   bool functionDec(Declaration&);
