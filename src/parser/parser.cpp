@@ -2,8 +2,12 @@
 #include <memory>
 #include <iostream>
 
-Parser::Parser(Tokenizer& tokenizer): tokenizer{tokenizer} {
+Parser::Parser(Tokenizer& tokenizer, NodeMemPool& memPool): tokenizer{tokenizer}, memPool{memPool} {
   program.name = "ProgName";
+}
+
+Parser::~Parser() {
+  memPool.reset();
 }
 
 bool Parser::parse() {
@@ -54,7 +58,7 @@ bool Parser::parse() {
       case TokenType::ENUM: {
         tokenizer.consumePeek();
 
-        auto& r = program.decs.emplace_back(std::make_unique<Enum>());
+        auto& r = program.decs.emplace_back(memPool.get(Enum{}));
         if (tokenizer.peekNext().type == TokenType::IDENTIFIER) {
           r.enm->name = tokenizer.peeked;
           tokenizer.consumePeek();
@@ -86,7 +90,7 @@ bool Parser::parse() {
 
       case TokenType::IDENTIFIER: {
         // global variable declaration
-        program.decs.emplace_back(memPoolS.get(parseStatement(TokenType::NOTHING, TokenType::SEMICOLON)));
+        program.decs.emplace_back(memPool.get(parseStatement(TokenType::NOTHING, TokenType::SEMICOLON)));
         if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
           expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
         } else {
@@ -146,7 +150,7 @@ bool Parser::functionDec(Declaration& dec) {
 
   // consume close brace
   tokenizer.consumePeek();
-  dec.func = std::make_unique<FunctionDec>(std::move(funDec));
+  dec.func = memPool.get(std::move(funDec));
   dec.decType = DecType::FUNCTION;
   return true;
 }
@@ -169,7 +173,7 @@ bool Parser::structDec(Declaration& dec) {
   while (token.type != TokenType::END_OF_FILE) {
     // variable dec
     if (token.type == TokenType::IDENTIFIER) {
-      sDec.decs.emplace_back(memPoolS.get(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)));
+      sDec.decs.emplace_back(memPool.get(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)));
       if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
         return false;
       }
@@ -195,7 +199,7 @@ bool Parser::structDec(Declaration& dec) {
     else if (token.type == TokenType::CLOSE_BRACE) {
       tokenizer.consumePeek();
       dec.decType = DecType::STRUCT;
-      dec.struc = std::make_unique<Struct>(std::move(sDec));
+      dec.struc = memPool.get(std::move(sDec));
       return true;
     }
     // invalid token
@@ -234,7 +238,7 @@ bool Parser::templateDec(Declaration& dec) {
     unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
     return false;
   }
-  dec.temp = std::make_unique<Template>(std::move(temp));
+  dec.temp = memPool.get(std::move(temp));
   dec.decType = DecType::TEMPLATE;
   return true;
 }
@@ -264,10 +268,10 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       Statement statement;
       if (isBinaryOp(token.type)) {
         statement.type = StatementType::BINARY_OP;
-        statement.binOp = std::make_unique<BinOp>(token.type);
+        statement.binOp = memPool.get(BinOp{token.type});
       } else {
         statement.type = StatementType::UNARY_OP;
-        statement.unOp = std::make_unique<UnOp>(token.type);
+        statement.unOp = memPool.get(UnOp{token.type});
       }
       if (!bottom) {
         // expected expression before binary operator
@@ -287,9 +291,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
           // first "value" token in statement: take it
           // this is the only node in the list (list.size == 1)
           if (statement.type == StatementType::BINARY_OP) {
-            statement.binOp->leftSide = memPoolS.get(std::move(rootStatement));
+            statement.binOp->leftSide = memPool.get(std::move(rootStatement));
           } else {
-            statement.unOp->operand = memPoolS.get(std::move(rootStatement));
+            statement.unOp->operand = memPool.get(std::move(rootStatement));
           }
           // move the statement to the tree root
           rootStatement = std::move(statement);
@@ -340,7 +344,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
                 }
                 // END DUP CODE
 
-                if (prev->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+                if (prev->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
                   std::cerr << "theres a problem\n";
                   exit(1);
                 }
@@ -350,9 +354,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
               // root node
               else {
                 if (statement.type == StatementType::BINARY_OP) {
-                  statement.binOp->leftSide = memPoolS.get(std::move(rootStatement));
+                  statement.binOp->leftSide = memPool.get(std::move(rootStatement));
                 } else {
-                  statement.unOp->operand = memPoolS.get(std::move(rootStatement));
+                  statement.unOp->operand = memPool.get(std::move(rootStatement));
                 }
                 // move the statement to the root
                 rootStatement = std::move(statement);
@@ -386,7 +390,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             }
             // END DUP CODE
 
-            if (prev->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+            if (prev->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
               expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
               break;
             } else {
@@ -412,7 +416,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
       // function call: identifier (
       if (lookAhead.type == TokenType::OPEN_PAREN) {
-        statement.funcCall = std::make_unique<FunctionCall>(token);
+        statement.funcCall = memPool.get(FunctionCall{token});
         statement.type = StatementType::FUNCTION_CALL;
         tokenizer.tokenizeNext();
         if (!getStatements(statement.funcCall->args, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
@@ -425,7 +429,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
       // pointer access with offset: identifier [
       else if (lookAhead.type == TokenType::OPEN_BRACKET) {
-        statement.arrAccess = std::make_unique<ArrayAccess>(token);
+        statement.arrAccess = memPool.get(ArrayAccess{token});
         statement.type = StatementType::ARRAY_ACCESS;
         tokenizer.tokenizeNext();
         statement.arrAccess->offset = parseStatement(TokenType::NOTHING, TokenType::CLOSE_BRACKET);
@@ -438,7 +442,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
       // variable declaration: identifier :
       else if (lookAhead.type == TokenType::COLON && delimiterA != TokenType::COLON) {
-        statement.varDec = std::make_unique<VariableDec>(token);
+        statement.varDec = memPool.get(VariableDec{token});
         statement.type = StatementType::VARIABLE_DEC;
         // consume the colon
         tokenizer.consumePeek();
@@ -466,7 +470,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
-      } else if (bottom->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+      } else if (bottom->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
         break;
       }
@@ -479,7 +483,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
-      } else if (bottom->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+      } else if (bottom->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
         break;
       }
@@ -489,7 +493,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     else if (isKeyword(token.type)) {
       Statement statement;
       if (isKeywordWithBody(token.type)) {
-        statement.keywBody = std::make_unique<KeywordWithBody>(token.type);
+        statement.keywBody = memPool.get(KeywordWithBody{token.type});
         statement.type = StatementType::KEY_W_BODY;
       }
       else if (token.type == TokenType::BREAK || token.type == TokenType::CONTINUE) {
@@ -524,7 +528,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
-      } else if (bottom->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+      } else if (bottom->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
         break;
       }
@@ -536,7 +540,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       lookAhead = tokenizer.peekNext();
       Statement statement;
       if (inner.type != StatementType::NONE) {
-        statement.wrapped = memPoolS.get(std::move(inner));
+        statement.wrapped = memPool.get(std::move(inner));
         statement.type = StatementType::WRAPPED_VALUE;
       } else {
         expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
@@ -545,7 +549,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
-      } else if (bottom->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+      } else if (bottom->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
         break;
       }
@@ -568,14 +572,14 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterB);
         break;
       }
-      Statement statement{std::make_unique<Scope>()};
+      Statement statement{memPool.get(Scope{})};
       getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
       lookAhead = tokenizer.peekNext();
       // DUP CODE: adding leaf node to the tree by move
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
-      } else if (bottom->addStatementToNode(memPoolS.get(std::move(statement))) != ExpectedType::NOTHING) {
+      } else if (bottom->addStatementToNode(memPool.get(std::move(statement))) != ExpectedType::NOTHING) {
         expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
         break;
       }

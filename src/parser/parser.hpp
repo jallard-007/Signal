@@ -3,16 +3,17 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../token.hpp"
 #include "../nodes.hpp"
-#include "../memPool.hpp"
+#include "../nodeMemPool.hpp"
 
 struct Parser {
   Program program;
   std::vector<Unexpected> unexpected;
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
+  NodeMemPool& memPool;
   Parser() = delete;
-  MemPool<Statement> memPoolS;
-  explicit Parser(Tokenizer& tokenizer);
+  ~Parser();
+  explicit Parser(Tokenizer&, NodeMemPool&);
   bool parse();
   bool functionDec(Declaration&);
   bool structDec(Declaration&);

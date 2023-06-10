@@ -22,7 +22,8 @@ int main(int argc, char **argv) {
   t.read(&buffer[0], size);
   t.close();
   Tokenizer lex(buffer);
-  Parser p{lex};
+  NodeMemPool mem;
+  Parser p{lex, mem};
   p.parse();
   return 0;
 }

@@ -32,27 +32,26 @@ void Statement::operator=(Statement&& st) noexcept {
   type = st.type;
   switch (st.type) {
     case StatementType::UNARY_OP:
-      new (&unOp) std::unique_ptr<UnOp>{std::move(st.unOp)}; break;
+      unOp = st.unOp; st.unOp = nullptr; break;
     case StatementType::BINARY_OP:
-      new (&binOp) std::unique_ptr<BinOp>{std::move(st.binOp)}; break;
+      binOp = st.binOp; st.binOp = nullptr; break;
     case StatementType::VARIABLE_DEC:
-      new (&varDec) std::unique_ptr<VariableDec>{std::move(st.varDec)}; break;
+      varDec = st.varDec; st.varDec = nullptr; break;
     case StatementType::FUNCTION_CALL:
-      new (&funcCall) std::unique_ptr<FunctionCall>{std::move(st.funcCall)}; break;
+      funcCall = st.funcCall; st.funcCall = nullptr; break;
     case StatementType::ARRAY_ACCESS:
-      new (&arrAccess) std::unique_ptr<ArrayAccess>{std::move(st.arrAccess)}; break;
+      arrAccess = st.arrAccess; st.arrAccess = nullptr; break;
     case StatementType::WRAPPED_VALUE:
       wrapped = st.wrapped; st.wrapped = nullptr; break;
     case StatementType::SCOPE:
-      new (&scope) std::unique_ptr<Scope>{std::move(st.scope)}; break;
+      scope = st.scope; st.scope = nullptr; break;
     case StatementType::LIST:
-      new (&list) std::unique_ptr<List>{std::move(st.list)}; break;
+      list = st.list; st.list = nullptr; break;
     case StatementType::KEY_W_BODY:
-      new (&keywBody) std::unique_ptr<KeywordWithBody>{std::move(st.keywBody)}; break;
+      keywBody = st.keywBody; st.keywBody = nullptr; break;
     case StatementType::VALUE:
       var = st.var; break;
-    default:
-      break;
+    default: break;
   }
   st.type = StatementType::NONE;
 }
@@ -129,28 +128,28 @@ Statement::Statement(Statement&& st) noexcept {
   operator=(std::move(st));
 }
 
-Statement::Statement(std::unique_ptr<UnOp> ptr) {
-  new (&unOp) std::unique_ptr<UnOp>{std::move(ptr)};
+Statement::Statement(UnOp *ptr) {
+  unOp = ptr;
   type = StatementType::UNARY_OP;
 }
 
-Statement::Statement(std::unique_ptr<BinOp> ptr) {
-  new (&binOp) std::unique_ptr<BinOp>{std::move(ptr)};
+Statement::Statement(BinOp *ptr) {
+  binOp = ptr;
   type = StatementType::BINARY_OP;
 }
 
-Statement::Statement(std::unique_ptr<VariableDec> ptr) {
-  new (&varDec) std::unique_ptr<VariableDec>{std::move(ptr)};
+Statement::Statement(VariableDec *ptr) {
+  varDec = ptr;
   type = StatementType::VARIABLE_DEC;
 }
 
-Statement::Statement(std::unique_ptr<FunctionCall> ptr) {
-  new (&funcCall) std::unique_ptr<FunctionCall>{std::move(ptr)};
+Statement::Statement(FunctionCall *ptr) {
+  funcCall = ptr;
   type = StatementType::FUNCTION_CALL;
 }
 
-Statement::Statement(std::unique_ptr<ArrayAccess> ptr) {
-  new (&arrAccess) std::unique_ptr<ArrayAccess>{std::move(ptr)};
+Statement::Statement(ArrayAccess *ptr) {
+  arrAccess = ptr;
   type = StatementType::ARRAY_ACCESS;
 }
 
@@ -159,37 +158,23 @@ Statement::Statement(Statement *ptr) {
   type = StatementType::WRAPPED_VALUE;
 }
 
-Statement::Statement(std::unique_ptr<Scope> ptr) {
-  new (&scope) std::unique_ptr<Scope>{std::move(ptr)};
+Statement::Statement(Scope *ptr) {
+  scope = ptr;
   type = StatementType::SCOPE;
 }
 
-Statement::Statement(std::unique_ptr<List> ptr) {
-  new (&list) std::unique_ptr<List>{std::move(ptr)};
+Statement::Statement(List *ptr) {
+  list = ptr;
   type = StatementType::LIST;
 }
 
-Statement::Statement(std::unique_ptr<KeywordWithBody> ptr) {
-  new (&keywBody) std::unique_ptr<KeywordWithBody>{std::move(ptr)};
+Statement::Statement(KeywordWithBody *ptr) {
+  keywBody = ptr;
   type = StatementType::KEY_W_BODY;
 }
 
 Statement::Statement(Token tok): var{tok} {
   type = StatementType::VALUE;
-}
-
-Statement::~Statement() {
-  switch (type) {
-    case StatementType::UNARY_OP: unOp.~unique_ptr<UnOp>(); break;
-    case StatementType::BINARY_OP: binOp.~unique_ptr<BinOp>(); break;
-    case StatementType::VARIABLE_DEC: varDec.~unique_ptr<VariableDec>(); break;
-    case StatementType::FUNCTION_CALL: funcCall.~unique_ptr<FunctionCall>(); break;
-    case StatementType::ARRAY_ACCESS: arrAccess.~unique_ptr<ArrayAccess>(); break;
-    case StatementType::SCOPE: scope.~unique_ptr<Scope>(); break;
-    case StatementType::LIST: list.~unique_ptr<List>(); break;
-    case StatementType::KEY_W_BODY: keywBody.~unique_ptr<KeywordWithBody>(); break;
-    default: break;
-  }
 }
 
 Statement **Statement::getChild() {
@@ -341,53 +326,28 @@ Declaration::Declaration(): func{nullptr}, decType{DecType::NONE} {}
 Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
   switch (dec.decType) {
     case DecType::FUNCTION:
-      new (&func) std::unique_ptr<FunctionDec>{std::move(dec.func)};
-      break;
+      func = dec.func; dec.func = nullptr; break;
     case DecType::STATEMENT:
-      statement = dec.statement;
-      dec.statement = nullptr;
-      break;
+      statement = dec.statement; dec.statement = nullptr; break;
     case DecType::STRUCT:
-      new (&struc) std::unique_ptr<Struct>{std::move(dec.struc)};
-      break;
+      struc = dec.struc; dec.struc = nullptr; break;
     case DecType::TEMPLATE:
-      new (&temp) std::unique_ptr<Template>{std::move(dec.temp)};
-      break;
+      temp = dec.temp; dec.temp = nullptr; break;
     case DecType::ENUM:
-      new (&enm) std::unique_ptr<Enum>{std::move(dec.enm)};
-      break;
-    default:
-      break;
+      enm = dec.enm; dec.enm = nullptr; break;
+    default: break;
   }
   dec.decType = DecType::NONE;
 }
 
-Declaration::Declaration(std::unique_ptr<FunctionDec> funcDec): decType{DecType::FUNCTION} {
-  new (&func) std::unique_ptr<FunctionDec>{std::move(funcDec)};
-}
+Declaration::Declaration(FunctionDec *ptr): func{ptr}, decType{DecType::FUNCTION} {}
 
-Declaration::Declaration(Statement *st): statement{st}, decType{DecType::STATEMENT} {}
+Declaration::Declaration(Statement *ptr): statement{ptr}, decType{DecType::STATEMENT} {}
 
-Declaration::Declaration(std::unique_ptr<Template> tDec): decType{DecType::TEMPLATE} {
-  new (&temp) std::unique_ptr<Template>{std::move(tDec)};
-}
+Declaration::Declaration(Template *ptr): temp{ptr}, decType{DecType::TEMPLATE} {}
 
-Declaration::Declaration(std::unique_ptr<Struct> sDec): decType{DecType::STRUCT} {
-  new (&struc) std::unique_ptr<Struct>{std::move(sDec)};
-}
+Declaration::Declaration(Struct *ptr): struc{ptr}, decType{DecType::STRUCT} {}
 
-Declaration::Declaration(std::unique_ptr<Enum> sDec): decType{DecType::ENUM} {
-  new (&enm) std::unique_ptr<Enum>{std::move(sDec)};
-}
-
-Declaration::~Declaration() {
-  switch(decType) {
-    case DecType::FUNCTION: func.~unique_ptr<FunctionDec>(); break;
-    case DecType::TEMPLATE: temp.~unique_ptr<Template>(); break;
-    case DecType::STRUCT: struc.~unique_ptr<Struct>(); break;
-    case DecType::ENUM: enm.~unique_ptr<Enum>(); break;
-    default: break;
-  }
-}
+Declaration::Declaration(Enum *ptr): enm{ptr}, decType{DecType::ENUM} {}
 
 Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std::move(prog.decs)} {}

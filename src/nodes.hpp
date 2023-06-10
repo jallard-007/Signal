@@ -73,15 +73,15 @@ typedef struct KeywordWithBody KeywordWithBody;
 
 struct Statement {
   union {
-    std::unique_ptr<UnOp> unOp;
-    std::unique_ptr<BinOp> binOp;
-    std::unique_ptr<VariableDec> varDec;
-    std::unique_ptr<FunctionCall> funcCall;
-    std::unique_ptr<ArrayAccess> arrAccess;
+    UnOp *unOp;
+    BinOp *binOp;
+    VariableDec *varDec;
+    FunctionCall *funcCall;
+    ArrayAccess *arrAccess;
     Statement *wrapped;
-    std::unique_ptr<Scope> scope;
-    std::unique_ptr<List> list;
-    std::unique_ptr<KeywordWithBody> keywBody;
+    Scope *scope;
+    List *list;
+    KeywordWithBody *keywBody;
     Token var;
     TokenType key;
   };
@@ -91,18 +91,17 @@ struct Statement {
   Statement(StatementType);
   Statement(const Statement&) = delete;
   Statement(Statement&&) noexcept ;
-  explicit Statement(std::unique_ptr<UnOp>);
-  explicit Statement(std::unique_ptr<BinOp>);
-  explicit Statement(std::unique_ptr<VariableDec>);
-  explicit Statement(std::unique_ptr<FunctionCall>);
-  explicit Statement(std::unique_ptr<ArrayAccess>);
+  explicit Statement(UnOp *);
+  explicit Statement(BinOp *);
+  explicit Statement(VariableDec *);
+  explicit Statement(FunctionCall *);
+  explicit Statement(ArrayAccess *);
   explicit Statement(Statement *);
-  explicit Statement(std::unique_ptr<Scope>);
-  explicit Statement(std::unique_ptr<KeywordWithBody>);
-  explicit Statement(std::unique_ptr<List>);
+  explicit Statement(Scope *);
+  explicit Statement(KeywordWithBody *);
+  explicit Statement(List *);
 
   explicit Statement(Token);
-  ~Statement();
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
@@ -198,21 +197,20 @@ typedef struct Struct Struct;
 
 struct Declaration {
   union{
-    std::unique_ptr<FunctionDec> func;
+    FunctionDec *func;
     Statement *statement;
-    std::unique_ptr<Template> temp;
-    std::unique_ptr<Struct> struc;
-    std::unique_ptr<Enum> enm;
+    Template *temp;
+    Struct *struc;
+    Enum *enm;
   };
   DecType decType;
   Declaration();
   Declaration(Declaration&&) noexcept;
-  explicit Declaration(std::unique_ptr<FunctionDec>);
+  explicit Declaration(FunctionDec *);
   explicit Declaration(Statement *);
-  explicit Declaration(std::unique_ptr<Template>);
-  explicit Declaration(std::unique_ptr<Struct>);
-  explicit Declaration(std::unique_ptr<Enum>);
-  ~Declaration();
+  explicit Declaration(Template *);
+  explicit Declaration(Struct *);
+  explicit Declaration(Enum *);
 };
 
 struct Struct {

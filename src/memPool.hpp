@@ -5,6 +5,7 @@
 
 template<typename T>
 struct MemPool {
+  uint32_t j;
   uint32_t n;
   uint32_t mainListSize;
   const uint32_t listSize;
@@ -34,14 +35,23 @@ struct MemPool {
     free(mem);
   }
 
-  void addList() {
-    if (++n >= mainListSize) {
-      mainListSize += mainListSize;
-      mem = (Obj**)realloc(mem, sizeof (Obj*) * (mainListSize));
-    }
-    mem[n] = (Obj*)malloc(sizeof (Obj) * (listSize));
-    initializeList(mem[n]);
+  void reset() {
+    initializeList(mem[0]);
+    freeObj = mem[0];
+    j = 0;
   }
+
+  void addList() {
+    if (++j > n) {
+      if (++n >= mainListSize) {
+        mainListSize += mainListSize;
+        mem = (Obj**)realloc(mem, sizeof (Obj*) * (mainListSize));
+      }
+      mem[n] = (Obj*)malloc(sizeof (Obj) * (listSize));
+    }
+    initializeList(mem[j]);
+  }
+
 
   void initializeList(Obj* list) {
     for (uint32_t i = 0; i < listSize - 1; ++i) {
@@ -50,10 +60,10 @@ struct MemPool {
     list[listSize - 1].next = nullptr;
   }
 
-  // void release(Obj *const obj) {
-  //   obj->next = freeObj;
-  //   freeObj = obj;
-  // }
+  void release(T *obj) {
+    ((Obj*)obj)->next = freeObj;
+    freeObj = (Obj *)obj;
+  }
 
   T *get(T&& t) {
     if (!freeObj->next) {
