@@ -1,7 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 #include "parser.hpp"
-#include "../nodeMemPool.hpp"
-
 #include <iostream>
 
 NodeMemPool memPool;
@@ -456,7 +454,7 @@ TEST_CASE("Big Boi", "[parser]") {
   f.tokenizeNext();
 
   param.type.tokens.emplace_back(f.tokenizeNext());
-  functionDec.params.emplace_back(Statement{&param});
+  functionDec.params.emplace_back(&param);
   f.tokenizeNext();
   f.tokenizeNext();
 

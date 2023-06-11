@@ -8,7 +8,7 @@ class NodeMemPool {
   MemPool<BinOp> binOps;
   MemPool<VariableDec> varDecs;
   MemPool<FunctionCall> funcCalls;
-  MemPool<ArrayAccess> ArrayAccesses;
+  MemPool<ArrayAccess> arrayAccesses;
   MemPool<Statement> statements;
   MemPool<Scope> scopes;
   MemPool<List> lists;
@@ -24,7 +24,7 @@ public:
     binOps.reset();
     varDecs.reset();
     funcCalls.reset();
-    ArrayAccesses.reset();
+    arrayAccesses.reset();
     statements.reset();
     scopes.reset();
     lists.reset();
@@ -39,7 +39,7 @@ public:
   BinOp* get(BinOp&& ref) {return binOps.get(std::move(ref));}
   VariableDec* get(VariableDec&& ref) {return varDecs.get(std::move(ref));}
   FunctionCall* get(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
-  ArrayAccess* get(ArrayAccess&& ref) {return ArrayAccesses.get(std::move(ref));}
+  ArrayAccess* get(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
   Statement* get(Statement&& ref) {return statements.get(std::move(ref));}
   Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
   List* get(List&& ref) {return lists.get(std::move(ref));}
@@ -53,7 +53,7 @@ public:
   void release(BinOp* ptr) { binOps.release(ptr);}
   void release(VariableDec* ptr) { varDecs.release(ptr);}
   void release(FunctionCall* ptr) { funcCalls.release(ptr);}
-  void release(ArrayAccess* ptr) { ArrayAccesses.release(ptr);}
+  void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
   void release(Statement* ptr) { statements.release(ptr);}
   void release(Scope* ptr) { scopes.release(ptr);}
   void release(List* ptr) { lists.release(ptr);}

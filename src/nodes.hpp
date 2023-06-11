@@ -4,11 +4,6 @@
 #include <vector>
 #include <memory>
 
-enum class ExpectedType : uint8_t {
-  NOTHING,
-  EXPRESSION,
-  TOKEN,
-};
 
 struct Unexpected {
   Token token;
@@ -19,6 +14,12 @@ struct Unexpected {
   bool operator==(const Unexpected&) const;
 };
 
+enum class ExpectedType : uint8_t {
+  NOTHING,
+  EXPRESSION,
+  TOKEN,
+};
+
 struct Expected {
   uint32_t line;
   uint32_t column;
@@ -27,27 +28,8 @@ struct Expected {
   Expected() = delete;
   Expected(ExpectedType, uint32_t, uint32_t);
   Expected(ExpectedType, uint32_t, uint32_t, TokenType);
-  bool operator==(const ExpectedType&) const;
+  bool operator==(const Expected&) const;
 };
-
-enum class StatementType: uint8_t {
-  NONE,
-  BAD,
-  BINARY_OP,
-  UNARY_OP,
-  VALUE,
-  VARIABLE_DEC,
-  FUNCTION_CALL,
-  ARRAY_ACCESS,
-  WRAPPED_VALUE,
-  ARRAY_OR_STRUCT_LITERAL,
-  LIST,
-  SCOPE,
-  KEYWORD,
-  KEY_W_BODY,
-};
-
-bool hasData(StatementType);
 
 struct Type {
   std::vector<Token> tokens;
@@ -74,6 +56,23 @@ typedef struct Scope Scope;
 typedef struct List List;
 typedef struct KeywordWithBody KeywordWithBody;
 
+enum class StatementType: uint8_t {
+  NONE,
+  BAD,
+  BINARY_OP,
+  UNARY_OP,
+  VALUE,
+  VARIABLE_DEC,
+  FUNCTION_CALL,
+  ARRAY_ACCESS,
+  WRAPPED_VALUE,
+  ARRAY_OR_STRUCT_LITERAL,
+  LIST,
+  SCOPE,
+  KEYWORD,
+  KEY_W_BODY,
+};
+
 struct Statement {
   union {
     UnOp *unOp;
@@ -91,7 +90,7 @@ struct Statement {
   StatementType type = StatementType::NONE;
 
   Statement();
-  Statement(StatementType);
+  explicit Statement(StatementType);
   Statement(const Statement&) = delete;
   Statement(Statement&&) noexcept ;
   explicit Statement(UnOp *);
@@ -108,12 +107,14 @@ struct Statement {
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
-  operator bool() const;
+  explicit operator bool() const;
 
   ExpectedType addStatementToNode(Statement&&);
   Statement *getChild();
   ExpectedType isValid() const;
 };
+
+bool hasData(StatementType);
 
 struct List {
   std::vector<Statement> list;
@@ -185,15 +186,6 @@ struct FunctionCall {
   bool operator==(const FunctionCall&) const;
 };
 
-enum class DecType: uint8_t {
-  NONE,
-  FUNCTION,
-  STATEMENT,
-  TEMPLATE,
-  STRUCT,
-  ENUM
-};
-
 struct Enum {
   std::vector<Token> members;
   Token name;
@@ -203,6 +195,15 @@ struct Enum {
 
 typedef struct Template Template;
 typedef struct Struct Struct;
+
+enum class DecType: uint8_t {
+  NONE,
+  FUNCTION,
+  STATEMENT,
+  TEMPLATE,
+  STRUCT,
+  ENUM
+};
 
 struct Declaration {
   union{

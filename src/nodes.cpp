@@ -8,11 +8,19 @@ bool hasData(StatementType type) {
 Unexpected::Unexpected(Token token, uint32_t line, uint32_t column):
   token{token}, line{line}, column{column} {}
 
+bool Unexpected::operator==(const Unexpected &ref) const {
+  return ref.column == column && ref.line == line && ref.token == token;
+}
+
 Expected::Expected(ExpectedType type, uint32_t line, uint32_t column):
   line{line}, column{column}, tokenType{TokenType::NOTHING}, expectedType{type} {}
 
 Expected::Expected(ExpectedType type, uint32_t line, uint32_t column, TokenType tokenType):
   line{line}, column{column}, tokenType{tokenType}, expectedType{type} {}
+
+bool Expected::operator==(const Expected &ref) const {
+  return ref.tokenType == tokenType && ref.expectedType == expectedType && ref.column == column && ref.line == line;
+}
 
 bool Type::operator==(const Type& tk) const {
   return tk.tokens == tokens;
@@ -237,12 +245,12 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
 ExpectedType Statement::isValid() const {
   switch (type) {
     case StatementType::UNARY_OP:
-      if (unOp->operand.type == StatementType::NONE) {
+      if (!unOp->operand) {
         return ExpectedType::EXPRESSION;
       }
       break;
     case StatementType::BINARY_OP:
-      if (binOp->rightSide == StatementType::NONE) {
+      if (!binOp->rightSide) {
         return ExpectedType::EXPRESSION;
       }
       break;

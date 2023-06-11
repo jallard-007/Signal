@@ -121,7 +121,7 @@ bool isBuiltInType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
 bool isKeywordWithBody(TokenType);
-bool isStatementDelimiter(TokenType);
+
 bool isTypeDelimiter(TokenType);
 
 // maps characters to tokens that can be matched with a single character

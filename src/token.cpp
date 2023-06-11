@@ -24,10 +24,6 @@ bool isKeywordWithBody(TokenType type) {
   return type >= TokenType::IF && type <= TokenType::WHILE;
 }
 
-bool isStatementDelimiter(TokenType type) {
-  return type >= TokenType::CLOSE_PAREN && type <= TokenType::CLOSE_BRACKET;
-}
-
 bool isTypeDelimiter(TokenType type) {
   return type != TokenType::IDENTIFIER && !isBuiltInType(type);
 }
