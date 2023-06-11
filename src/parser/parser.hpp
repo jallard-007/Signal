@@ -1,8 +1,6 @@
 #pragma once
 
 #include "../tokenizer/tokenizer.hpp"
-#include "../token.hpp"
-#include "../nodes.hpp"
 #include "../nodeMemPool.hpp"
 
 struct Parser {

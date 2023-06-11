@@ -187,7 +187,7 @@ Statement::Statement(Token tok): var{tok} {
   type = StatementType::VALUE;
 }
 
-Statement **Statement::getChild() {
+Statement *Statement::getChild() {
   switch (type) {
     case StatementType::UNARY_OP:
       return &unOp->operand;
@@ -198,13 +198,13 @@ Statement **Statement::getChild() {
   }
 }
 
-ExpectedType Statement::addStatementToNode(Statement *st) {
+ExpectedType Statement::addStatementToNode(Statement&& st) {
   switch (type) {
     case StatementType::UNARY_OP:
       if (unOp->operand) {
         return ExpectedType::TOKEN;
       }
-      unOp->operand = st;
+      unOp->operand = std::move(st);
       return ExpectedType::NOTHING;
 
     case StatementType::BINARY_OP:
@@ -212,19 +212,19 @@ ExpectedType Statement::addStatementToNode(Statement *st) {
         return ExpectedType::TOKEN;
       }
 
-      binOp->rightSide = st;
+      binOp->rightSide = std::move(st);
       return ExpectedType::NOTHING;
 
     case StatementType::KEY_W_BODY:
       if (keywBody->body) {
         return ExpectedType::TOKEN;
       }
-      if (hasData(st->type) && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
-        keywBody->header = st;
+      if (hasData(st.type) && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
+        keywBody->header = std::move(st);
         return ExpectedType::NOTHING;
       }
-      else if (st->type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN && keywBody->header) {
-        keywBody->body = st;
+      else if (st.type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN && keywBody->header) {
+        keywBody->body = std::move(st);
         return ExpectedType::NOTHING;
       }
       return ExpectedType::TOKEN;
@@ -237,12 +237,12 @@ ExpectedType Statement::addStatementToNode(Statement *st) {
 ExpectedType Statement::isValid() const {
   switch (type) {
     case StatementType::UNARY_OP:
-      if (unOp->operand == nullptr) {
+      if (unOp->operand.type == StatementType::NONE) {
         return ExpectedType::EXPRESSION;
       }
       break;
     case StatementType::BINARY_OP:
-      if (binOp->rightSide == nullptr) {
+      if (binOp->rightSide == StatementType::NONE) {
         return ExpectedType::EXPRESSION;
       }
       break;
@@ -254,9 +254,7 @@ ExpectedType Statement::isValid() const {
 
 KeywordWithBody::KeywordWithBody(TokenType type): body{}, header{}, keyword{type} {}
 
-KeywordWithBody::KeywordWithBody(KeywordWithBody&& rval): body{rval.body}, header{rval.header}, keyword{rval.keyword} {
-  rval.body = nullptr;
-  rval.header = nullptr;
+KeywordWithBody::KeywordWithBody(KeywordWithBody&& rval): body{std::move(rval.body)}, header{std::move(rval.header)}, keyword{rval.keyword} {
   rval.keyword = TokenType::NOTHING;
 }
 
@@ -270,12 +268,9 @@ bool Scope::operator==(const Scope& sp) const {
   return sp.scopeStatements == scopeStatements;
 }
 
-BinOp::BinOp(TokenType op): leftSide{nullptr}, rightSide{nullptr}, op{op} {}
+BinOp::BinOp(TokenType op): leftSide{}, rightSide{}, op{op} {}
 
-BinOp::BinOp(BinOp&& binOp) noexcept:
-leftSide{binOp.leftSide}, rightSide{binOp.rightSide}, op{binOp.op} {
-  binOp.leftSide = nullptr;
-  binOp.rightSide = nullptr;
+BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {
   binOp.op = TokenType::NOTHING;
 }
 
@@ -299,7 +294,7 @@ bool BinOp::operator==(const BinOp& bo) const {
     return false;
   }
   if (r) {
-    if (rightSide == bo.rightSide) {
+    if (!(rightSide == bo.rightSide)) {
       return false;
     }
   }
@@ -308,7 +303,7 @@ bool BinOp::operator==(const BinOp& bo) const {
 
 UnOp::UnOp(TokenType op): op{op} {}
 
-UnOp::UnOp(UnOp&& unOp) noexcept : operand{unOp.operand} , op{unOp.op} {}
+UnOp::UnOp(UnOp&& unOp) noexcept : operand{std::move(unOp.operand)} , op{unOp.op} {}
 
 bool UnOp::operator==(const UnOp& uo) const {
   if (operand && uo.operand) {
@@ -370,4 +365,105 @@ Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std
 
 bool List::operator==(const List & l) const {
   return list == l.list;
+}
+
+bool FunctionDec::operator==(const FunctionDec& ref) const {
+  return ref.name == name && ref.returnType == returnType && ref.params == params && ref.bodyStatements == bodyStatements;
+}
+
+bool Enum::operator==(const Enum& ref) const {
+  return ref.name == name && ref.members == members;
+}
+
+bool Declaration::operator==(const Declaration& ref) const {
+  if (ref.decType != decType) {
+    return false;
+  }
+
+  switch (decType) {
+    case DecType::TEMPLATE:
+      if (ref.temp && temp) {
+        if (!(*ref.temp == *temp)) {
+          return false;
+        }
+      } else if (ref.temp || temp) {
+        return false;
+      }
+      return true;
+    case DecType::ENUM:
+      if (ref.enm && enm) {
+        if (!(*ref.enm == *enm)) {
+          return false;
+        }
+      } else if (ref.enm || enm) {
+        return false;
+      }
+      return true;
+    case DecType::STATEMENT:
+      if (ref.statement && statement) {
+        if (!(*ref.statement == *statement)) {
+          return false;
+        }
+      } else if (ref.statement || statement) {
+        return false;
+      }
+      return true;
+    case DecType::STRUCT:
+      if (ref.struc && struc) {
+        if (!(*ref.struc == *struc)) {
+          return false;
+        }
+      } else if (ref.struc || struc) {
+        return false;
+      }
+      return true;
+    case DecType::FUNCTION:
+      if (ref.func && func) {
+        if (!(*ref.func == *func)) {
+          return false;
+        }
+      } else if (ref.func || func) {
+        return false;
+      }
+      return true;
+    default:
+      return true;
+  }
+}
+
+bool Struct::operator==(const Struct& ref) const {
+  return (ref.name == name) && (ref.decs == decs);
+}
+
+bool Template::operator==(const Template& ref) const {
+  return ref.templateIdentifiers == templateIdentifiers && ref.dec == dec;
+}
+
+bool Program::operator==(const Program& ref) const {
+  return ref.name == name && ref.decs == decs;
+}
+
+bool KeywordWithBody::operator==(const KeywordWithBody& ref) const {
+  if (ref.keyword != keyword) {
+    return false;
+  }
+  if (ref.body && body) {
+    if (!(ref.body == body)) {
+      return false;
+    }
+  } else if (ref.body || body) {
+    return false;
+  }
+  if (ref.header && header) {
+    if (!(ref.header == header)) {
+      return false;
+    }
+  } else if (ref.header || header) {
+    return false;
+  }
+  return true;
+}
+
+Statement::operator bool() const {
+  return type != StatementType::NONE;
 }

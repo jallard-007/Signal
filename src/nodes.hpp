@@ -16,6 +16,7 @@ struct Unexpected {
   uint32_t column;
   Unexpected() = delete;
   Unexpected(Token, uint32_t, uint32_t);
+  bool operator==(const Unexpected&) const;
 };
 
 struct Expected {
@@ -26,6 +27,7 @@ struct Expected {
   Expected() = delete;
   Expected(ExpectedType, uint32_t, uint32_t);
   Expected(ExpectedType, uint32_t, uint32_t, TokenType);
+  bool operator==(const ExpectedType&) const;
 };
 
 enum class StatementType: uint8_t {
@@ -106,8 +108,10 @@ struct Statement {
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
-  ExpectedType addStatementToNode(Statement*);
-  Statement **getChild();
+  operator bool() const;
+
+  ExpectedType addStatementToNode(Statement&&);
+  Statement *getChild();
   ExpectedType isValid() const;
 };
 
@@ -119,12 +123,13 @@ struct List {
 };
 
 struct KeywordWithBody {
-  Statement *body;
-  Statement *header;
+  Statement body;
+  Statement header;
   TokenType keyword;
   KeywordWithBody() = delete;
   KeywordWithBody(TokenType);
   KeywordWithBody(KeywordWithBody&&);
+  bool operator==(const KeywordWithBody&) const;
 };
 
 struct Scope {
@@ -143,8 +148,8 @@ struct ArrayAccess {
 };
 
 struct BinOp {
-  Statement *leftSide;
-  Statement *rightSide;
+  Statement leftSide;
+  Statement rightSide;
   TokenType op;
   explicit BinOp(TokenType);
   BinOp(const BinOp&) = delete;
@@ -153,7 +158,7 @@ struct BinOp {
 };
 
 struct UnOp {
-  Statement *operand;
+  Statement operand;
   TokenType op;
   explicit UnOp(TokenType);
   UnOp(const UnOp&) = delete;
@@ -169,6 +174,7 @@ struct FunctionDec {
   FunctionDec() = delete;
   explicit FunctionDec(Token);
   FunctionDec(FunctionDec&&);
+  bool operator==(const FunctionDec&) const;
 };
 
 struct FunctionCall {
@@ -192,6 +198,7 @@ struct Enum {
   std::vector<Token> members;
   Token name;
   Enum();
+  bool operator==(const Enum&) const;
 };
 
 typedef struct Template Template;
@@ -213,6 +220,7 @@ struct Declaration {
   explicit Declaration(Template *);
   explicit Declaration(Struct *);
   explicit Declaration(Enum *);
+  bool operator==(const Declaration&) const;
 };
 
 struct Struct {
@@ -220,6 +228,7 @@ struct Struct {
   Token name;
   Struct(Token);
   Struct(Struct&&) = default;
+  bool operator==(const Struct&) const;
 };
 
 struct Template {
@@ -228,6 +237,7 @@ struct Template {
   Template() = default;
   Template(const Template&) = delete;
   Template(Template&&) = default;
+  bool operator==(const Template&) const;
 };
 
 struct Program {
@@ -235,4 +245,5 @@ struct Program {
   std::vector<Declaration> decs;
   Program() = default;
   Program(Program&&) noexcept;
+  bool operator==(const Program&) const;
 };

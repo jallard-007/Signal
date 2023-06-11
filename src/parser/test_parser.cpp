@@ -187,14 +187,14 @@ TEST_CASE("Binary Operators", "[parser]") {
     CHECK(binOp->op == TokenType::ADDITION);
 
     REQUIRE(binOp->leftSide);
-    REQUIRE(binOp->leftSide->type == StatementType::VALUE);
-    CHECK(binOp->leftSide->var.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->leftSide->var) == "4");
+    REQUIRE(binOp->leftSide.type == StatementType::VALUE);
+    CHECK(binOp->leftSide.var.type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->leftSide.var) == "4");
 
     REQUIRE(binOp->rightSide);
-    REQUIRE(binOp->rightSide->type == StatementType::VALUE);
-    CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->rightSide->var) == "4");
+    REQUIRE(binOp->rightSide.type == StatementType::VALUE);
+    CHECK(binOp->rightSide.var.type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->rightSide.var) == "4");
   }
 
    // operator with higher precedence on right node
@@ -211,28 +211,26 @@ TEST_CASE("Binary Operators", "[parser]") {
      CHECK(binOp->op == TokenType::SUBTRACTION);
 
      REQUIRE(binOp->leftSide);
-     REQUIRE(binOp->leftSide->type == StatementType::VALUE);
-     CHECK(binOp->leftSide->var.type == TokenType::IDENTIFIER);
-     CHECK(tokenizer.extractToken(binOp->leftSide->var) == "x");
+     REQUIRE(binOp->leftSide.type == StatementType::VALUE);
+     CHECK(binOp->leftSide.var.type == TokenType::IDENTIFIER);
+     CHECK(tokenizer.extractToken(binOp->leftSide.var) == "x");
 
      REQUIRE(binOp->rightSide);
-     REQUIRE(binOp->rightSide->type == StatementType::BINARY_OP);
-     REQUIRE(binOp->rightSide->binOp);
-     CHECK(binOp->rightSide->binOp->op == TokenType::MULTIPLICATION);
+     REQUIRE(binOp->rightSide.type == StatementType::BINARY_OP);
+     REQUIRE(binOp->rightSide.binOp);
+     CHECK(binOp->rightSide.binOp->op == TokenType::MULTIPLICATION);
 
-     auto& rl = binOp->rightSide->binOp->leftSide;
-     REQUIRE(rl);
-     REQUIRE(rl->type == StatementType::FUNCTION_CALL);
-     REQUIRE(rl->funcCall);
-     REQUIRE(tokenizer.extractToken(rl->funcCall->name) == "function");
-     REQUIRE(rl->funcCall->args.size() == 1);
-     REQUIRE(rl->funcCall->args[0].type == StatementType::VALUE);
-     REQUIRE(rl->funcCall->args[0].var.type == TokenType::IDENTIFIER);
+     auto& rl = binOp->rightSide.binOp->leftSide;
+     REQUIRE(rl.type == StatementType::FUNCTION_CALL);
+     REQUIRE(rl.funcCall);
+     REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
+     REQUIRE(rl.funcCall->args.size() == 1);
+     REQUIRE(rl.funcCall->args[0].type == StatementType::VALUE);
+     REQUIRE(rl.funcCall->args[0].var.type == TokenType::IDENTIFIER);
 
-     auto& rr = binOp->rightSide->binOp->rightSide;
-     REQUIRE(rr);
-     CHECK(rr->type == StatementType::VALUE);
-     CHECK(rr->var.type == TokenType::DECIMAL_NUMBER);
+     auto& rr = binOp->rightSide.binOp->rightSide;
+     CHECK(rr.type == StatementType::VALUE);
+     CHECK(rr.var.type == TokenType::DECIMAL_NUMBER);
 
    }
 
@@ -249,26 +247,24 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(binOp);
      CHECK(binOp->op == TokenType::SUBTRACTION);
 
-     REQUIRE(binOp->rightSide);
-     REQUIRE(binOp->rightSide->type == StatementType::VALUE);
-     CHECK(binOp->rightSide->var.type == TokenType::DECIMAL_NUMBER);
+     REQUIRE(binOp->rightSide.type == StatementType::VALUE);
+     CHECK(binOp->rightSide.var.type == TokenType::DECIMAL_NUMBER);
 
-     REQUIRE(binOp->leftSide);
-     REQUIRE(binOp->leftSide->type == StatementType::BINARY_OP);
-     CHECK(binOp->leftSide->binOp->op == TokenType::MULTIPLICATION);
+     CHECK(binOp->leftSide.type == StatementType::BINARY_OP);
+     REQUIRE(binOp->leftSide.binOp);
+     CHECK(binOp->leftSide.binOp->op == TokenType::MULTIPLICATION);
 
-     auto& ll = binOp->leftSide->binOp->leftSide;
-     REQUIRE(ll);
-     REQUIRE(ll->type == StatementType::VALUE);
-     CHECK(ll->var.type == TokenType::IDENTIFIER);
+     auto& ll = binOp->leftSide.binOp->leftSide;
+     REQUIRE(ll.type == StatementType::VALUE);
+     CHECK(ll.var.type == TokenType::IDENTIFIER);
 
-     auto& lr = binOp->leftSide->binOp->rightSide;
-     REQUIRE(lr->type == StatementType::FUNCTION_CALL);
-     REQUIRE(lr->funcCall);
-     CHECK(tokenizer.extractToken(lr->funcCall->name) == "function");
-     REQUIRE(lr->funcCall->args.size() == 1);
-     CHECK(lr->funcCall->args[0].type == StatementType::VALUE);
-     CHECK(lr->funcCall->args[0].var.type == TokenType::IDENTIFIER);
+     auto& lr = binOp->leftSide.binOp->rightSide;
+     REQUIRE(lr.type == StatementType::FUNCTION_CALL);
+     REQUIRE(lr.funcCall);
+     CHECK(tokenizer.extractToken(lr.funcCall->name) == "function");
+     REQUIRE(lr.funcCall->args.size() == 1);
+     CHECK(lr.funcCall->args[0].type == StatementType::VALUE);
+     CHECK(lr.funcCall->args[0].var.type == TokenType::IDENTIFIER);
    }
 }
 
@@ -389,8 +385,7 @@ TEST_CASE("Variable Declaration", "[parser]") {
   REQUIRE(d.statement);
   CHECK(d.statement->type == StatementType::BINARY_OP);
   REQUIRE(d.statement->binOp);
-  REQUIRE(d.statement->binOp->leftSide);
-  CHECK(d.statement->binOp->leftSide->type == StatementType::VARIABLE_DEC);
+  CHECK(d.statement->binOp->leftSide.type == StatementType::VARIABLE_DEC);
 }
 
 TEST_CASE("Keywords", "[parser]") {
@@ -404,12 +399,11 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(s.type == StatementType::KEY_W_BODY);
     REQUIRE(s.keywBody);
     CHECK(s.keywBody->keyword == TokenType::IF);
-    REQUIRE(s.keywBody->header);
-    CHECK(s.keywBody->header->type == StatementType::WRAPPED_VALUE);
-    REQUIRE(s.keywBody->header->wrapped);
-    CHECK(s.keywBody->header->wrapped->type == StatementType::VALUE);
+    CHECK(s.keywBody->header.type == StatementType::WRAPPED_VALUE);
+    REQUIRE(s.keywBody->header.wrapped);
+    CHECK(s.keywBody->header.wrapped->type == StatementType::VALUE);
     REQUIRE(s.keywBody->body);
-    CHECK(s.keywBody->body->type == StatementType::SCOPE);
+    CHECK(s.keywBody->body.type == StatementType::SCOPE);
   }
 
   {
@@ -423,9 +417,192 @@ TEST_CASE("Keywords", "[parser]") {
     REQUIRE(s.keywBody);
     CHECK(s.keywBody->keyword == TokenType::RETURN);
     REQUIRE(s.keywBody->header);
-    CHECK(s.keywBody->header->type == StatementType::ARRAY_OR_STRUCT_LITERAL);
-    REQUIRE(s.keywBody->header->list);
-    CHECK(s.keywBody->header->list->list.size() == 2);
+    CHECK(s.keywBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
+    REQUIRE(s.keywBody->header.list);
+    CHECK(s.keywBody->header.list->list.size() == 2);
     REQUIRE(!s.keywBody->body);
   }
+}
+
+// this is so stupid, but i did it anyways, at least i know for sure it parses correctly
+// next time im just gonna write the "pretty print" stuff and compare the output
+TEST_CASE("Big Boi", "[parser]") {
+  const std::string str =
+"func checkForRegistrationOfEvent(eventCode: int): int^ {"
+"  currRegistration: RegistrationNode^ = registrationList;"
+"  while (currRegistration) {"
+"    if (~(~currRegistration).registration == eventCode) {"
+"      array[length - 1] = (~currRegistration).registration.registrationCode;"
+"    }"
+"  }"
+"  return array;"
+"}";
+
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer, memPool};
+  parser.parse();
+
+  Program program;
+  Tokenizer f{str};
+
+  // function object
+  f.tokenizeNext();
+  FunctionDec functionDec{f.tokenizeNext()};
+  f.tokenizeNext();
+
+
+  // param
+  VariableDec param{f.tokenizeNext()};
+  f.tokenizeNext();
+
+  param.type.tokens.emplace_back(f.tokenizeNext());
+  functionDec.params.emplace_back(Statement{&param});
+  f.tokenizeNext();
+  f.tokenizeNext();
+
+  // return type
+  functionDec.returnType.tokens.emplace_back(f.tokenizeNext());
+  functionDec.returnType.tokens.emplace_back(f.tokenizeNext());
+  f.tokenizeNext();
+
+
+  auto& bS = functionDec.bodyStatements;
+
+  // "  currRegistration: RegistrationNode^ = registrationList;"
+  auto& currRegDec = bS.emplace_back();
+  VariableDec varDec1{f.tokenizeNext()};
+  f.tokenizeNext();
+  varDec1.type.tokens.emplace_back(f.tokenizeNext());
+  varDec1.type.tokens.emplace_back(f.tokenizeNext());
+  BinOp bOp1{f.tokenizeNext().type};
+  bOp1.leftSide.type = StatementType::VARIABLE_DEC;
+  bOp1.leftSide.varDec = &varDec1;
+  bOp1.rightSide.type = StatementType::VALUE;
+  bOp1.rightSide.var = f.tokenizeNext();
+  f.tokenizeNext();
+  currRegDec.type = StatementType::BINARY_OP;
+  currRegDec.binOp = &bOp1;
+
+// "  while (currRegistration) {"
+  KeywordWithBody whileLoop{f.tokenizeNext().type};
+  f.tokenizeNext();
+  whileLoop.header.type = StatementType::WRAPPED_VALUE;
+  Statement st454{f.tokenizeNext()};
+  whileLoop.header.wrapped = &st454;
+  whileLoop.body.type = StatementType::SCOPE;
+  Scope scp123;
+  whileLoop.body.scope = &scp123;
+  f.tokenizeNext();
+  f.tokenizeNext();
+
+// "    if (~(~currRegistration).registration == eventCode) {"
+  KeywordWithBody ifCond{f.tokenizeNext().type};
+  auto& sp87 = scp123.scopeStatements.emplace_back();
+  f.tokenizeNext();
+  ifCond.header.type = StatementType::WRAPPED_VALUE;
+  ifCond.body.type = StatementType::SCOPE;
+  Scope scp95;
+  ifCond.body.scope = &scp95;
+
+  UnOp unp123{f.tokenizeNext().type};
+  f.tokenizeNext();
+
+  UnOp unp1233{f.tokenizeNext().type};
+  unp1233.operand.type = StatementType::VALUE;
+  unp1233.operand.var = f.tokenizeNext();
+  f.tokenizeNext();
+  Statement st312{&unp1233};
+
+  BinOp bin2232{f.tokenizeNext().type};
+  bin2232.leftSide.type = StatementType::WRAPPED_VALUE;
+  bin2232.leftSide.wrapped = &st312;
+  bin2232.rightSide.type = StatementType::VALUE;
+  bin2232.rightSide.var = f.tokenizeNext();
+  unp123.operand.type = StatementType::BINARY_OP;
+  unp123.operand.binOp = &bin2232;
+
+  BinOp bin75{f.tokenizeNext().type};
+  bin75.rightSide.type = StatementType::VALUE;
+  bin75.rightSide.var = f.tokenizeNext();
+  bin75.leftSide.type = StatementType::UNARY_OP;
+  bin75.leftSide.unOp = &unp123;
+
+  Statement sg235{&bin75};
+  ifCond.header.wrapped = &sg235;
+
+  sp87.type = StatementType::KEY_W_BODY;
+  sp87.keywBody = &ifCond;
+
+  f.tokenizeNext(); // (
+  f.tokenizeNext(); // {
+
+// "      array[length - 1] = (~currRegistration).registration.registrationCode;"
+
+  //  array[length - 1]
+  ArrayAccess arrAcc0{f.tokenizeNext()};
+  f.tokenizeNext();
+  BinOp bOp2{TokenType::SUBTRACTION};
+  bOp2.leftSide.type = StatementType::VALUE;
+  bOp2.leftSide.var = f.tokenizeNext();
+  f.tokenizeNext();
+  bOp2.rightSide.type = StatementType::VALUE;
+  bOp2.rightSide.var = f.tokenizeNext();
+  f.tokenizeNext(); // [
+
+  BinOp b12{f.tokenizeNext().type}; // =
+  b12.leftSide.type = StatementType::ARRAY_ACCESS;
+  b12.leftSide.arrAccess = &arrAcc0;
+
+    // (~currRegistration).registration.registrationCode
+
+    f.tokenizeNext();
+    UnOp up84{f.tokenizeNext().type};
+    up84.operand.type = StatementType::VALUE;
+    up84.operand.var = f.tokenizeNext();
+    Statement si876{&up84};
+    f.tokenizeNext();
+    BinOp bOp4{f.tokenizeNext().type};
+    bOp4.leftSide.type = StatementType::WRAPPED_VALUE;
+    bOp4.leftSide.wrapped = &si876;
+    bOp4.rightSide.type = StatementType::VALUE;
+    bOp4.rightSide.var = f.tokenizeNext();
+    BinOp bOp5{f.tokenizeNext().type};
+    bOp5.leftSide.type = StatementType::BINARY_OP;
+    bOp5.leftSide.binOp = &bOp4;
+    bOp5.rightSide.type = StatementType::VALUE;
+    bOp5.rightSide.var = f.tokenizeNext();
+
+    b12.rightSide.type = StatementType::BINARY_OP;
+    b12.rightSide.binOp = &bOp5;
+
+    
+    auto& r = scp95.scopeStatements.emplace_back();
+    r.type = StatementType::BINARY_OP;
+    r.binOp = &b12;
+  f.tokenizeNext(); // ;
+  f.tokenizeNext(); // }
+  f.tokenizeNext(); // }
+
+
+  auto& j =  bS.emplace_back();
+  j.type = StatementType::KEY_W_BODY;
+  j.keywBody = &whileLoop;
+
+// "  return array;"
+  KeywordWithBody kd{f.tokenizeNext().type};
+  kd.header.type = StatementType::VALUE;
+  kd.header.var = f.tokenizeNext();
+  f.tokenizeNext(); // ;
+  f.tokenizeNext(); // }
+
+  auto& b =  bS.emplace_back();
+  b.type = StatementType::KEY_W_BODY;
+  b.keywBody = &kd;
+
+  program.decs.emplace_back(&functionDec);
+  program.operator==(parser.program);
+  if (program == parser.program) {
+    // do something
+  }
+  CHECK(program == parser.program);
 }

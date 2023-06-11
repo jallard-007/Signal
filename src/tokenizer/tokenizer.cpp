@@ -1,6 +1,4 @@
-#include <vector>
 #include <cctype>
-#include "../token.hpp"
 #include "tokenizer.hpp"
 
 bool my_isalpha(char c) {
