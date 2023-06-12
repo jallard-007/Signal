@@ -1,14 +1,5 @@
-#include <cctype>
 #include <iostream>
 #include "tokenizer.hpp"
-
-bool my_isalpha(char c) {
-  return std::isalpha(static_cast<unsigned char>(c));
-}
-
-bool my_isalnum(char c) {
-  return std::isalnum(static_cast<unsigned char>(c));
-}
 
 Tokenizer::Tokenizer(const std::string& filePath, const std::string& fileContent):
   filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
@@ -270,7 +261,7 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
 
 void Tokenizer::movePastKeywordOrIdentifier() {
   for (++position; position < size; ++position) {
-    if (numToType[(int)content[position]] != TokenType::IDENTIFIER) {
+    if (numToType[(int)content[position]] != TokenType::IDENTIFIER && numToType[(int)content[position]] != TokenType::DECIMAL_NUMBER) {
       return;
     }
   }
