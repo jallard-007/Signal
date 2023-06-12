@@ -7,6 +7,7 @@
 struct Tokenizer {
   const std::string& content;
   Token peeked;
+  Token error;
   const uint32_t size;
   uint32_t position;
   uint32_t lineNum;
@@ -26,7 +27,7 @@ struct Tokenizer {
   void movePastKeywordOrIdentifier();
   void movePastNumber();
   void movePastHexNumber();
-  void movePastLiteral(char);
+  bool movePastLiteral(char);
   void moveToNewLine();
   std::string extractToken(Token);
 };

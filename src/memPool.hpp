@@ -52,7 +52,6 @@ struct MemPool {
     initializeList(mem[j]);
   }
 
-
   void initializeList(Obj* list) {
     for (uint32_t i = 0; i < listSize - 1; ++i) {
       list[i].next = &list[i + 1];

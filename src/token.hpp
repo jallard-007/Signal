@@ -301,7 +301,8 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::TEMPLATE, "template "},
   {TokenType::WHILE, "while "},
   {TokenType::POINTER, "ptr"},
-
+  {TokenType::STRING_LITERAL, "\""},
+  {TokenType::CHAR_LITERAL, "'"},
 };
 
 #define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)

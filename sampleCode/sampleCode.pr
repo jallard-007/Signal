@@ -30,10 +30,10 @@ func main(): int {
     vector: intVector;
     vector.arr = data;
     vector.size = arraySize;
-    max : int = vector.findMax();
+    max: int = vector.findMax();
     min: int = vector.findMin();
     print(max);
-    print("\n");
+    print('\n');
     print(min);
   }
 

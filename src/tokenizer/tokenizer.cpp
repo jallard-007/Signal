@@ -10,7 +10,7 @@ bool my_isalnum(char c) {
 }
 
 Tokenizer::Tokenizer(const std::string& fileContent):
-  content{fileContent}, peeked{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
+  content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -34,6 +34,10 @@ std::vector<Token> Tokenizer::tokenizeAll() {
 */
 Token Tokenizer::peekNext() {
   if (peeked.type != TokenType::NOTHING) {
+    if (prevType == TokenType::BAD_VALUE) {
+      // fatal error not handled
+      exit(55);
+    }
     return peeked;
   }
   peeked = tokenizeNext();
@@ -43,14 +47,22 @@ Token Tokenizer::peekNext() {
 }
 
 void Tokenizer::consumePeek() {
-  if (peeked.type != TokenType::NOTHING) { 
+  if (peeked.type != TokenType::NOTHING) {
+    if (prevType == TokenType::BAD_VALUE) {
+      // fatal error not handled
+      exit(55);
+    }
     peeked.type = TokenType::NOTHING;
     position = peeked.position + peeked.length;
   }
 }
 
 Token Tokenizer::tokenizeNext() {
-  if (peeked.type != TokenType::NOTHING) { 
+  if (peeked.type != TokenType::NOTHING) {
+    if (prevType == TokenType::BAD_VALUE) {
+      // fatal error not handled
+      exit(55);
+    }
     const Token temp = peeked;
     peeked.type = TokenType::NOTHING;
     position = peeked.position + peeked.length;
@@ -68,10 +80,44 @@ Token Tokenizer::tokenizeNext() {
   if (charToType.find(c) != charToType.end()) {
     type = charToType.at(c);
     if (type == TokenType::STRING_LITERAL) {
-      movePastLiteral('"');
+      if (!movePastLiteral('"')) {
+        error.type = TokenType::STRING_LITERAL;
+        error.position = position;
+        error.length = 0;
+        type = TokenType::BAD_VALUE;
+      }
     }
     else if (type == TokenType::CHAR_LITERAL) {
-      movePastLiteral('\'');
+      if (!movePastLiteral('\'')) {
+        error.type = TokenType::CHAR_LITERAL;
+        error.position = position;
+        error.length = 0;
+        type = TokenType::BAD_VALUE;
+      }
+      // ' '\n \r \t \' \" \\ \v \f \e \b \a \0
+      else if (position - tokenStartPos == 2) {
+        // empty char
+        error.type = TokenType::CHAR_LITERAL;
+        error.position = position;
+        error.length = 0;
+        type = TokenType::BAD_VALUE;
+      }
+      else if (position - tokenStartPos > 4) {
+        // char too big, definitely more than one char
+        error.type = TokenType::CHAR_LITERAL;
+        error.position = position;
+        error.length = 0;
+        type = TokenType::BAD_VALUE;
+
+      } else if (position - tokenStartPos == 4) {
+        if (content[tokenStartPos + 1] != '\\') {
+          error.type = TokenType::CHAR_LITERAL;
+          error.position = position;
+          error.length = 0;
+          type = TokenType::BAD_VALUE;
+        }
+        // escaped char, we cool
+      }
     }
     else if (type == TokenType::COMMENT) {
       moveToNewLine();
@@ -237,18 +283,23 @@ void Tokenizer::movePastHexNumber() {
   }
 }
 
-void Tokenizer::movePastLiteral(char delimiter) {
+bool Tokenizer::movePastLiteral(char delimiter) {
   char prev = content[position];
   char prevPrev = content[position];
   for (++position; position < size; ++position) {
     const char c = content[position];
+    if (c == '\n') {
+      ++position;
+      return false;
+    }
     if (c == delimiter && !(prev == '\\' && prevPrev != '\\')) {
       ++position;
-      return;
+      return true;
     }
     prevPrev = prev;
     prev = c;
   }
+  return false;
 }
 
 void Tokenizer::moveToNewLine() {
