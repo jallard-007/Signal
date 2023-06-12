@@ -5,7 +5,7 @@
 NodeMemPool memPool;
 
 TEST_CASE("getType", "[parser]") {
-  const std::string str = " char customType ^^ , int ^^ )";
+  const std::string str = " char customType ptr ptr , int ptr ptr )";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer, memPool};
   {
@@ -34,7 +34,7 @@ TEST_CASE("getType", "[parser]") {
 }
 
 TEST_CASE("getParams", "[parser]") {
-  const std::string str = "first: int, second: double, third: customType ^^)";
+  const std::string str = "first: int, second: double, third: customType ptr ptr)";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer, memPool};
   std::vector<Statement> vars;
@@ -66,7 +66,7 @@ TEST_CASE("getParams", "[parser]") {
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
-  const std::string str = "func funcName(first: int^): int {}";
+  const std::string str = "func funcName(first: int ptr): int {}";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer, memPool};
   parser.parse();
@@ -92,7 +92,7 @@ TEST_CASE("Function Declaration", "[parser]") {
   REQUIRE(func->returnType.tokens.size() == 1);
   CHECK(func->returnType.tokens[0].type == TokenType::INT_TYPE);
 
-  CHECK(func->bodyStatements.empty());
+  CHECK(func->body.scopeStatements.empty());
 }
 
 TEST_CASE("Function Call - Base", "[parser]") {
@@ -365,7 +365,7 @@ TEST_CASE("Template Declaration", "[parser]") {
   CHECK(tokenizer.extractToken(t.temp->templateIdentifiers[0].var) == "T");
   REQUIRE(t.temp->dec.decType == DecType::FUNCTION);
   REQUIRE(t.temp->dec.func);
-  CHECK(t.temp->dec.func->bodyStatements.size() == 2);
+  CHECK(t.temp->dec.func->body.scopeStatements.size() == 2);
 }
 
 TEST_CASE("Variable Declaration", "[parser]") {
@@ -416,18 +416,50 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(s.keywBody->keyword == TokenType::RETURN);
     REQUIRE(s.keywBody->header);
     CHECK(s.keywBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
-    REQUIRE(s.keywBody->header.list);
-    CHECK(s.keywBody->header.list->list.size() == 2);
+    REQUIRE(s.keywBody->header.arrOrStructLiteral);
+    CHECK(s.keywBody->header.arrOrStructLiteral->list.size() == 2);
     REQUIRE(!s.keywBody->body);
   }
+
+  {
+    const std::string str = "for (i : int = 0; i < 34; ++i) {doSomething.something(); } }";
+    Tokenizer tokenizer{str};
+    Parser parser{tokenizer, memPool};
+    Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    CHECK(parser.expected.empty());
+    CHECK(parser.unexpected.empty());
+    REQUIRE(s.type == StatementType::KEY_W_BODY);
+    REQUIRE(s.keywBody);
+    CHECK(s.keywBody->keyword == TokenType::FOR);
+    REQUIRE(s.keywBody->header.type == StatementType::FOR_LOOP_HEADER);
+    REQUIRE(s.keywBody->header.list);
+    CHECK(s.keywBody->header.list->list.size() == 3);
+
+  }
 }
+
+TEST_CASE("Array", "[parser]") {
+  const std::string str = " [-3 , 23 ]; ";
+  Tokenizer tk{str};
+  Token t = tk.tokenizeNext();
+  t = tk.tokenizeNext();
+  t = tk.tokenizeNext();
+  Tokenizer tokenizer{str};
+  Parser parser{tokenizer, memPool};
+  Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+  CHECK(parser.expected.empty());
+  CHECK(parser.unexpected.empty());
+  REQUIRE(s.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
+  REQUIRE(s.arrOrStructLiteral->list.size() == 2);
+}
+
 
 // this is so stupid, but i did it anyways, at least i know for sure it parses correctly
 // next time im just gonna write the "pretty print" stuff and compare the output
 TEST_CASE("Big Boi", "[parser]") {
   const std::string str =
-"func checkForRegistrationOfEvent(eventCode: int): int^ {"
-"  currRegistration: RegistrationNode^ = registrationList;"
+"func checkForRegistrationOfEvent(eventCode: int): int ptr {"
+"  currRegistration: RegistrationNode ptr = registrationList;"
 "  while (currRegistration) {"
 "    if (~(~currRegistration).registration == eventCode) {"
 "      array[length - 1] = (~currRegistration).registration.registrationCode;"
@@ -464,10 +496,10 @@ TEST_CASE("Big Boi", "[parser]") {
   f.tokenizeNext();
 
 
-  auto& bS = functionDec.bodyStatements;
+  auto& bS = functionDec.body;
 
   // "  currRegistration: RegistrationNode^ = registrationList;"
-  auto& currRegDec = bS.emplace_back();
+  auto& currRegDec = bS.scopeStatements.emplace_back();
   VariableDec varDec1{f.tokenizeNext()};
   f.tokenizeNext();
   varDec1.type.tokens.emplace_back(f.tokenizeNext());
@@ -551,49 +583,45 @@ TEST_CASE("Big Boi", "[parser]") {
   b12.leftSide.type = StatementType::ARRAY_ACCESS;
   b12.leftSide.arrAccess = &arrAcc0;
 
-    // (~currRegistration).registration.registrationCode
+  f.tokenizeNext();
+  UnOp up84{f.tokenizeNext().type};
+  up84.operand.type = StatementType::VALUE;
+  up84.operand.var = f.tokenizeNext();
+  Statement si876{&up84};
+  f.tokenizeNext();
+  BinOp bOp4{f.tokenizeNext().type};
+  bOp4.leftSide.type = StatementType::WRAPPED_VALUE;
+  bOp4.leftSide.wrapped = &si876;
+  bOp4.rightSide.type = StatementType::VALUE;
+  bOp4.rightSide.var = f.tokenizeNext();
+  BinOp bOp5{f.tokenizeNext().type};
+  bOp5.leftSide.type = StatementType::BINARY_OP;
+  bOp5.leftSide.binOp = &bOp4;
+  bOp5.rightSide.type = StatementType::VALUE;
+  bOp5.rightSide.var = f.tokenizeNext();
 
-    f.tokenizeNext();
-    UnOp up84{f.tokenizeNext().type};
-    up84.operand.type = StatementType::VALUE;
-    up84.operand.var = f.tokenizeNext();
-    Statement si876{&up84};
-    f.tokenizeNext();
-    BinOp bOp4{f.tokenizeNext().type};
-    bOp4.leftSide.type = StatementType::WRAPPED_VALUE;
-    bOp4.leftSide.wrapped = &si876;
-    bOp4.rightSide.type = StatementType::VALUE;
-    bOp4.rightSide.var = f.tokenizeNext();
-    BinOp bOp5{f.tokenizeNext().type};
-    bOp5.leftSide.type = StatementType::BINARY_OP;
-    bOp5.leftSide.binOp = &bOp4;
-    bOp5.rightSide.type = StatementType::VALUE;
-    bOp5.rightSide.var = f.tokenizeNext();
-
-    b12.rightSide.type = StatementType::BINARY_OP;
-    b12.rightSide.binOp = &bOp5;
+  b12.rightSide.type = StatementType::BINARY_OP;
+  b12.rightSide.binOp = &bOp5;
 
     
-    auto& r = scp95.scopeStatements.emplace_back();
-    r.type = StatementType::BINARY_OP;
-    r.binOp = &b12;
+  auto& r = scp95.scopeStatements.emplace_back();
+  r.type = StatementType::BINARY_OP;
+  r.binOp = &b12;
   f.tokenizeNext(); // ;
   f.tokenizeNext(); // }
   f.tokenizeNext(); // }
 
-
-  auto& j =  bS.emplace_back();
+  auto& j =  bS.scopeStatements.emplace_back();
   j.type = StatementType::KEY_W_BODY;
   j.keywBody = &whileLoop;
 
-// "  return array;"
   KeywordWithBody kd{f.tokenizeNext().type};
   kd.header.type = StatementType::VALUE;
   kd.header.var = f.tokenizeNext();
   f.tokenizeNext(); // ;
   f.tokenizeNext(); // }
 
-  auto& b =  bS.emplace_back();
+  auto& b =  bS.scopeStatements.emplace_back();
   b.type = StatementType::KEY_W_BODY;
   b.keywBody = &kd;
 

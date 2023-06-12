@@ -109,7 +109,10 @@ Token Tokenizer::tokenizeNext() {
           type = TokenType::SHIFT_RIGHT;
         }
       } else if (c == '-') {
-        if (cNext == '-') {
+        if (cNext == '>') {
+          type = TokenType::PTR_MEMBER_ACCESS;
+        }
+        else if (cNext == '-') {
           if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
             type = TokenType::DECREMENT_POSTFIX;
           } else {
@@ -123,6 +126,7 @@ Token Tokenizer::tokenizeNext() {
             type = TokenType::SUBTRACTION;
           } else {
             type = TokenType::NEGATIVE;
+            --position;
           }
         }
       } else if (c == '+' && cNext == '+') {

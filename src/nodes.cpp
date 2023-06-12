@@ -2,7 +2,7 @@
 #include <iostream>
 
 bool hasData(StatementType type) {
-  return type >= StatementType::BINARY_OP && type <= StatementType::LIST;
+  return type >= StatementType::BINARY_OP && type <= StatementType::ARRAY_OR_STRUCT_LITERAL;
 }
 
 Unexpected::Unexpected(Token token, uint32_t line, uint32_t column):
@@ -54,7 +54,8 @@ void Statement::operator=(Statement&& st) noexcept {
     case StatementType::SCOPE:
       scope = st.scope; st.scope = nullptr; break;
     case StatementType::ARRAY_OR_STRUCT_LITERAL:
-    case StatementType::LIST:
+      arrOrStructLiteral = st.arrOrStructLiteral; st.arrOrStructLiteral = nullptr; break;
+    case StatementType::FOR_LOOP_HEADER:
       list = st.list; st.list = nullptr; break;
     case StatementType::KEY_W_BODY:
       keywBody = st.keywBody; st.keywBody = nullptr; break;
@@ -119,7 +120,14 @@ bool Statement::operator==(const Statement& st) const {
       }
       return *wrapped == *st.wrapped;
     case StatementType::ARRAY_OR_STRUCT_LITERAL:
-    case StatementType::LIST:
+      if (!arrOrStructLiteral && !st.arrOrStructLiteral) {
+        return true;
+      }
+      if (!arrOrStructLiteral || !st.arrOrStructLiteral) {
+        return false;
+      }
+      return *arrOrStructLiteral == *st.arrOrStructLiteral;
+    case StatementType::FOR_LOOP_HEADER:
       if (!list && !st.list) {
         return true;
       }
@@ -181,14 +189,19 @@ Statement::Statement(Scope *ptr) {
   type = StatementType::SCOPE;
 }
 
-Statement::Statement(List *ptr) {
-  list = ptr;
-  type = StatementType::LIST;
+Statement::Statement(ArrOrStructLiteral *ptr) {
+  arrOrStructLiteral = ptr;
+  type = StatementType::ARRAY_OR_STRUCT_LITERAL;
 }
 
 Statement::Statement(KeywordWithBody *ptr) {
   keywBody = ptr;
   type = StatementType::KEY_W_BODY;
+}
+
+Statement::Statement(ForLoopHeader *ptr) {
+  list = ptr;
+  type = StatementType::FOR_LOOP_HEADER;
 }
 
 Statement::Statement(Token tok): var{tok} {
@@ -227,7 +240,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (keywBody->body) {
         return ExpectedType::TOKEN;
       }
-      if (hasData(st.type) && keywBody->keyword != TokenType::ELSE && !keywBody->header) {
+      if (((hasData(st.type) && keywBody->keyword != TokenType::ELSE) || (st.type == StatementType::FOR_LOOP_HEADER && keywBody->keyword == TokenType::FOR)) && !keywBody->header) {
         keywBody->header = std::move(st);
         return ExpectedType::NOTHING;
       }
@@ -329,7 +342,7 @@ Enum::Enum(): name{0,0,TokenType::NOTHING} {}
 FunctionDec::FunctionDec(Token token): name{token} {}
 
 FunctionDec::FunctionDec(FunctionDec&& fd):
-  params{std::move(fd.params)}, bodyStatements{std::move(fd.bodyStatements)},
+  params{std::move(fd.params)}, body{std::move(fd.body)},
   returnType{std::move(fd.returnType)}, name{fd.name} {}
 
 FunctionCall::FunctionCall(Token token): name{token} {}
@@ -371,12 +384,12 @@ Declaration::Declaration(Enum *ptr): enm{ptr}, decType{DecType::ENUM} {}
 
 Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std::move(prog.decs)} {}
 
-bool List::operator==(const List & l) const {
+bool ArrOrStructLiteral::operator==(const ArrOrStructLiteral & l) const {
   return list == l.list;
 }
 
 bool FunctionDec::operator==(const FunctionDec& ref) const {
-  return ref.name == name && ref.returnType == returnType && ref.params == params && ref.bodyStatements == bodyStatements;
+  return ref.name == name && ref.returnType == returnType && ref.params == params && ref.body == body;
 }
 
 bool Enum::operator==(const Enum& ref) const {
@@ -474,4 +487,24 @@ bool KeywordWithBody::operator==(const KeywordWithBody& ref) const {
 
 Statement::operator bool() const {
   return type != StatementType::NONE;
+}
+
+bool ForLoopHeader::operator==(const ForLoopHeader& ref) const {
+  return list == ref.list;
+}
+
+
+std::string Expected::getErrorMessage(const std::string& file) {
+  if (expectedType == ExpectedType::TOKEN) {
+    return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
+    "\nExpected token: " + typeToString.at(this->tokenType) + '\n';
+  } else {
+    return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
+    "\nExpected expression\n";
+  }
+}
+
+std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
+  "\nUnexpected token: " + tk.extractToken(token) + '\n';
 }

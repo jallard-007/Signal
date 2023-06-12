@@ -51,6 +51,7 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("returns") == TokenType::IDENTIFIER);
    CHECK(firstToken("struct") == TokenType::STRUCT);
    CHECK(firstToken("switch") == TokenType::SWITCH);
+   CHECK(firstToken("ptr") == TokenType::POINTER);
    CHECK(firstToken("template") == TokenType::TEMPLATE);
    CHECK(firstToken("templat ") == TokenType::IDENTIFIER);
    CHECK(firstToken("true") == TokenType::TRUE);
@@ -72,6 +73,7 @@ TEST_CASE("Unit Test - General", "[tokenizer][tokenType]") {
    CHECK(firstToken("?") == TokenType::TERNARY);
    CHECK(firstToken(",") == TokenType::COMMA);
    CHECK(firstToken(".") == TokenType::DOT);
+   CHECK(firstToken("->") == TokenType::PTR_MEMBER_ACCESS);
 }
 
 TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
@@ -97,7 +99,7 @@ TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
    CHECK(firstToken("*") == TokenType::MULTIPLICATION);
    CHECK(firstToken("/") == TokenType::DIVISION);
    CHECK(firstToken("%") == TokenType::MODULO);
-   CHECK(firstToken("$") == TokenType::BITWISE_XOR);
+   CHECK(firstToken("^") == TokenType::BITWISE_XOR);
    CHECK(firstToken("&") == TokenType::BITWISE_AND);
    CHECK(firstToken("|") == TokenType::BITWISE_OR);
    CHECK(firstToken("<<") == TokenType::SHIFT_LEFT);
@@ -113,7 +115,7 @@ TEST_CASE("Unit Test - Assignments", "[tokenizer][tokenType]") {
    CHECK(firstToken("%=") == TokenType::MODULO_ASSIGNMENT);
    CHECK(firstToken("|=") == TokenType::BITWISE_OR_ASSIGNMENT);
    CHECK(firstToken("&=") == TokenType::BITWISE_AND_ASSIGNMENT);
-   CHECK(firstToken("$=") == TokenType::BITWISE_XOR_ASSIGNMENT);
+   CHECK(firstToken("^=") == TokenType::BITWISE_XOR_ASSIGNMENT);
    CHECK(firstToken("<<=") == TokenType::SHIFT_LEFT_ASSIGNMENT);
    CHECK(firstToken(">>=") == TokenType::SHIFT_RIGHT_ASSIGNMENT);
 }
@@ -134,12 +136,12 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
    CHECK(firstToken("char") == TokenType::CHAR_TYPE);
    CHECK(firstToken("int") == TokenType::INT_TYPE);
    CHECK(firstToken("double") == TokenType::DOUBLE_TYPE);
-   CHECK(firstToken("^") == TokenType::POINTER);
+   CHECK(firstToken("ptr") == TokenType::POINTER);
 }
 
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    {
-   const std::string str = "func functionName(content:char^, size:int)\n# this is a comment\nnotAComment  ";
+   const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
    Tokenizer tokenizer{str};
    auto tokens = tokenizer.tokenizeAll();
    REQUIRE(tokens.size() == 15);
@@ -162,5 +164,13 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    CHECK(tokenizer.extractToken(tokens[1]) == "0b10101101");
    CHECK(tokenizer.extractToken(tokens[2]) == "0xFABDECAAaaffbceda1010199747393");
    }
+}
+#include <iostream>
 
+TEST_CASE("thing", "[tokenizer]") {
+  const std::string str = R"(template [T] struct vectorTemplate {  data : T ptr;  size : int;  func findMax() : T {    max : T = 0;    for (i : int = 0; i < arr->size; ++i) {      if (this->data[i] > max) {        max = arr[i];      }    }    return max;  }  func findMin(): T {    min : T = 0;    for (i : int = 0; i < arr->size; ++i) {      if (this->data[i] < min) {        min = arr[i];      }    }    return min;  }}func main() {  {    arraySize: int = 9;    data: int [arraySize] = [-3, 23, 21, 554, 3, 6, -234, 123, 43];    vector: intVector;    vector.arr = data;    vector.size = arraySize;    max : int = vector.findMax();    min: int = vector.findMin();    print(max);    print("\n");    print(min);  }  {    arraySize: int = 4;    data: double [arraySize] = [-3.4, 23.2, 21.3, 43.8];    vector: intVector;    vector.arr = data;    vector.size = arraySize;    max : double = vector.findMax();    min: double = vector.findMin();    print(max);    print("\n");    print(min);  }})";
+  Tokenizer tokenizer{str};
+  std::cout << "thing";
+  auto tokens = tokenizer.tokenizeAll();
+  CHECK(tokens.size() > 1);
 }

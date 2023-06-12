@@ -1,7 +1,5 @@
-include stdio;
-
 template [T] struct vectorTemplate {
-  data : T ^;
+  data : T ptr;
   size : int;
 
   func findMax() : T {
@@ -25,13 +23,10 @@ template [T] struct vectorTemplate {
   }
 }
 
-create [int] vectorTemplate as intVector;
-create [double] vectorTemplate as doubleVector;
-
-func main() {
+func main(): int {
   {
     arraySize: int = 9;
-    data: int [arraySize] = [-3, 23, 21, 554, 3, 6, -234, 123, 43];
+    data: int ptr = [-3 , 23, 21, 554, 3, 6, -234, 123, 43];
     vector: intVector;
     vector.arr = data;
     vector.size = arraySize;
@@ -44,7 +39,7 @@ func main() {
 
   {
     arraySize: int = 4;
-    data: double [arraySize] = [-3.4, 23.2, 21.3, 43.8];
+    data: double ptr = [-3.4, 23.2, 21.3, 43.8];
     vector: intVector;
     vector.arr = data;
     vector.size = arraySize;

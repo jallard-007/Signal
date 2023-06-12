@@ -145,7 +145,7 @@ bool Parser::functionDec(Declaration& dec) {
   }
   // consume open brace
   tokenizer.consumePeek();
-  if (!getStatements(funDec.bodyStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
+  if (!getStatements(funDec.body.scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
     if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
       expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
       return false;
@@ -542,9 +542,17 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     }
 
     else if (token.type == TokenType::OPEN_PAREN) {
-      Statement statement {memPool.get(parseStatement(TokenType::NOTHING, TokenType::CLOSE_PAREN))};
-      if (statement.wrapped->type == StatementType::NONE) {
-        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+      Statement statement;
+      if (rootStatement.type == StatementType::KEY_W_BODY && rootStatement.keywBody->keyword == TokenType::FOR) {
+        statement.type = StatementType::FOR_LOOP_HEADER;
+        statement.list = memPool.get(ForLoopHeader{});
+        getStatements(statement.list->list, TokenType::SEMICOLON, TokenType::CLOSE_PAREN);
+      } else {
+        statement.type = StatementType::WRAPPED_VALUE;
+        statement.wrapped = memPool.get(parseStatement(TokenType::NOTHING, TokenType::CLOSE_PAREN));
+        if (statement.wrapped->type == StatementType::NONE) {
+          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+        }
       }
 
       lookAhead = tokenizer.peekNext();
@@ -604,9 +612,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
     // array literals, structs
     else if (token.type == TokenType::OPEN_BRACKET) {
-      Statement statement{memPool.get(List{})};
+      Statement statement{memPool.get(ArrOrStructLiteral{})};
       statement.type = StatementType::ARRAY_OR_STRUCT_LITERAL;
-      if (!getStatements(statement.list->list, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
+      if (!getStatements(statement.arrOrStructLiteral->list, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
         if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
           expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
         }

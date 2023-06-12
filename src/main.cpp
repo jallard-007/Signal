@@ -21,10 +21,28 @@ int main(int argc, char **argv) {
   t.seekg(0);
   t.read(&buffer[0], size);
   t.close();
-  Tokenizer lex(buffer);
+  Tokenizer tk(buffer);
   NodeMemPool mem;
-  Parser p{lex, mem};
-  p.parse();
+  Parser p{tk, mem};
+  if (!p.parse()) {
+    std::cout << "Error:\n";
+  }
+  if (!p.expected.empty()) {
+    for (auto enx : p.expected) {
+      std::cout << enx.getErrorMessage(argv[1]);
+    }
+    exit(1);
+  }
+  if (!p.unexpected.empty()) {
+    for (auto enx : p.unexpected) {
+      std::cout << enx.getErrorMessage(tk, argv[1]);
+    }
+    exit(1);
+  }
+  std::string pretty;
+  pretty.reserve(size);
+  p.program.prettyPrint(tk, pretty);
+  std::cout << pretty << '\n';
   return 0;
 }
 

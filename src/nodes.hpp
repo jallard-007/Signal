@@ -1,9 +1,8 @@
 #pragma once
 
-#include "token.hpp"
+#include "tokenizer/tokenizer.hpp"
 #include <vector>
 #include <memory>
-
 
 struct Unexpected {
   Token token;
@@ -12,6 +11,7 @@ struct Unexpected {
   Unexpected() = delete;
   Unexpected(Token, uint32_t, uint32_t);
   bool operator==(const Unexpected&) const;
+  std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
 enum class ExpectedType : uint8_t {
@@ -29,6 +29,7 @@ struct Expected {
   Expected(ExpectedType, uint32_t, uint32_t);
   Expected(ExpectedType, uint32_t, uint32_t, TokenType);
   bool operator==(const Expected&) const;
+  std::string getErrorMessage(const std::string&);
 };
 
 struct Type {
@@ -37,6 +38,7 @@ struct Type {
   Type() = default;
   Type(Type&&) = default;
   bool operator==(const Type&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct VariableDec {
@@ -46,6 +48,7 @@ struct VariableDec {
   explicit VariableDec(Token);
   VariableDec(VariableDec&&) = default;
   bool operator==(const VariableDec&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 typedef struct BinOp BinOp;
@@ -53,7 +56,8 @@ typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
 typedef struct Scope Scope;
-typedef struct List List;
+typedef struct ForLoopHeader ForLoopHeader;
+typedef struct ArrOrStructLiteral ArrOrStructLiteral;
 typedef struct KeywordWithBody KeywordWithBody;
 
 enum class StatementType: uint8_t {
@@ -67,7 +71,7 @@ enum class StatementType: uint8_t {
   ARRAY_ACCESS,
   WRAPPED_VALUE,
   ARRAY_OR_STRUCT_LITERAL,
-  LIST,
+  FOR_LOOP_HEADER,
   SCOPE,
   KEYWORD,
   KEY_W_BODY,
@@ -82,7 +86,8 @@ struct Statement {
     ArrayAccess *arrAccess;
     Statement *wrapped;
     Scope *scope;
-    List *list;
+    ArrOrStructLiteral *arrOrStructLiteral;
+    ForLoopHeader *list;
     KeywordWithBody *keywBody;
     Token var;
     TokenType key;
@@ -100,8 +105,9 @@ struct Statement {
   explicit Statement(ArrayAccess *);
   explicit Statement(Statement *);
   explicit Statement(Scope *);
+  explicit Statement(ForLoopHeader *);
   explicit Statement(KeywordWithBody *);
-  explicit Statement(List *);
+  explicit Statement(ArrOrStructLiteral *);
 
   explicit Statement(Token);
   void operator=(Statement&&) noexcept;
@@ -112,15 +118,17 @@ struct Statement {
   ExpectedType addStatementToNode(Statement&&);
   Statement *getChild();
   ExpectedType isValid() const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 bool hasData(StatementType);
 
-struct List {
+struct ArrOrStructLiteral {
   std::vector<Statement> list;
-  List() = default;
-  List(List&&) = default;
-  bool operator==(const List&) const;
+  ArrOrStructLiteral() = default;
+  ArrOrStructLiteral(ArrOrStructLiteral&&) = default;
+  bool operator==(const ArrOrStructLiteral&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct KeywordWithBody {
@@ -131,12 +139,22 @@ struct KeywordWithBody {
   KeywordWithBody(TokenType);
   KeywordWithBody(KeywordWithBody&&);
   bool operator==(const KeywordWithBody&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+struct ForLoopHeader {
+  std::vector<Statement> list;
+  ForLoopHeader() = default;
+  bool operator==(const ForLoopHeader&) const;
+  ForLoopHeader(ForLoopHeader&&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct Scope {
   std::vector<Statement> scopeStatements;
   Scope() = default;
   bool operator==(const Scope&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct ArrayAccess {
@@ -146,6 +164,7 @@ struct ArrayAccess {
   ArrayAccess() = delete;
   explicit ArrayAccess(Token);
   bool operator==(const ArrayAccess&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct BinOp {
@@ -156,6 +175,7 @@ struct BinOp {
   BinOp(const BinOp&) = delete;
   BinOp(BinOp&&) noexcept;
   bool operator==(const BinOp&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct UnOp {
@@ -165,17 +185,7 @@ struct UnOp {
   UnOp(const UnOp&) = delete;
   UnOp(UnOp&&) noexcept;
   bool operator==(const UnOp&) const;
-};
-
-struct FunctionDec {
-  std::vector<Statement> params;
-  std::vector<Statement> bodyStatements;
-  Type returnType;
-  Token name;
-  FunctionDec() = delete;
-  explicit FunctionDec(Token);
-  FunctionDec(FunctionDec&&);
-  bool operator==(const FunctionDec&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct FunctionCall {
@@ -184,6 +194,7 @@ struct FunctionCall {
   FunctionCall() = delete;
   explicit FunctionCall(Token);
   bool operator==(const FunctionCall&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct Enum {
@@ -191,6 +202,19 @@ struct Enum {
   Token name;
   Enum();
   bool operator==(const Enum&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+struct FunctionDec {
+  std::vector<Statement> params;
+  Scope body;
+  Type returnType;
+  Token name;
+  FunctionDec() = delete;
+  explicit FunctionDec(Token);
+  FunctionDec(FunctionDec&&);
+  bool operator==(const FunctionDec&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 typedef struct Template Template;
@@ -222,6 +246,7 @@ struct Declaration {
   explicit Declaration(Struct *);
   explicit Declaration(Enum *);
   bool operator==(const Declaration&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct Struct {
@@ -230,6 +255,7 @@ struct Struct {
   Struct(Token);
   Struct(Struct&&) = default;
   bool operator==(const Struct&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct Template {
@@ -239,6 +265,7 @@ struct Template {
   Template(const Template&) = delete;
   Template(Template&&) = default;
   bool operator==(const Template&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct Program {
@@ -247,4 +274,5 @@ struct Program {
   Program() = default;
   Program(Program&&) noexcept;
   bool operator==(const Program&) const;
+  void prettyPrint(Tokenizer&, std::string&);
 };

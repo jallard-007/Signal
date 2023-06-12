@@ -23,14 +23,14 @@ variableName : int = 0;
 // custom type
 
 struct intVector {
-  arr : int ^,
+  arr : int ptr ptr,
   arrSize : int,
 };
 
 // pointer to type
 
-ptrVar : int ^;
-ptrVar : int ^ = nullptr;
+ptrVar : int ptr;
+ptrVar : int  = nullptr;
 
 // address of operator
 

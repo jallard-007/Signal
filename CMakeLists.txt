@@ -9,7 +9,7 @@ target_link_libraries(parser PRIVATE tokenizer)
 
 set_target_properties(tokenizer parser PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
 
-add_executable(main ./src/main.cpp)
+add_executable(main ./src/main.cpp ./src/prettyPrint.cpp)
 target_link_libraries(main PRIVATE parser)
 
 add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp)

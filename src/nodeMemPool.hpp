@@ -11,7 +11,8 @@ class NodeMemPool {
   MemPool<ArrayAccess> arrayAccesses;
   MemPool<Statement> statements;
   MemPool<Scope> scopes;
-  MemPool<List> lists;
+  MemPool<ArrOrStructLiteral> arrOrStructs;
+  MemPool<ForLoopHeader> lists;
   MemPool<KeywordWithBody> keysWBodies;
   MemPool<FunctionDec> functionDecs;
   MemPool<Enum> enums;
@@ -27,6 +28,7 @@ public:
     arrayAccesses.reset();
     statements.reset();
     scopes.reset();
+    arrOrStructs.reset();
     lists.reset();
     keysWBodies.reset();
     functionDecs.reset();
@@ -42,7 +44,8 @@ public:
   ArrayAccess* get(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
   Statement* get(Statement&& ref) {return statements.get(std::move(ref));}
   Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
-  List* get(List&& ref) {return lists.get(std::move(ref));}
+  ArrOrStructLiteral* get(ArrOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
+  ForLoopHeader* get(ForLoopHeader&& ref) {return lists.get(std::move(ref));}
   KeywordWithBody* get(KeywordWithBody&& ref) {return keysWBodies.get(std::move(ref));}
   FunctionDec* get(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
   Enum* get(Enum&& ref) {return enums.get(std::move(ref));}
@@ -56,7 +59,8 @@ public:
   void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
   void release(Statement* ptr) { statements.release(ptr);}
   void release(Scope* ptr) { scopes.release(ptr);}
-  void release(List* ptr) { lists.release(ptr);}
+  void release(ArrOrStructLiteral* ptr) { arrOrStructs.release(ptr);}
+  void release(ForLoopHeader* ptr) { lists.release(ptr);}
   void release(KeywordWithBody* ptr) { keysWBodies.release(ptr);}
   void release(FunctionDec* ptr) { functionDecs.release(ptr);}
   void release(Enum* ptr) { enums.release(ptr);}

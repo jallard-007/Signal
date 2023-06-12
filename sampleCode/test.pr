@@ -1,0 +1,9 @@
+func checkForRegistrationOfEvent(eventCode: int): int ptr {
+  currRegistration: RegistrationNode ptr = registrationList;
+  while (currRegistration) {
+    if (~(~currRegistration).registration == eventCode) {
+      array[length - 1] = (~currRegistration).registration.registrationCode;
+    }
+  }
+  return array;
+}
