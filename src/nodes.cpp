@@ -493,6 +493,41 @@ bool ForLoopHeader::operator==(const ForLoopHeader& ref) const {
   return list == ref.list;
 }
 
+TokenList::TokenList(): curr{0,0,TokenType::NOTHING}, next{nullptr} {}
+
+bool TokenList::operator==(const TokenList& ref) const {
+  const TokenList* refCurr = &ref;
+  const TokenList* thisCurr = this;
+  while (refCurr->next && thisCurr->next) {
+    if (!(refCurr->curr == thisCurr->curr)) {
+      return false;
+    }
+    refCurr = refCurr->next;
+    thisCurr = thisCurr->next;
+  }
+  if (refCurr->next || thisCurr->next) {
+    return false;
+  }
+  return true;
+}
+
+bool StatementList::operator==(const StatementList& ref) const {
+  const StatementList* refCurr = &ref;
+  const StatementList* thisCurr = this;
+  while (refCurr->next && thisCurr->next) {
+    if (!(refCurr->curr == thisCurr->curr)) {
+      return false;
+    }
+    refCurr = refCurr->next;
+    thisCurr = thisCurr->next;
+  }
+  if (refCurr->next || thisCurr->next) {
+    return false;
+  }
+  return true;
+}
+
+StatementList::StatementList(): curr{}, next{} {}
 
 std::string Expected::getErrorMessage(const std::string& file) {
   if (expectedType == ExpectedType::TOKEN) {

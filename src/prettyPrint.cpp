@@ -4,17 +4,18 @@
 const uint8_t indentationSize = 2;
 
 void Type::prettyPrint(Tokenizer& tk, std::string& str) {
-  if (tokens.empty()) {
+  if (tokens.curr.type == TokenType::NOTHING) {
     return;
   }
-  for (uint32_t i = 0; i < tokens.size() - 1; ++i) {
-    if (tokens[i].type != TokenType::POINTER) {
-      str += tk.extractToken(tokens[i]) + " ";
+  TokenList * iter = &tokens;
+  for (; iter->next; iter = iter->next) {
+    if (iter->curr.type != TokenType::POINTER) {
+      str += tk.extractToken(iter->curr) + " ";
     } else {
       str += typeToString.at(TokenType::POINTER);
     }
   }
-  str += tk.extractToken(tokens.back());
+  str += tk.extractToken(iter->curr);
 }
 
 void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
@@ -75,14 +76,15 @@ void BinOp::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation ) 
 void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += tk.extractToken(name);
   str += '(';
-  if (!args.empty()) {
-    indentation += 4;
-    for (uint32_t i = 0; i < args.size() - 1; ++i) {
-      args[i].prettyPrint(tk, str, indentation);
+  if (args.curr.type != StatementType::NONE) {
+    indentation += indentationSize;
+    StatementList * iter = &args;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
       str += ", ";
     }
-    args.back().prettyPrint(tk, str, indentation);
-    indentation -= 4;
+    iter->curr.prettyPrint(tk, str, indentation);
+    indentation -= indentationSize;
   }
   str += ')';
 }
@@ -96,31 +98,34 @@ void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
 
 void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += "{\n";
-  indentation += indentationSize;
-  for (uint32_t i = 0; i < scopeStatements.size(); ++i) {
-    str += std::string(indentation, ' ');
-    scopeStatements[i].prettyPrint(tk, str, indentation);
-    if (scopeStatements[i].type != StatementType::SCOPE && !(scopeStatements[i].type == StatementType::KEY_W_BODY && scopeStatements[i].keywBody->keyword != TokenType::RETURN)) {
-      str += ";\n";
+  if (scopeStatements.curr.type != StatementType::NONE) {
+    indentation += indentationSize;
+    for (StatementList * iter = &scopeStatements; iter; iter = iter->next) {
+      str += std::string(indentation, ' ');
+      iter->curr.prettyPrint(tk, str, indentation);
+      if (iter->curr.type != StatementType::SCOPE && !(iter->curr.type == StatementType::KEY_W_BODY && iter->curr.keywBody->keyword != TokenType::RETURN)) {
+        str += ";\n";
+      }
     }
+    indentation -= indentationSize;
   }
-  indentation -= indentationSize;
   str += std::string(indentation, ' ');
   str += "}\n";
 }
 
 void ForLoopHeader::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += '(';
-  if (!list.empty()) {
-    for (uint32_t i = 0; i < list.size() - 1; ++i) {
-      list[i].prettyPrint(tk, str, indentation);
-      if (list[i].type != StatementType::NONE) {
+  if (list.curr.type != StatementType::NONE) {
+    StatementList * iter = &list;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
+      if (iter->curr.type != StatementType::NONE) {
         str += "; ";
       } else {
         str += ";";
       }
     }
-    list.back().prettyPrint(tk, str, indentation);
+    iter->curr.prettyPrint(tk, str, indentation);
   }
   str += ')';
 }
@@ -141,14 +146,15 @@ void KeywordWithBody::prettyPrint(Tokenizer& tk, std::string& str, uint32_t inde
 
 void ArrOrStructLiteral::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += '[';
-  if (!list.empty()) {
-    indentation += 4;
-    for (uint32_t i = 0; i < list.size() - 1; ++i) {
-      list[i].prettyPrint(tk, str, indentation);
+  if (list.curr.type != StatementType::NONE) {
+    indentation += indentationSize;
+    StatementList * iter = &list;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
       str += ", ";
     }
-    list.back().prettyPrint(tk, str, indentation);
-    indentation -= 4;
+    iter->curr.prettyPrint(tk, str, indentation);
+    indentation -= indentationSize;
   }
   str += ']';
 }
@@ -156,13 +162,14 @@ void ArrOrStructLiteral::prettyPrint(Tokenizer& tk, std::string& str, uint32_t i
 void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::FUNC);
   str += tk.extractToken(name) + '(';
-  if (!params.empty()) {
+  if (params.curr.type != StatementType::NONE) {
     indentation += indentationSize;
-    for (uint32_t i = 0; i < params.size() - 1; ++i) {
-      params[i].prettyPrint(tk, str, indentation);
+    StatementList * iter = &params;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
       str += ", ";
     }
-    params.back().prettyPrint(tk, str, indentation);
+    iter->curr.prettyPrint(tk, str, indentation);
     indentation -= indentationSize;
   }
   str += "): ";
@@ -174,14 +181,14 @@ void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
 void Enum::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::ENUM);
   str += tk.extractToken(name);
-  indentation += 4;
+  indentation += indentationSize;
   str += "{\n";
   for (uint32_t i = 0; i < members.size() - 1; ++i) {
     str += std::string(indentation, ' ');
     str += tk.extractToken(members[i]);
     str += ",\n";
   }
-  indentation -= 4;
+  indentation -= indentationSize;
   str += std::string(indentation, ' ');
   str += "}\n" + std::string(indentation, ' ');
 }
@@ -225,12 +232,13 @@ void Struct::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) 
 void Template::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::TEMPLATE);
   str += '[';
-  if (!templateIdentifiers.empty()) {
-    for (uint32_t i = 0; i < templateIdentifiers.size() - 1; ++i) {
-      templateIdentifiers[i].prettyPrint(tk, str, indentation);
+  if (templateIdentifiers.curr.type != StatementType::NONE) {
+    StatementList * iter = &templateIdentifiers;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
       str += ", ";
     }
-    templateIdentifiers.back().prettyPrint(tk, str, indentation);
+    iter->curr.prettyPrint(tk, str, indentation);
   }
   str += "] ";
   dec.prettyPrint(tk, str, indentation);

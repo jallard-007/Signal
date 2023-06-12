@@ -75,5 +75,17 @@ struct MemPool {
     new (curr) T{std::move(t)};
     return curr;
   }
+
+  T *get() {
+    if (!freeObj->next) {
+      addList();
+      freeObj->next = mem[n];
+    }
+
+    T *curr = &freeObj->val;
+    freeObj = freeObj->next;
+    new (curr) T{};
+    return curr;
+  }
   
 };

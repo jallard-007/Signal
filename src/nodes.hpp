@@ -32,9 +32,17 @@ struct Expected {
   std::string getErrorMessage(const std::string&);
 };
 
+struct TokenList {
+  Token curr;
+  TokenList *next;
+  TokenList();
+  TokenList(TokenList&&) = default;
+  ~TokenList() = default;
+  bool operator==(const TokenList&) const;
+};
+
 struct Type {
-  std::vector<Token> tokens;
-  
+  TokenList tokens;
   Type() = default;
   Type(Type&&) = default;
   bool operator==(const Type&) const;
@@ -121,10 +129,21 @@ struct Statement {
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+
+
+struct StatementList {
+  Statement curr;
+  StatementList *next;
+  StatementList();
+  StatementList(StatementList&&) = default;
+  ~StatementList() = default;
+  bool operator==(const StatementList&) const;
+};
+
 bool hasData(StatementType);
 
 struct ArrOrStructLiteral {
-  std::vector<Statement> list;
+  StatementList list;
   ArrOrStructLiteral() = default;
   ArrOrStructLiteral(ArrOrStructLiteral&&) = default;
   bool operator==(const ArrOrStructLiteral&) const;
@@ -143,7 +162,7 @@ struct KeywordWithBody {
 };
 
 struct ForLoopHeader {
-  std::vector<Statement> list;
+  StatementList list;
   ForLoopHeader() = default;
   bool operator==(const ForLoopHeader&) const;
   ForLoopHeader(ForLoopHeader&&) = default;
@@ -151,7 +170,7 @@ struct ForLoopHeader {
 };
 
 struct Scope {
-  std::vector<Statement> scopeStatements;
+  StatementList scopeStatements;
   Scope() = default;
   bool operator==(const Scope&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -189,7 +208,7 @@ struct UnOp {
 };
 
 struct FunctionCall {
-  std::vector<Statement> args;
+  StatementList args;
   Token name;
   FunctionCall() = delete;
   explicit FunctionCall(Token);
@@ -206,7 +225,7 @@ struct Enum {
 };
 
 struct FunctionDec {
-  std::vector<Statement> params;
+  StatementList params;
   Scope body;
   Type returnType;
   Token name;
@@ -259,7 +278,7 @@ struct Struct {
 };
 
 struct Template {
-  std::vector<Statement> templateIdentifiers;
+  StatementList templateIdentifiers;
   Declaration dec;
   Template() = default;
   Template(const Template&) = delete;

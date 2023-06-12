@@ -2,8 +2,10 @@
 #include <fstream>
 #include <string>
 #include "./parser/parser.hpp"
+#include <time.h>
 
 int main(int argc, char **argv) {
+  clock_t begin = clock();
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;
@@ -39,10 +41,13 @@ int main(int argc, char **argv) {
     }
     exit(1);
   }
+  clock_t end = clock();
+  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+  std::cout << time_spent << '\n';
   std::string pretty;
   pretty.reserve(size);
   p.program.prettyPrint(tk, pretty);
-  std::cout << pretty << '\n';
+  //std::cout << pretty << '\n';
   return 0;
 }
 

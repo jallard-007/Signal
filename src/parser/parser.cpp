@@ -711,20 +711,24 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
  *  false otherwise (EOF, or when the delimiterMajor was expected by the parser)
  * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimiterMajor on true)
 */
-bool Parser::getStatements(std::vector<Statement>& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
+bool Parser::getStatements(StatementList& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
   Token token = tokenizer.peekNext();
   if (token.type == TokenType::BAD_VALUE) {
     expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.error.position + 1 - tokenizer.lineStart, tokenizer.error.type);
     return false;
   }
+  StatementList *prev = nullptr;
+  StatementList *ptr = &statements;
   size_t prevExpectedSize = expected.size();
   while (token.type != TokenType::END_OF_FILE) {
-    statements.emplace_back(parseStatement(delimiterMinor, delimiterMajor));
-    if (statements.back().type == StatementType::NONE) {
-      statements.pop_back();
+    Statement s = parseStatement(delimiterMinor, delimiterMajor);
+    if (s.type == StatementType::NONE) {
       if (delimiterMinor == TokenType::COMMA && token.type != delimiterMajor) {
         expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
       }
+    } else {
+      ptr->curr = std::move(s);
+      ptr->next = memPool.getStatementList();
     }
     if (tokenizer.prevType == TokenType::BAD_VALUE) {
       break;
@@ -737,9 +741,27 @@ bool Parser::getStatements(std::vector<Statement>& statements, const TokenType d
     }
     token = tokenizer.peekNext();
     if (token.type == delimiterMajor) {
+      if (ptr->next) {
+        memPool.release(ptr->next);
+        ptr->next = nullptr;
+      }
+      if (prev && ptr->curr.type == StatementType::NONE) {
+        prev->next = nullptr;
+        memPool.release(ptr);
+      }
       return true;
     }
+    prev = ptr;
+    ptr = ptr->next;
     tokenizer.consumePeek();
+  }
+  if (ptr->next) {
+    memPool.release(ptr->next);
+    ptr->next = nullptr;
+  }
+  if (prev && ptr->curr.type == StatementType::NONE) {
+    prev->next = nullptr;
+    memPool.release(ptr);
   }
   return false;
 }
@@ -750,12 +772,25 @@ bool Parser::getStatements(std::vector<Statement>& statements, const TokenType d
 */
 Token Parser::getType(Type& type) {
   Token tp = tokenizer.peekNext();
+  TokenList * prev = nullptr;
+  TokenList * ptr = &type.tokens;
   while (tp.type != TokenType::END_OF_FILE) {
     if (isTypeDelimiter(tp.type)) {
+      if (ptr->next) {
+        memPool.release(ptr->next);
+        ptr->next = nullptr;
+      }
+      if (prev && ptr->curr.type == TokenType::NOTHING) {
+        prev->next = nullptr;
+        memPool.release(ptr);
+      }
       break;
     }
     tokenizer.consumePeek();
-    type.tokens.emplace_back(tp);
+    ptr->curr = tp;
+    ptr->next = memPool.getTokenList();
+    prev = ptr;
+    ptr = ptr->next;
     tp = tokenizer.peekNext();
   }
   return tp;

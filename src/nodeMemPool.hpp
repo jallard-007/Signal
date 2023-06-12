@@ -13,6 +13,8 @@ class NodeMemPool {
   MemPool<Scope> scopes;
   MemPool<ArrOrStructLiteral> arrOrStructs;
   MemPool<ForLoopHeader> lists;
+  MemPool<StatementList> statementList;
+  MemPool<TokenList> tokenList;
   MemPool<KeywordWithBody> keysWBodies;
   MemPool<FunctionDec> functionDecs;
   MemPool<Enum> enums;
@@ -30,6 +32,8 @@ public:
     scopes.reset();
     arrOrStructs.reset();
     lists.reset();
+    statementList.reset();
+    tokenList.reset();
     keysWBodies.reset();
     functionDecs.reset();
     enums.reset();
@@ -46,6 +50,8 @@ public:
   Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
   ArrOrStructLiteral* get(ArrOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
   ForLoopHeader* get(ForLoopHeader&& ref) {return lists.get(std::move(ref));}
+  StatementList* getStatementList() {return statementList.get();}
+  TokenList* getTokenList() {return tokenList.get();}
   KeywordWithBody* get(KeywordWithBody&& ref) {return keysWBodies.get(std::move(ref));}
   FunctionDec* get(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
   Enum* get(Enum&& ref) {return enums.get(std::move(ref));}
@@ -61,6 +67,8 @@ public:
   void release(Scope* ptr) { scopes.release(ptr);}
   void release(ArrOrStructLiteral* ptr) { arrOrStructs.release(ptr);}
   void release(ForLoopHeader* ptr) { lists.release(ptr);}
+  void release(StatementList* ptr) { statementList.release(ptr);}
+  void release(TokenList* ptr) { tokenList.release(ptr);}
   void release(KeywordWithBody* ptr) { keysWBodies.release(ptr);}
   void release(FunctionDec* ptr) { functionDecs.release(ptr);}
   void release(Enum* ptr) { enums.release(ptr);}

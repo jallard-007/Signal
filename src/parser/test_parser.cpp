@@ -12,12 +12,15 @@ TEST_CASE("getType", "[parser]") {
     Type type;
     REQUIRE(parser.getType(type).type == TokenType::COMMA);
     auto& tokens = type.tokens;
-    REQUIRE(tokens.size() == 4);
-    CHECK(tokens[0].type == TokenType::CHAR_TYPE);
-    CHECK(tokens[1].type == TokenType::IDENTIFIER);
-    CHECK(tokenizer.extractToken(tokens[1]) == "customType");
-    CHECK(tokens[2].type == TokenType::POINTER);
-    CHECK(tokens[3].type == TokenType::POINTER);
+    REQUIRE(tokens.next);
+    REQUIRE(tokens.next->next);
+    REQUIRE(tokens.next->next->next);
+    CHECK_FALSE(tokens.next->next->next->next);
+    CHECK(tokens.curr.type == TokenType::CHAR_TYPE);
+    CHECK(tokens.next->curr.type == TokenType::IDENTIFIER);
+    CHECK(tokenizer.extractToken(tokens.next->curr) == "customType");
+    CHECK(tokens.next->next->curr.type == TokenType::POINTER);
+    CHECK(tokens.next->next->next->curr.type == TokenType::POINTER);
   }
   REQUIRE(tokenizer.peekNext().type == TokenType::COMMA);
   tokenizer.consumePeek();
@@ -25,10 +28,12 @@ TEST_CASE("getType", "[parser]") {
     Type type;
     REQUIRE(parser.getType(type).type == TokenType::CLOSE_PAREN);
     auto& tokens = type.tokens;
-    REQUIRE(tokens.size() == 3);
-    CHECK(tokens[0].type == TokenType::INT_TYPE);
-    CHECK(tokens[2].type == TokenType::POINTER);
-    CHECK(tokens[2].type == TokenType::POINTER);
+    REQUIRE(tokens.next);
+    REQUIRE(tokens.next->next);
+    CHECK_FALSE(tokens.next->next->next);
+    CHECK(tokens.curr.type == TokenType::INT_TYPE);
+    CHECK(tokens.next->curr.type == TokenType::POINTER);
+    CHECK(tokens.next->next->curr.type == TokenType::POINTER);
   }
 
 }
@@ -37,32 +42,35 @@ TEST_CASE("getParams", "[parser]") {
   const std::string str = "first: int, second: double, third: customType ptr ptr)";
   Tokenizer tokenizer{str};
   Parser parser{tokenizer, memPool};
-  std::vector<Statement> vars;
+  StatementList vars;
   REQUIRE(parser.getStatements(vars, TokenType::COMMA, TokenType::CLOSE_PAREN) == true);
   CHECK(parser.unexpected.empty());
   CHECK(parser.expected.empty());
-  REQUIRE(vars.size() == 3);
 
-  REQUIRE(vars[0].type == StatementType::VARIABLE_DEC);
-  REQUIRE(vars[0].varDec);
-  CHECK(tokenizer.extractToken(vars[0].varDec->name) == "first");
-  REQUIRE(vars[0].varDec->type.tokens.size() == 1);
-  REQUIRE(vars[0].varDec->type.tokens[0].type == TokenType::INT_TYPE);
-
-  REQUIRE(vars[1].type == StatementType::VARIABLE_DEC);
-  REQUIRE(vars[1].varDec);
-  CHECK(tokenizer.extractToken(vars[1].varDec->name) == "second");
-  REQUIRE(vars[1].varDec->type.tokens.size() == 1);
-  REQUIRE(vars[1].varDec->type.tokens[0].type == TokenType::DOUBLE_TYPE);
-
-  REQUIRE(vars[2].type == StatementType::VARIABLE_DEC);
-  REQUIRE(vars[2].varDec);
-  CHECK(tokenizer.extractToken(vars[2].varDec->name) == "third");
-  REQUIRE(vars[2].varDec->type.tokens.size() == 3);
-  REQUIRE(vars[2].varDec->type.tokens[0].type == TokenType::IDENTIFIER);
-  CHECK(tokenizer.extractToken(vars[2].varDec->type.tokens[0]) == "customType");
-  REQUIRE(vars[2].varDec->type.tokens[1].type == TokenType::POINTER);
-  REQUIRE(vars[2].varDec->type.tokens[2].type == TokenType::POINTER);
+  REQUIRE(vars.curr.type == StatementType::VARIABLE_DEC);
+  REQUIRE(vars.curr.varDec);
+  CHECK(tokenizer.extractToken(vars.curr.varDec->name) == "first");
+  CHECK_FALSE(vars.curr.varDec->type.tokens.next);
+  REQUIRE(vars.curr.varDec->type.tokens.curr.type == TokenType::INT_TYPE);
+  StatementList * next = vars.next;
+  REQUIRE(next);
+  REQUIRE(next->curr.type == StatementType::VARIABLE_DEC);
+  REQUIRE(next->curr.varDec);
+  CHECK(tokenizer.extractToken(next->curr.varDec->name) == "second");
+  CHECK_FALSE(next->curr.varDec->type.tokens.next);
+  REQUIRE(next->curr.varDec->type.tokens.curr.type == TokenType::DOUBLE_TYPE);
+  next = next->next;
+  REQUIRE(next);
+  REQUIRE(next->curr.type == StatementType::VARIABLE_DEC);
+  REQUIRE(next->curr.varDec);
+  CHECK(tokenizer.extractToken(next->curr.varDec->name) == "third");
+  REQUIRE(next->curr.varDec->type.tokens.next);
+  REQUIRE(next->curr.varDec->type.tokens.next->next);
+  CHECK_FALSE(next->curr.varDec->type.tokens.next->next->next);
+  REQUIRE(next->curr.varDec->type.tokens.curr.type == TokenType::IDENTIFIER);
+  CHECK(tokenizer.extractToken(next->curr.varDec->type.tokens.curr) == "customType");
+  REQUIRE(next->curr.varDec->type.tokens.next->curr.type == TokenType::POINTER);
+  REQUIRE(next->curr.varDec->type.tokens.next->next->curr.type == TokenType::POINTER);
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
@@ -80,19 +88,18 @@ TEST_CASE("Function Declaration", "[parser]") {
   CHECK(tokenizer.extractToken(func->name) == "funcName");
 
   // check parameters
-  REQUIRE(func->params.size() == 1);
-  REQUIRE(func->params[0].type == StatementType::VARIABLE_DEC);
-  REQUIRE(func->params[0].varDec);
-  CHECK(tokenizer.extractToken(func->params[0].varDec->name) == "first");
-  REQUIRE(func->params[0].varDec->type.tokens.size() == 2);
-  CHECK(func->params[0].varDec->type.tokens[0].type == TokenType::INT_TYPE);
-  CHECK(func->params[0].varDec->type.tokens[1].type == TokenType::POINTER);
+  REQUIRE(func->params.curr.type == StatementType::VARIABLE_DEC);
+  REQUIRE(func->params.curr.varDec);
+  CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
+  REQUIRE(func->params.curr.varDec->type.tokens.next);
+  CHECK(func->params.curr.varDec->type.tokens.curr.type == TokenType::INT_TYPE);
+  CHECK(func->params.curr.varDec->type.tokens.next->curr.type == TokenType::POINTER);
 
   // check return type
-  REQUIRE(func->returnType.tokens.size() == 1);
-  CHECK(func->returnType.tokens[0].type == TokenType::INT_TYPE);
+  CHECK_FALSE(func->returnType.tokens.next);
+  CHECK(func->returnType.tokens.curr.type == TokenType::INT_TYPE);
 
-  CHECK(func->body.scopeStatements.empty());
+  CHECK(func->body.scopeStatements.curr.type == StatementType::NONE);
 }
 
 TEST_CASE("Function Call - Base", "[parser]") {
@@ -107,7 +114,7 @@ TEST_CASE("Function Call - Base", "[parser]") {
 
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
   auto& argsList = statement.funcCall->args;
-  CHECK(argsList.empty());
+  CHECK(argsList.curr.type == StatementType::NONE);
 }
 
 TEST_CASE("Function Call - Single Arg", "[parser]") {
@@ -122,8 +129,8 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
 
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
   auto& argsList = statement.funcCall->args;
-  REQUIRE(argsList.size() == 1);
-  auto& arg1 = argsList[0];
+  REQUIRE(argsList.next == nullptr);
+  auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == StatementType::VALUE);
   CHECK(tokenizer.extractToken(arg1.var) == "arg1");
 }
@@ -139,13 +146,13 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   REQUIRE(statement.funcCall);
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
   auto& argsList = statement.funcCall->args;
-  REQUIRE(argsList.size() == 2);
-  auto& arg1 = argsList[0];
+  auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == StatementType::VALUE);
   CHECK(tokenizer.extractToken(arg1.var) == "arg1");
-  auto& arg2 = argsList[1];
-  REQUIRE(arg2.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(arg2.var) == "arg2");
+  REQUIRE(argsList.next);
+  auto& arg2 = *argsList.next;
+  REQUIRE(arg2.curr.type == StatementType::VALUE);
+  CHECK(tokenizer.extractToken(arg2.curr.var) == "arg2");
 }
 
 TEST_CASE("Function Call - Nested", "[parser]") {
@@ -160,8 +167,8 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   CHECK(tokenizer.extractToken(statement.funcCall->name) == "functionName");
   auto& argsList = statement.funcCall->args;
 
-  REQUIRE(argsList.size() == 1);
-  auto& arg1 = argsList[0];
+  REQUIRE(argsList.next == nullptr);
+  auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == StatementType::ARRAY_ACCESS);
   REQUIRE(arg1.arrAccess);
   CHECK(tokenizer.extractToken(arg1.arrAccess->array) == "arg1");
@@ -169,7 +176,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   auto& arg1_arg1 = arg1.arrAccess->offset.funcCall;
   REQUIRE(arg1_arg1);
   CHECK(tokenizer.extractToken(arg1_arg1->name) == "nested");
-  CHECK(arg1_arg1->args.empty());
+  CHECK(arg1_arg1->args.curr.type == StatementType::NONE);
 }
 
 TEST_CASE("Binary Operators", "[parser]") {
@@ -222,9 +229,9 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(rl.type == StatementType::FUNCTION_CALL);
      REQUIRE(rl.funcCall);
      REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
-     REQUIRE(rl.funcCall->args.size() == 1);
-     REQUIRE(rl.funcCall->args[0].type == StatementType::VALUE);
-     REQUIRE(rl.funcCall->args[0].var.type == TokenType::IDENTIFIER);
+     CHECK(rl.funcCall->args.next == nullptr);
+     REQUIRE(rl.funcCall->args.curr.type == StatementType::VALUE);
+     REQUIRE(rl.funcCall->args.curr.var.type == TokenType::IDENTIFIER);
 
      auto& rr = binOp->rightSide.binOp->rightSide;
      CHECK(rr.type == StatementType::VALUE);
@@ -260,9 +267,9 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(lr.type == StatementType::FUNCTION_CALL);
      REQUIRE(lr.funcCall);
      CHECK(tokenizer.extractToken(lr.funcCall->name) == "function");
-     REQUIRE(lr.funcCall->args.size() == 1);
-     CHECK(lr.funcCall->args[0].type == StatementType::VALUE);
-     CHECK(lr.funcCall->args[0].var.type == TokenType::IDENTIFIER);
+     CHECK(lr.funcCall->args.next == nullptr);
+     CHECK(lr.funcCall->args.curr.type == StatementType::VALUE);
+     CHECK(lr.funcCall->args.curr.var.type == TokenType::IDENTIFIER);
    }
 }
 
@@ -360,12 +367,12 @@ TEST_CASE("Template Declaration", "[parser]") {
   auto& t = parser.program.decs[0];
   REQUIRE(t.decType == DecType::TEMPLATE);
   REQUIRE(t.temp);
-  REQUIRE(t.temp->templateIdentifiers.size() == 1);
-  REQUIRE(t.temp->templateIdentifiers[0].type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(t.temp->templateIdentifiers[0].var) == "T");
+  REQUIRE(t.temp->templateIdentifiers.next == nullptr);
+  REQUIRE(t.temp->templateIdentifiers.curr.type == StatementType::VALUE);
+  CHECK(tokenizer.extractToken(t.temp->templateIdentifiers.curr.var) == "T");
   REQUIRE(t.temp->dec.decType == DecType::FUNCTION);
   REQUIRE(t.temp->dec.func);
-  CHECK(t.temp->dec.func->body.scopeStatements.size() == 2);
+  CHECK(t.temp->dec.func->body.scopeStatements.next);
 }
 
 TEST_CASE("Variable Declaration", "[parser]") {
@@ -417,7 +424,7 @@ TEST_CASE("Keywords", "[parser]") {
     REQUIRE(s.keywBody->header);
     CHECK(s.keywBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
     REQUIRE(s.keywBody->header.arrOrStructLiteral);
-    CHECK(s.keywBody->header.arrOrStructLiteral->list.size() == 2);
+    CHECK(s.keywBody->header.arrOrStructLiteral->list.next);
     REQUIRE(!s.keywBody->body);
   }
 
@@ -433,8 +440,8 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(s.keywBody->keyword == TokenType::FOR);
     REQUIRE(s.keywBody->header.type == StatementType::FOR_LOOP_HEADER);
     REQUIRE(s.keywBody->header.list);
-    CHECK(s.keywBody->header.list->list.size() == 3);
-
+    REQUIRE(s.keywBody->header.list->list.next);
+    CHECK(s.keywBody->header.list->list.next->next);
   }
 }
 
@@ -446,7 +453,8 @@ TEST_CASE("Array", "[parser]") {
   CHECK(parser.expected.empty());
   CHECK(parser.unexpected.empty());
   REQUIRE(s.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
-  REQUIRE(s.arrOrStructLiteral->list.size() == 2);
+  REQUIRE(s.arrOrStructLiteral->list.next);
+  CHECK_FALSE(s.arrOrStructLiteral->list.next->next);
 }
 
 TEST_CASE("Big Boi", "[parser]") {
@@ -478,25 +486,30 @@ TEST_CASE("Big Boi", "[parser]") {
   VariableDec param{f.tokenizeNext()};
   f.tokenizeNext();
 
-  param.type.tokens.emplace_back(f.tokenizeNext());
-  functionDec.params.emplace_back(&param);
+  param.type.tokens.curr = f.tokenizeNext();
+  functionDec.params.curr.type = StatementType::VARIABLE_DEC;
+  functionDec.params.curr.varDec = &param;
   f.tokenizeNext();
   f.tokenizeNext();
 
   // return type
-  functionDec.returnType.tokens.emplace_back(f.tokenizeNext());
-  functionDec.returnType.tokens.emplace_back(f.tokenizeNext());
+  functionDec.returnType.tokens.curr = f.tokenizeNext();
+  TokenList g;
+  g.curr = f.tokenizeNext();
+  functionDec.returnType.tokens.next = &g;
   f.tokenizeNext();
 
 
   auto& bS = functionDec.body;
 
   // "  currRegistration: RegistrationNode^ = registrationList;"
-  auto& currRegDec = bS.scopeStatements.emplace_back();
+  auto& currRegDec = bS.scopeStatements.curr;
   VariableDec varDec1{f.tokenizeNext()};
   f.tokenizeNext();
-  varDec1.type.tokens.emplace_back(f.tokenizeNext());
-  varDec1.type.tokens.emplace_back(f.tokenizeNext());
+  varDec1.type.tokens.curr = f.tokenizeNext();
+  TokenList t;
+  t.curr = f.tokenizeNext();
+  varDec1.type.tokens.next = &t;
   BinOp bOp1{f.tokenizeNext().type};
   bOp1.leftSide.type = StatementType::VARIABLE_DEC;
   bOp1.leftSide.varDec = &varDec1;
@@ -508,6 +521,10 @@ TEST_CASE("Big Boi", "[parser]") {
 
 // "  while (currRegistration) {"
   KeywordWithBody whileLoop{f.tokenizeNext().type};
+  StatementList sdg;
+  sdg.curr.type = StatementType::KEY_W_BODY;
+  sdg.curr.keywBody = &whileLoop;
+  bS.scopeStatements.next = &sdg;
   f.tokenizeNext();
   whileLoop.header.type = StatementType::WRAPPED_VALUE;
   Statement st454{f.tokenizeNext()};
@@ -520,7 +537,7 @@ TEST_CASE("Big Boi", "[parser]") {
 
 // "    if (~(~currRegistration).registration == eventCode) {"
   KeywordWithBody ifCond{f.tokenizeNext().type};
-  auto& sp87 = scp123.scopeStatements.emplace_back();
+  auto& sp87 = scp123.scopeStatements.curr;
   f.tokenizeNext();
   ifCond.header.type = StatementType::WRAPPED_VALUE;
   ifCond.body.type = StatementType::SCOPE;
@@ -597,24 +614,33 @@ TEST_CASE("Big Boi", "[parser]") {
   b12.rightSide.binOp = &bOp5;
 
     
-  auto& r = scp95.scopeStatements.emplace_back();
+  auto& r = scp95.scopeStatements.curr;
   r.type = StatementType::BINARY_OP;
   r.binOp = &b12;
   f.tokenizeNext(); // ;
   f.tokenizeNext(); // }
   f.tokenizeNext(); // }
 
-  auto& j =  bS.scopeStatements.emplace_back();
+  StatementList hhg;
+  Statement& j = hhg.curr;
+  scp95.scopeStatements.next = &hhg;
+
   j.type = StatementType::KEY_W_BODY;
   j.keywBody = &whileLoop;
 
   KeywordWithBody kd{f.tokenizeNext().type};
+  StatementList ad23;
+  ad23.curr.type = StatementType::KEY_W_BODY;
+  ad23.curr.keywBody = &kd;
+  sdg.next = &ad23;
   kd.header.type = StatementType::VALUE;
   kd.header.var = f.tokenizeNext();
   f.tokenizeNext(); // ;
   f.tokenizeNext(); // }
 
-  auto& b =  bS.scopeStatements.emplace_back();
+  StatementList erw;
+  Statement& b = erw.curr;
+  hhg.next = &erw;
   b.type = StatementType::KEY_W_BODY;
   b.keywBody = &kd;
 
