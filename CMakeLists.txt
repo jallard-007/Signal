@@ -22,3 +22,5 @@ endif()
 if ( MSVC )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 endif()
+
+# gprof main gmon.out | gprof2dot -s | dot -Gdpi=200 -Tpng -o output.png

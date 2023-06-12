@@ -1,4 +1,5 @@
 #include <cctype>
+#include <iostream>
 #include "tokenizer.hpp"
 
 bool my_isalpha(char c) {
@@ -9,8 +10,8 @@ bool my_isalnum(char c) {
   return std::isalnum(static_cast<unsigned char>(c));
 }
 
-Tokenizer::Tokenizer(const std::string& fileContent):
-  content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
+Tokenizer::Tokenizer(const std::string& filePath, const std::string& fileContent):
+  filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -77,17 +78,43 @@ Token Tokenizer::tokenizeNext() {
   uint16_t length = 0;
   TokenType type = TokenType::BAD_VALUE;
   char c = content[position];
-  if (charToType.find(c) != charToType.end()) {
-    type = charToType.at(c);
-    if (type == TokenType::STRING_LITERAL) {
+  // if (c > 127) {
+  //   std::cerr << "Invalid character: Extended ASCII not supported (Character with value greater than 127 found)\n";
+  //   exit(1);
+  // }
+  type = numToType[(int)c];
+  switch (type) {
+    case TokenType::IDENTIFIER: {
+      movePastKeywordOrIdentifier();
+      if (length >= MIN_CHARS_TO_DISAMBIG) {
+        type = TokenType::IDENTIFIER;
+      } else {
+        // + 1 for null termination
+        char chars[MIN_CHARS_TO_DISAMBIG + 1]{};
+        chars[0] = c;
+        for (uint32_t i = tokenStartPos + 1, j = 1; i < position && j < MIN_CHARS_TO_DISAMBIG; ++i, ++j) {
+          chars[j] = content[i];
+        }
+        if (stringToType.find(chars) != stringToType.end()) {
+          type = stringToType.at(chars);
+        } else {
+          type = TokenType::IDENTIFIER;
+        }
+      }
+      break;
+    }
+
+    case TokenType::STRING_LITERAL: {
       if (!movePastLiteral('"')) {
         error.type = TokenType::STRING_LITERAL;
         error.position = position;
         error.length = 0;
         type = TokenType::BAD_VALUE;
       }
+      break;
     }
-    else if (type == TokenType::CHAR_LITERAL) {
+
+    case TokenType::CHAR_LITERAL: {
       if (!movePastLiteral('\'')) {
         error.type = TokenType::CHAR_LITERAL;
         error.position = position;
@@ -118,133 +145,118 @@ Token Tokenizer::tokenizeNext() {
         }
         // escaped char, we cool
       }
+      break;
     }
-    else if (type == TokenType::COMMENT) {
+
+    case TokenType::COMMENT: {
       moveToNewLine();
+      break;
     }
-    else if (type == TokenType::NEWLINE) {
+
+    case TokenType::NEWLINE: {
       ++lineNum;
       lineStart = ++position;
       return tokenizeNext();
     }
-    else if (++position < size) {
-      const char cNext = content[position++];
-      if (c == '|' && cNext == '|') {
-        type = TokenType::LOGICAL_OR;
-      } else if (c == '&' && cNext == '&') {
-        type = TokenType::LOGICAL_AND;
-      } else if (cNext == '=') {
-        TokenType newType = charWithEqualToType.at(c);
-        if (newType != TokenType::NOTHING) {
-          type = newType;
+
+    case TokenType::DECIMAL_NUMBER: {
+      if (c == '0' && position + 1 < size) {
+        c = content[++position];
+        if (c == 'x') {
+          type = TokenType::HEX_NUMBER;
+          movePastHexNumber();
         } else {
-          --position;
-        }
-      } else if (c == '<' && cNext == '<') {
-        if (position < size && content[position] == '=') {
-          type = TokenType::SHIFT_LEFT_ASSIGNMENT;
-          ++position;
-        } else {
-          type = TokenType::SHIFT_LEFT;
-        }
-      } else if (c == '>' && cNext == '>') {
-        if (position < size && content[position] == '=') {
-          type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
-          ++position;
-        } else {
-          type = TokenType::SHIFT_RIGHT;
-        }
-      } else if (c == '-') {
-        if (cNext == '>') {
-          type = TokenType::PTR_MEMBER_ACCESS;
-        }
-        else if (cNext == '-') {
-          if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
-            type = TokenType::DECREMENT_POSTFIX;
+          if (c == 'b') {
+            type = TokenType::BINARY_NUMBER;
           } else {
-            type = TokenType::DECREMENT_PREFIX;
-          }
-        } else {
-          if (prevType == TokenType::IDENTIFIER ||
-            isLiteral(prevType) ||
-            prevType == TokenType::CLOSE_PAREN ||
-            prevType == TokenType::CLOSE_BRACE) {
-            type = TokenType::SUBTRACTION;
-          } else {
-            type = TokenType::NEGATIVE;
+            type = TokenType::DECIMAL_NUMBER;
             --position;
           }
+          movePastNumber();
         }
-      } else if (c == '+' && cNext == '+') {
-        if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
-          type = TokenType::INCREMENT_POSTFIX;
-        } else {
-          type = TokenType::INCREMENT_PREFIX;
-        }
-      }
-      else {
-        --position;
-      }
-    }
-    if (position - tokenStartPos > UINT16_MAX) {
-      // error
-      exit(1);
-    }
-    length = static_cast<uint16_t>(position - tokenStartPos);
-  }
-
-  else if (c >= '0' && c <= '9') {
-    if (c == '0' && position + 1 < size) {
-      c = content[++position];
-      if (c == 'x') {
-        type = TokenType::HEX_NUMBER;
-        movePastHexNumber();
       } else {
-        if (c == 'b') {
-          type = TokenType::BINARY_NUMBER;
-        } else {
-          type = TokenType::DECIMAL_NUMBER;
-          --position;
-        }
+        type = TokenType::DECIMAL_NUMBER;
         movePastNumber();
       }
-    } else {
-      type = TokenType::DECIMAL_NUMBER;
-      movePastNumber();
+      break;
     }
-    if (position - tokenStartPos > UINT16_MAX) {
-      // error
+  
+    case TokenType::BAD_VALUE: {
+      std::cerr << filePath << ':' << lineNum << ':' << position + 1 - lineStart << '\n'; 
+      std::cerr << "Invalid character with ASCII code: [" << (int)c << "]\n";
       exit(1);
     }
-    length = static_cast<uint16_t>(position - tokenStartPos);
+
+    default: {
+      if (++position < size) {
+        const char cNext = content[position++];
+        if (c == '|' && cNext == '|') {
+          type = TokenType::LOGICAL_OR;
+        } else if (c == '&' && cNext == '&') {
+          type = TokenType::LOGICAL_AND;
+        } else if (cNext == '=') {
+          TokenType newType = charWithEqualToType.at(c);
+          if (newType != TokenType::NOTHING) {
+            type = newType;
+          } else {
+            --position;
+          }
+        } else if (c == '<' && cNext == '<') {
+          if (position < size && content[position] == '=') {
+            type = TokenType::SHIFT_LEFT_ASSIGNMENT;
+            ++position;
+          } else {
+            type = TokenType::SHIFT_LEFT;
+          }
+        } else if (c == '>' && cNext == '>') {
+          if (position < size && content[position] == '=') {
+            type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
+            ++position;
+          } else {
+            type = TokenType::SHIFT_RIGHT;
+          }
+        } else if (c == '-') {
+          if (cNext == '>') {
+            type = TokenType::PTR_MEMBER_ACCESS;
+          }
+          else if (cNext == '-') {
+            if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+              type = TokenType::DECREMENT_POSTFIX;
+            } else {
+              type = TokenType::DECREMENT_PREFIX;
+            }
+          } else {
+            if (prevType == TokenType::IDENTIFIER ||
+              isLiteral(prevType) ||
+              prevType == TokenType::CLOSE_PAREN ||
+              prevType == TokenType::CLOSE_BRACE) {
+              type = TokenType::SUBTRACTION;
+            } else {
+              type = TokenType::NEGATIVE;
+              --position;
+            }
+          }
+        } else if (c == '+' && cNext == '+') {
+          if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+            type = TokenType::INCREMENT_POSTFIX;
+          } else {
+            type = TokenType::INCREMENT_PREFIX;
+          }
+        }
+        else {
+          --position;
+        }
+      }
+      break;
+    }
   }
 
-  else if (my_isalpha(c) || c == '_') {
-    movePastKeywordOrIdentifier();
-    if (position - tokenStartPos > UINT16_MAX) {
-      // error
-      exit(1);
-    }
-    length = static_cast<uint16_t>(position - tokenStartPos);
-    if (length >= MIN_CHARS_TO_DISAMBIG) {
-      type = TokenType::IDENTIFIER;
-    } else {
-      // + 1 for null termination
-      char chars[MIN_CHARS_TO_DISAMBIG + 1]{};
-      chars[0] = c;
-      for (uint32_t i = tokenStartPos + 1, j = 1; i < position && j < MIN_CHARS_TO_DISAMBIG; ++i, ++j) {
-        chars[j] = content[i];
-      }
-      if (stringToType.find(chars) != stringToType.end()) {
-        type = stringToType.at(chars);
-      } else {
-        type = TokenType::IDENTIFIER;
-      }
-    }
+  if (position - tokenStartPos > UINT16_MAX) {
+    // error
+    exit(1);
   }
-  
   prevType = type;
-  return {tokenStartPos, length, type};
+  return {tokenStartPos, static_cast<uint16_t>(position - tokenStartPos), type};
 }
 
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
@@ -258,8 +270,7 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
 
 void Tokenizer::movePastKeywordOrIdentifier() {
   for (++position; position < size; ++position) {
-    const char c = content[position];
-    if (!my_isalnum(c) && c != '_') {
+    if (numToType[(int)content[position]] != TokenType::IDENTIFIER) {
       return;
     }
   }

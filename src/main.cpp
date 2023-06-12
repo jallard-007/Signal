@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   t.seekg(0);
   t.read(&buffer[0], size);
   t.close();
-  Tokenizer tk(buffer);
+  Tokenizer tk(argv[1], buffer);
   NodeMemPool mem;
   Parser p{tk, mem};
   if (!p.parse()) {
@@ -41,13 +41,13 @@ int main(int argc, char **argv) {
     }
     exit(1);
   }
-  clock_t end = clock();
-  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+   clock_t end = clock();
+   double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
   std::cout << time_spent << '\n';
-  std::string pretty;
-  pretty.reserve(size);
-  p.program.prettyPrint(tk, pretty);
-  //std::cout << pretty << '\n';
+  // std::string pretty;
+  // pretty.reserve(size);
+  // p.program.prettyPrint(tk, pretty);
+  // std::cout << pretty << '\n';
   return 0;
 }
 

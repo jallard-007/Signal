@@ -5,6 +5,7 @@
 #include "../token.hpp"
 
 struct Tokenizer {
+  const std::string& filePath;
   const std::string& content;
   Token peeked;
   Token error;
@@ -16,7 +17,7 @@ struct Tokenizer {
 
   Tokenizer() = delete;
 
-  explicit Tokenizer(const std::string&);
+  explicit Tokenizer(const std::string&, const std::string&);
 
   std::vector<Token> tokenizeAll();
   Token tokenizeNext();
