@@ -165,12 +165,3 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    CHECK(tokenizer.extractToken(tokens[2]) == "0xFABDECAAaaffbceda1010199747393");
    }
 }
-#include <iostream>
-
-TEST_CASE("thing", "[tokenizer]") {
-  const std::string str = R"(template [T] struct vectorTemplate {  data : T ptr;  size : int;  func findMax() : T {    max : T = 0;    for (i : int = 0; i < arr->size; ++i) {      if (this->data[i] > max) {        max = arr[i];      }    }    return max;  }  func findMin(): T {    min : T = 0;    for (i : int = 0; i < arr->size; ++i) {      if (this->data[i] < min) {        min = arr[i];      }    }    return min;  }}func main() {  {    arraySize: int = 9;    data: int [arraySize] = [-3, 23, 21, 554, 3, 6, -234, 123, 43];    vector: intVector;    vector.arr = data;    vector.size = arraySize;    max : int = vector.findMax();    min: int = vector.findMin();    print(max);    print("\n");    print(min);  }  {    arraySize: int = 4;    data: double [arraySize] = [-3.4, 23.2, 21.3, 43.8];    vector: intVector;    vector.arr = data;    vector.size = arraySize;    max : double = vector.findMax();    min: double = vector.findMin();    print(max);    print("\n");    print(min);  }})";
-  Tokenizer tokenizer{str};
-  std::cout << "thing";
-  auto tokens = tokenizer.tokenizeAll();
-  CHECK(tokens.size() > 1);
-}

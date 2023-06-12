@@ -38,7 +38,7 @@ struct Type {
   Type() = default;
   Type(Type&&) = default;
   bool operator==(const Type&) const;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 struct VariableDec {
@@ -48,7 +48,7 @@ struct VariableDec {
   explicit VariableDec(Token);
   VariableDec(VariableDec&&) = default;
   bool operator==(const VariableDec&) const;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 typedef struct BinOp BinOp;

@@ -440,10 +440,6 @@ TEST_CASE("Keywords", "[parser]") {
 
 TEST_CASE("Array", "[parser]") {
   const std::string str = " [-3 , 23 ]; ";
-  Tokenizer tk{str};
-  Token t = tk.tokenizeNext();
-  t = tk.tokenizeNext();
-  t = tk.tokenizeNext();
   Tokenizer tokenizer{str};
   Parser parser{tokenizer, memPool};
   Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
@@ -453,9 +449,6 @@ TEST_CASE("Array", "[parser]") {
   REQUIRE(s.arrOrStructLiteral->list.size() == 2);
 }
 
-
-// this is so stupid, but i did it anyways, at least i know for sure it parses correctly
-// next time im just gonna write the "pretty print" stuff and compare the output
 TEST_CASE("Big Boi", "[parser]") {
   const std::string str =
 "func checkForRegistrationOfEvent(eventCode: int): int ptr {"
