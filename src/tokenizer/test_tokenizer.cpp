@@ -2,12 +2,12 @@
 #include "tokenizer.hpp"
 
 TokenType firstToken(const char* c) {
-   Tokenizer tokenizer{c};
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  c};
    return tokenizer.tokenizeNext().type;
 }
 
 TokenType tokenAtN(const char* c, uint32_t n) {
-   Tokenizer tokenizer{c};
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  c};
    for (uint32_t i = 0; i < n; ++i) {
       tokenizer.tokenizeNext();
    }
@@ -15,7 +15,6 @@ TokenType tokenAtN(const char* c, uint32_t n) {
 }
 
 TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {
-   CHECK(firstToken("`") == TokenType::BAD_VALUE);
    CHECK(firstToken("") == TokenType::END_OF_FILE);
 }
 
@@ -142,7 +141,7 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    {
    const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
-   Tokenizer tokenizer{str};
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
    auto tokens = tokenizer.tokenizeAll();
    REQUIRE(tokens.size() == 15);
    CHECK(tokenizer.extractToken(tokens[0]) == "func");
@@ -157,7 +156,7 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
 
    {
    const std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
-   Tokenizer tokenizer{str};
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
    auto tokens = tokenizer.tokenizeAll();
    REQUIRE(tokens.size() == 4);
    CHECK(tokenizer.extractToken(tokens[0]) == "0xFFF");

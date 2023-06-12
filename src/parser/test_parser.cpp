@@ -6,7 +6,7 @@ NodeMemPool memPool;
 
 TEST_CASE("getType", "[parser]") {
   const std::string str = " char customType ptr ptr , int ptr ptr )";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   {
     Type type;
@@ -40,7 +40,7 @@ TEST_CASE("getType", "[parser]") {
 
 TEST_CASE("getParams", "[parser]") {
   const std::string str = "first: int, second: double, third: customType ptr ptr)";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   StatementList vars;
   REQUIRE(parser.getStatements(vars, TokenType::COMMA, TokenType::CLOSE_PAREN) == true);
@@ -75,7 +75,7 @@ TEST_CASE("getParams", "[parser]") {
 
 TEST_CASE("Function Declaration", "[parser]") {
   const std::string str = "func funcName(first: int ptr): int {}";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
   auto& decs = parser.program.decs;
@@ -104,7 +104,7 @@ TEST_CASE("Function Declaration", "[parser]") {
 
 TEST_CASE("Function Call - Base", "[parser]") {
   const std::string str = "functionName();";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   CHECK(parser.unexpected.empty());
@@ -119,7 +119,7 @@ TEST_CASE("Function Call - Base", "[parser]") {
 
 TEST_CASE("Function Call - Single Arg", "[parser]") {
   const std::string str = "functionName(arg1);";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   CHECK(parser.unexpected.empty());
@@ -137,7 +137,7 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
 
 TEST_CASE("Function Call - Multi Arg", "[parser]") {
   const std::string str = "functionName(arg1, arg2);";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   CHECK(parser.unexpected.empty());
@@ -157,7 +157,7 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
 
 TEST_CASE("Function Call - Nested", "[parser]") {
   const std::string str = "functionName(arg1[nested()]);";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   Statement statement = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   CHECK(parser.unexpected.empty());
@@ -183,7 +183,7 @@ TEST_CASE("Binary Operators", "[parser]") {
   // basic bin op
   {
     const std::string str = " 4 + 4 ;";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
     REQUIRE(statement.type == StatementType::BINARY_OP);
@@ -205,7 +205,7 @@ TEST_CASE("Binary Operators", "[parser]") {
    // operator with higher precedence on right node
    {
      const std::string str = " x - function(var) * 9;";
-     Tokenizer tokenizer{str};
+     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
      Parser parser{tokenizer, memPool};
      Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
      CHECK(parser.unexpected.empty());
@@ -242,7 +242,7 @@ TEST_CASE("Binary Operators", "[parser]") {
    // operator with higher precedence on left node
    {
      const std::string str = " x * function(var) - 9;";
-     Tokenizer tokenizer{str};
+     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
      Parser parser{tokenizer, memPool};
      Statement statement{parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)};
      CHECK(parser.expected.empty());
@@ -276,7 +276,7 @@ TEST_CASE("Binary Operators", "[parser]") {
 TEST_CASE("Expected tokens", "[parser]") {
   {
     const std::string str = " x var - 9;";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
@@ -288,7 +288,7 @@ TEST_CASE("Expected tokens", "[parser]") {
 
   {
     const std::string str = " var - 9 thing() ; ";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
@@ -299,7 +299,7 @@ TEST_CASE("Expected tokens", "[parser]") {
 
   {
     const std::string str = " var - ; ";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
@@ -309,7 +309,7 @@ TEST_CASE("Expected tokens", "[parser]") {
 
   {
     const std::string str = "\n\n x + () \n4 ;";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
@@ -335,7 +335,7 @@ TEST_CASE("Struct Declaration", "[parser]") {
     " var: int ;\n" \
     " struct structName {}\n" \
     "}";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.empty());
@@ -358,7 +358,7 @@ TEST_CASE("Template Declaration", "[parser]") {
   " doStuff:int = 34;" \
   " other = stuff * another;" \
   "}";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
   REQUIRE(parser.unexpected.empty());
@@ -377,7 +377,7 @@ TEST_CASE("Template Declaration", "[parser]") {
 
 TEST_CASE("Variable Declaration", "[parser]") {
   const std::string str = "thing: stuff = 23 + other()";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
   REQUIRE(parser.expected.size() == 1);
@@ -396,7 +396,7 @@ TEST_CASE("Variable Declaration", "[parser]") {
 TEST_CASE("Keywords", "[parser]") {
   {
     const std::string str = "if (1) {} }";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     CHECK(parser.unexpected.empty());
@@ -413,7 +413,7 @@ TEST_CASE("Keywords", "[parser]") {
 
   {
     const std::string str = "return [thing, 0]; }";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     CHECK(parser.unexpected.empty());
@@ -430,7 +430,7 @@ TEST_CASE("Keywords", "[parser]") {
 
   {
     const std::string str = "for (i : int = 0; i < 34; ++i) {doSomething.something(); } }";
-    Tokenizer tokenizer{str};
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     CHECK(parser.expected.empty());
@@ -447,7 +447,7 @@ TEST_CASE("Keywords", "[parser]") {
 
 TEST_CASE("Array", "[parser]") {
   const std::string str = " [-3 , 23 ]; ";
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
   CHECK(parser.expected.empty());
@@ -469,12 +469,12 @@ TEST_CASE("Big Boi", "[parser]") {
 "  return array;"
 "}";
 
-  Tokenizer tokenizer{str};
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
 
   Program program;
-  Tokenizer f{str};
+  Tokenizer f{"", str};
 
   // function object
   f.tokenizeNext();
