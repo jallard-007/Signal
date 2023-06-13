@@ -111,7 +111,9 @@ enum class TokenType : uint8_t {
   // types
   CHAR_TYPE,
   INT_TYPE,
+  FLOAT_TYPE,
   DOUBLE_TYPE,
+  REFERENCE,
   POINTER,
 
 };
@@ -243,7 +245,7 @@ const TokenType numToType [128] {
   TokenType::OPEN_BRACE, // 123 {
   TokenType::BITWISE_OR, // 124 |
   TokenType::CLOSE_BRACE, // 125 }
-  TokenType::DEREFERENCE, // 126 ~
+  TokenType::BAD_VALUE, // 126 ~
   TokenType::BAD_VALUE  // 127 DEL
 };
 
@@ -270,12 +272,14 @@ const std::unordered_map<std::string, TokenType> stringToType {
   {"false", TokenType::FALSE},
   {"for", TokenType::FOR},
   {"func", TokenType::FUNC},
+  {"float", TokenType::FLOAT_TYPE},
   {"if", TokenType::IF},
   {"int", TokenType::INT_TYPE},
   {"include", TokenType::INCLUDE},
   {"extern", TokenType::EXTERN},
   {"null", TokenType::NULL_},
   {"ptr", TokenType::POINTER},
+  {"ref", TokenType::REFERENCE},
   {"return", TokenType::RETURN},
   {"struct", TokenType::STRUCT},
   {"switch", TokenType::SWITCH},
@@ -298,7 +302,6 @@ const std::unordered_map<char, TokenType> charWithEqualToType {
   {'>', TokenType::GREATER_THAN_EQUAL},
   {'/', TokenType::DIVISION_ASSIGNMENT},
 
-  {'~', TokenType::NOTHING},
   {'@', TokenType::NOTHING},
   {'#', TokenType::NOTHING},
   {'(', TokenType::NOTHING},
@@ -320,7 +323,7 @@ const std::unordered_map<char, TokenType> charWithEqualToType {
 
 // maps characters to tokens that can be matched with a single character
 const std::unordered_map<TokenType, std::string> typeToString {
-  {TokenType::DEREFERENCE, "~"},
+  {TokenType::DEREFERENCE, "*"},
   {TokenType::NOT, "!"},
   {TokenType::NOT_EQUAL, " != "},
   {TokenType::ADDRESS_OF, "@"},
@@ -384,6 +387,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::ENUM, "enum "},
   {TokenType::FOR, "for "},
   {TokenType::FUNC, "func "},
+  {TokenType::FLOAT_TYPE, "float"},
   {TokenType::IF, "if "},
   {TokenType::INT_TYPE, "int"},
   {TokenType::INCLUDE, "include "},
@@ -393,6 +397,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::TEMPLATE, "template "},
   {TokenType::WHILE, "while "},
   {TokenType::POINTER, "ptr"},
+  {TokenType::REFERENCE, "ref"},
   {TokenType::STRING_LITERAL, "\""},
   {TokenType::CHAR_LITERAL, "'"},
 };

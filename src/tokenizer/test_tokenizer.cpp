@@ -78,7 +78,7 @@ TEST_CASE("Unit Test - General", "[tokenizer][tokenType]") {
 TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
    // UNARY
    CHECK(firstToken("@") == TokenType::ADDRESS_OF);
-   CHECK(firstToken("~") == TokenType::DEREFERENCE);
+   CHECK(tokenAtN("(* ", 1) == TokenType::DEREFERENCE);
    CHECK(firstToken("++") == TokenType::INCREMENT_PREFIX);
    CHECK(firstToken("--") == TokenType::DECREMENT_PREFIX);
    CHECK(tokenAtN("identifier++", 1) == TokenType::INCREMENT_POSTFIX);

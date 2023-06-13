@@ -129,8 +129,6 @@ struct Statement {
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-
-
 struct StatementList {
   Statement curr;
   StatementList *next;
@@ -158,6 +156,8 @@ struct KeywordWithBody {
   KeywordWithBody(TokenType);
   KeywordWithBody(KeywordWithBody&&);
   bool operator==(const KeywordWithBody&) const;
+  bool typeCheck();
+
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -217,6 +217,7 @@ struct FunctionCall {
 };
 
 struct Enum {
+  // we can assign specific values to tokens, has to be statements >:(
   std::vector<Token> members;
   Token name;
   Enum();
@@ -242,7 +243,7 @@ typedef struct Struct Struct;
 enum class DecType: uint8_t {
   NONE,
   FUNCTION,
-  STATEMENT,
+  VARIABLEDEC,
   TEMPLATE,
   STRUCT,
   ENUM
@@ -251,7 +252,7 @@ enum class DecType: uint8_t {
 struct Declaration {
   union{
     FunctionDec *func;
-    Statement *statement;
+    VariableDec *varDec;
     Template *temp;
     Struct *struc;
     Enum *enm;
@@ -260,7 +261,7 @@ struct Declaration {
   Declaration();
   Declaration(Declaration&&) noexcept;
   explicit Declaration(FunctionDec *);
-  explicit Declaration(Statement *);
+  explicit Declaration(VariableDec *);
   explicit Declaration(Template *);
   explicit Declaration(Struct *);
   explicit Declaration(Enum *);

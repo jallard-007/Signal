@@ -9,3 +9,4 @@ Makefile
 *CMake*
 !CMakeLists.txt
 Testing
+gmon.out

@@ -112,30 +112,9 @@ Token Tokenizer::tokenizeNext() {
         error.length = 0;
         type = TokenType::BAD_VALUE;
       }
-      // ' '\n \r \t \' \" \\ \v \f \e \b \a \0
-      else if (position - tokenStartPos == 2) {
-        // empty char
-        error.type = TokenType::CHAR_LITERAL;
-        error.position = position;
-        error.length = 0;
-        type = TokenType::BAD_VALUE;
-      }
-      else if (position - tokenStartPos > 4) {
-        // char too big, definitely more than one char
-        error.type = TokenType::CHAR_LITERAL;
-        error.position = position;
-        error.length = 0;
-        type = TokenType::BAD_VALUE;
-
-      } else if (position - tokenStartPos == 4) {
-        if (content[tokenStartPos + 1] != '\\') {
-          error.type = TokenType::CHAR_LITERAL;
-          error.position = position;
-          error.length = 0;
-          type = TokenType::BAD_VALUE;
-        }
-        // escaped char, we cool
-      }
+      // TODO: validate content of character. escaped characters :(
+      // maybe do this during type checking?
+      // ' '\n \r \t \' \" \\ \v \f \e \b \a \127 - \0
       break;
     }
 
@@ -211,7 +190,7 @@ Token Tokenizer::tokenizeNext() {
             type = TokenType::PTR_MEMBER_ACCESS;
           }
           else if (cNext == '-') {
-            if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+            if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACKET) {
               type = TokenType::DECREMENT_POSTFIX;
             } else {
               type = TokenType::DECREMENT_PREFIX;
@@ -233,6 +212,8 @@ Token Tokenizer::tokenizeNext() {
           } else {
             type = TokenType::INCREMENT_PREFIX;
           }
+        } else if (c == '*' && (prevType == TokenType::OPEN_BRACE || prevType == TokenType::OPEN_PAREN || prevType == TokenType::OPEN_BRACKET || isBinaryOp(prevType))) {
+          type = TokenType::DEREFERENCE;
         }
         else {
           --position;

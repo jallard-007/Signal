@@ -88,12 +88,23 @@ bool Parser::parse() {
 
       case TokenType::IDENTIFIER: {
         // global variable declaration
-        program.decs.emplace_back(memPool.get(parseStatement(TokenType::NOTHING, TokenType::SEMICOLON)));
-        if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
-        } else {
-          tokenizer.consumePeek();
+        tokenizer.consumePeek();
+        if (tokenizer.peekNext().type != TokenType::COLON) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::COLON);
+          return false;
         }
+        tokenizer.consumePeek();
+        VariableDec ac{token};
+        if (getType(ac.type).type != TokenType::SEMICOLON) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+          return false;
+        }
+        tokenizer.consumePeek();
+        if (ac.type.tokens.curr.type == TokenType::NOTHING) {
+          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart);
+          return false;
+        }
+        program.decs.emplace_back(memPool.get(std::move(ac)));
         break;
       }
         
@@ -182,27 +193,30 @@ bool Parser::structDec(Declaration& dec) {
   Struct sDec{token};
   token = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
-    // variable dec
+    // some statement
     if (token.type == TokenType::IDENTIFIER) {
-      sDec.decs.emplace_back(memPool.get(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE)));
-      if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+      tokenizer.consumePeek();
+      if (tokenizer.peekNext().type != TokenType::COLON) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::COLON);
         return false;
       }
       tokenizer.consumePeek();
+      VariableDec ac{token};
+      if (getType(ac.type).type != TokenType::SEMICOLON) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+        return false;
+      }
+      tokenizer.consumePeek();
+      if (ac.type.tokens.curr.type == TokenType::NOTHING) {
+        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart);
+      }
+      sDec.decs.emplace_back(memPool.get(std::move(ac)));
     }
     // function dec
     else if (token.type == TokenType::FUNC) {
       auto& funcDec = sDec.decs.emplace_back();
       tokenizer.consumePeek();
       if (!functionDec(funcDec)) {
-        return false;
-      }
-    }
-    // struct
-    else if (token.type == TokenType::STRUCT) {
-      auto& subSDec = sDec.decs.emplace_back();
-      tokenizer.consumePeek();
-      if (!structDec(subSDec)) {
         return false;
       }
     }

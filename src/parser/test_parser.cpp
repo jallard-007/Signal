@@ -333,7 +333,6 @@ TEST_CASE("Struct Declaration", "[parser]") {
     const std::string str = "struct sName {\n" \
     " func funcName(): int {} \n" \
     " var: int ;\n" \
-    " struct structName {}\n" \
     "}";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
@@ -346,10 +345,9 @@ TEST_CASE("Struct Declaration", "[parser]") {
     REQUIRE(s[0].struc);
     CHECK(tokenizer.extractToken(s[0].struc->name) == "sName");
     auto& sd = s[0].struc->decs;
-    CHECK(sd.size() == 3);
+    CHECK(sd.size() == 2);
     CHECK(sd[0].decType == DecType::FUNCTION);
-    CHECK(sd[1].decType == DecType::STATEMENT);
-    CHECK(sd[2].decType == DecType::STRUCT);
+    CHECK(sd[1].decType == DecType::VARIABLEDEC);
   }
 }
 
@@ -376,21 +374,15 @@ TEST_CASE("Template Declaration", "[parser]") {
 }
 
 TEST_CASE("Variable Declaration", "[parser]") {
-  const std::string str = "thing: stuff = 23 + other()";
+  const std::string str = "thing: stuff;";
   Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
-  REQUIRE(parser.expected.size() == 1);
-  CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
-  CHECK(parser.expected[0].column == 28);
+  REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());
   REQUIRE(parser.program.decs.size() == 1);
   auto& d = parser.program.decs[0];
-  CHECK(d.decType == DecType::STATEMENT);
-  REQUIRE(d.statement);
-  CHECK(d.statement->type == StatementType::BINARY_OP);
-  REQUIRE(d.statement->binOp);
-  CHECK(d.statement->binOp->leftSide.type == StatementType::VARIABLE_DEC);
+  CHECK(d.decType == DecType::VARIABLEDEC);
 }
 
 TEST_CASE("Keywords", "[parser]") {
@@ -462,8 +454,8 @@ TEST_CASE("Big Boi", "[parser]") {
 "func checkForRegistrationOfEvent(eventCode: int): int ptr {"
 "  currRegistration: RegistrationNode ptr = registrationList;"
 "  while (currRegistration) {"
-"    if (~(~currRegistration).registration == eventCode) {"
-"      array[length - 1] = (~currRegistration).registration.registrationCode;"
+"    if (*(*currRegistration).registration == eventCode) {"
+"      array[length - 1] = (*currRegistration).registration.registrationCode;"
 "    }"
 "  }"
 "  return array;"

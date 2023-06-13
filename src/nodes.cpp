@@ -59,6 +59,8 @@ void Statement::operator=(Statement&& st) noexcept {
       list = st.list; st.list = nullptr; break;
     case StatementType::KEY_W_BODY:
       keywBody = st.keywBody; st.keywBody = nullptr; break;
+    case StatementType::KEYWORD:
+      key = st.key; break;
     case StatementType::VALUE:
       var = st.var; break;
     default: break;
@@ -143,6 +145,8 @@ bool Statement::operator==(const Statement& st) const {
         return false;
       }
       return *scope == *st.scope;
+    case StatementType::KEYWORD:
+      return key == st.key;
     case StatementType::VALUE:
       return var == st.var;
     default:
@@ -240,11 +244,11 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (keywBody->body) {
         return ExpectedType::TOKEN;
       }
-      if (((hasData(st.type) && keywBody->keyword != TokenType::ELSE) || (st.type == StatementType::FOR_LOOP_HEADER && keywBody->keyword == TokenType::FOR)) && !keywBody->header) {
+      if ((hasData(st.type) || st.type == StatementType::FOR_LOOP_HEADER) && !keywBody->header) {
         keywBody->header = std::move(st);
         return ExpectedType::NOTHING;
       }
-      else if (st.type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN && keywBody->header) {
+      else if (st.type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN) {
         keywBody->body = std::move(st);
         return ExpectedType::NOTHING;
       }
@@ -359,8 +363,8 @@ Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
   switch (dec.decType) {
     case DecType::FUNCTION:
       func = dec.func; dec.func = nullptr; break;
-    case DecType::STATEMENT:
-      statement = dec.statement; dec.statement = nullptr; break;
+    case DecType::VARIABLEDEC:
+      varDec = dec.varDec; dec.varDec = nullptr; break;
     case DecType::STRUCT:
       struc = dec.struc; dec.struc = nullptr; break;
     case DecType::TEMPLATE:
@@ -374,7 +378,7 @@ Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
 
 Declaration::Declaration(FunctionDec *ptr): func{ptr}, decType{DecType::FUNCTION} {}
 
-Declaration::Declaration(Statement *ptr): statement{ptr}, decType{DecType::STATEMENT} {}
+Declaration::Declaration(VariableDec *ptr): varDec{ptr}, decType{DecType::VARIABLEDEC} {}
 
 Declaration::Declaration(Template *ptr): temp{ptr}, decType{DecType::TEMPLATE} {}
 
@@ -420,12 +424,12 @@ bool Declaration::operator==(const Declaration& ref) const {
         return false;
       }
       return true;
-    case DecType::STATEMENT:
-      if (ref.statement && statement) {
-        if (!(*ref.statement == *statement)) {
+    case DecType::VARIABLEDEC:
+      if (ref.varDec && varDec) {
+        if (!(*ref.varDec == *varDec)) {
           return false;
         }
-      } else if (ref.statement || statement) {
+      } else if (ref.varDec || varDec) {
         return false;
       }
       return true;

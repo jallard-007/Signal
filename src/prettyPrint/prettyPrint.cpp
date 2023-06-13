@@ -1,5 +1,6 @@
-#include "nodes.hpp"
-#include "tokenizer/tokenizer.hpp"
+#include "../nodes.hpp"
+#include "../tokenizer/tokenizer.hpp"
+#include <iostream>
 
 const uint8_t indentationSize = 2;
 
@@ -51,6 +52,8 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
       list->prettyPrint(tk, str, indentation); break;
     case StatementType::KEY_W_BODY:
       keywBody->prettyPrint(tk, str, indentation); break;
+    case StatementType::KEYWORD:
+      str += typeToString.at(key); break;
     case StatementType::VALUE:
       str += tk.extractToken(var); break;
     default: break;
@@ -138,10 +141,10 @@ void KeywordWithBody::prettyPrint(Tokenizer& tk, std::string& str, uint32_t inde
     }
   }
   header.prettyPrint(tk, str, indentation);
-  if (body.type != StatementType::NONE) {
+  if (keyword == TokenType::IF || keyword == TokenType::FOR || keyword == TokenType::ELIF || keyword == TokenType::WHILE) {
     str += ' ';
-    body.prettyPrint(tk, str, indentation);
   }
+  body.prettyPrint(tk, str, indentation);
 }
 
 void ArrOrStructLiteral::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
@@ -200,8 +203,8 @@ void Declaration::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
   switch (decType) {
     case DecType::FUNCTION:
       func->prettyPrint(tk, str, indentation); break;
-    case DecType::STATEMENT:
-      statement->prettyPrint(tk, str, indentation); break;
+    case DecType::VARIABLEDEC:
+      varDec->prettyPrint(tk, str); break;
     case DecType::TEMPLATE:
       temp->prettyPrint(tk, str, indentation); break;
     case DecType::STRUCT:
@@ -220,7 +223,7 @@ void Struct::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) 
   for (uint32_t i = 0; i < decs.size(); ++i) {
     str += std::string(indentation, ' ');
     decs[i].prettyPrint(tk, str, indentation);
-    if (decs[i].decType == DecType::STATEMENT && !(decs[i].statement->type == StatementType::KEY_W_BODY && decs[i].statement->keywBody->keyword != TokenType::RETURN)) {
+    if (decs[i].decType == DecType::VARIABLEDEC) {
       str += ";\n";
     }
   }
@@ -245,8 +248,11 @@ void Template::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation
 }
 
 void Program::prettyPrint(Tokenizer& tk, std::string& str) {
-  for (uint32_t i = 0; i < decs.size(); ++i) {
+  for (uint32_t i = 0; i < decs.size() - 1; ++i) {
     decs[i].prettyPrint(tk, str, 0);
     str += '\n';
+  }
+  if (decs.size() >= 1) {
+    decs.back().prettyPrint(tk, str, 0);
   }
 }

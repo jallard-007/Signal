@@ -68,8 +68,6 @@ const std::unordered_map<TokenType, uint8_t> operatorPrecedence {
   {TokenType::DECREMENT_PREFIX, 13},
   {TokenType::INCREMENT_PREFIX, 13},
 
-
-
   {TokenType::DOT, 14},
   {TokenType::PTR_MEMBER_ACCESS, 14},
   {TokenType::DECREMENT_POSTFIX, 14},
