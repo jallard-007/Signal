@@ -44,7 +44,7 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("function") == TokenType::IDENTIFIER);
    CHECK(firstToken("if") == TokenType::IF);
    CHECK(firstToken("ifelif") == TokenType::IDENTIFIER);
-   CHECK(firstToken("null") == TokenType::NULL_);
+   CHECK(firstToken("nullptr") == TokenType::NULL_PTR);
    CHECK(firstToken("include") == TokenType::INCLUDE);
    CHECK(firstToken("return") == TokenType::RETURN);
    CHECK(firstToken("returns") == TokenType::IDENTIFIER);

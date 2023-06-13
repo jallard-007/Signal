@@ -1,7 +1,7 @@
 #include "token.hpp"
 
 bool isLiteral(TokenType type) {
-  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_;
+  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_PTR;
 }
 
 bool isKeyword(TokenType type) {

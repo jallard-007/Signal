@@ -18,7 +18,7 @@ enum class TokenType : uint8_t {
   HEX_NUMBER,
   FALSE, //
   TRUE, //
-  NULL_, //
+  NULL_PTR, //
 
   // keywords
   AS, //
@@ -277,7 +277,7 @@ const std::unordered_map<std::string, TokenType> stringToType {
   {"int", TokenType::INT_TYPE},
   {"include", TokenType::INCLUDE},
   {"extern", TokenType::EXTERN},
-  {"null", TokenType::NULL_},
+  {"nullptr", TokenType::NULL_PTR},
   {"ptr", TokenType::POINTER},
   {"ref", TokenType::REFERENCE},
   {"return", TokenType::RETURN},
@@ -397,6 +397,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::TEMPLATE, "template "},
   {TokenType::WHILE, "while "},
   {TokenType::POINTER, "ptr"},
+  {TokenType::NULL_PTR, "nullptr"},
   {TokenType::REFERENCE, "ref"},
   {TokenType::STRING_LITERAL, "\""},
   {TokenType::CHAR_LITERAL, "'"},
