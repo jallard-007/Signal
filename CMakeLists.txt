@@ -8,15 +8,15 @@ add_library(parser STATIC ./src/parser/parser.cpp ./src/nodes.cpp)
 target_link_libraries(parser PRIVATE tokenizer)
 add_library(prettyPrint STATIC ./src/prettyPrint/prettyPrint.cpp)
 target_link_libraries(prettyPrint PRIVATE parser)
-add_library(typeChecker STATIC ./src/typeChecker/typeChecker.cpp)
+add_library(checker STATIC ./src/checker/checker.cpp)
 
-set_target_properties(tokenizer parser prettyPrint typeChecker PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
+set_target_properties(tokenizer parser prettyPrint checker PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
 
 add_executable(main ./src/main.cpp)
 target_link_libraries(main PRIVATE prettyPrint)
 
-add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/typeChecker/test_typeChecker.cpp)
-target_link_libraries(test PRIVATE typeChecker)
+add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp)
+target_link_libraries(test PRIVATE checker)
 target_link_libraries(test PRIVATE prettyPrint)
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)
 

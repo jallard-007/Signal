@@ -44,7 +44,7 @@ void Statement::operator=(Statement&& st) noexcept {
     case StatementType::BINARY_OP:
       binOp = st.binOp; st.binOp = nullptr; break;
     case StatementType::VARIABLE_DEC:
-      varDec = st.varDec; st.varDec = nullptr; break;
+      dec = st.dec; st.dec = nullptr; break;
     case StatementType::FUNCTION_CALL:
       funcCall = st.funcCall; st.funcCall = nullptr; break;
     case StatementType::ARRAY_ACCESS:
@@ -62,7 +62,7 @@ void Statement::operator=(Statement&& st) noexcept {
     case StatementType::KEYWORD:
       key = st.key; break;
     case StatementType::VALUE:
-      var = st.var; break;
+      var = st.var; st.var = nullptr; break;
     default: break;
   }
   st.type = StatementType::NONE;
@@ -90,13 +90,13 @@ bool Statement::operator==(const Statement& st) const {
       }
       return *binOp == *st.binOp;
     case StatementType::VARIABLE_DEC:
-      if (!varDec && !st.varDec) {
+      if (!dec && !st.dec) {
         return true;
       }
-      if (!varDec || !st.varDec) {
+      if (!dec || !st.dec) {
         return false;
       }
-      return *varDec == *st.varDec;
+      return *dec == *st.dec;
     case StatementType::FUNCTION_CALL:
       if (!funcCall && !st.funcCall) {
         return true;
@@ -148,7 +148,13 @@ bool Statement::operator==(const Statement& st) const {
     case StatementType::KEYWORD:
       return key == st.key;
     case StatementType::VALUE:
-      return var == st.var;
+      if (!var && !st.var) {
+        return true;
+      }
+      if (!var || !st.var) {
+        return false;
+      }
+      return *var == *st.var;
     default:
       return true;
   }
@@ -168,8 +174,8 @@ Statement::Statement(BinOp *ptr) {
   type = StatementType::BINARY_OP;
 }
 
-Statement::Statement(VariableDec *ptr) {
-  varDec = ptr;
+Statement::Statement(Declaration *ptr) {
+  dec = ptr;
   type = StatementType::VARIABLE_DEC;
 }
 
@@ -208,7 +214,8 @@ Statement::Statement(ForLoopHeader *ptr) {
   type = StatementType::FOR_LOOP_HEADER;
 }
 
-Statement::Statement(Token tok): var{tok} {
+Statement::Statement(Token *ptr) {
+  var = ptr;
   type = StatementType::VALUE;
 }
 
@@ -293,9 +300,9 @@ bool Scope::operator==(const Scope& sp) const {
   return sp.scopeStatements == scopeStatements;
 }
 
-BinOp::BinOp(TokenType op): leftSide{}, rightSide{}, op{op} {}
+BinOp::BinOp(TokenType op): leftSide{}, rightSide{}, resultType{}, op{op} {}
 
-BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {
+BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, resultType{}, op{binOp.op} {
   binOp.op = TokenType::NOTHING;
 }
 
@@ -363,7 +370,7 @@ Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
   switch (dec.decType) {
     case DecType::FUNCTION:
       func = dec.func; dec.func = nullptr; break;
-    case DecType::VARIABLEDEC:
+    case DecType::VARIABLE_DEC:
       varDec = dec.varDec; dec.varDec = nullptr; break;
     case DecType::STRUCT:
       struc = dec.struc; dec.struc = nullptr; break;
@@ -378,7 +385,7 @@ Declaration::Declaration(Declaration&& dec) noexcept : decType{dec.decType} {
 
 Declaration::Declaration(FunctionDec *ptr): func{ptr}, decType{DecType::FUNCTION} {}
 
-Declaration::Declaration(VariableDec *ptr): varDec{ptr}, decType{DecType::VARIABLEDEC} {}
+Declaration::Declaration(VariableDec *ptr): varDec{ptr}, decType{DecType::VARIABLE_DEC} {}
 
 Declaration::Declaration(Template *ptr): temp{ptr}, decType{DecType::TEMPLATE} {}
 
@@ -424,7 +431,7 @@ bool Declaration::operator==(const Declaration& ref) const {
         return false;
       }
       return true;
-    case DecType::VARIABLEDEC:
+    case DecType::VARIABLE_DEC:
       if (ref.varDec && varDec) {
         if (!(*ref.varDec == *varDec)) {
           return false;
@@ -498,6 +505,7 @@ bool ForLoopHeader::operator==(const ForLoopHeader& ref) const {
 }
 
 TokenList::TokenList(): curr{0,0,TokenType::NOTHING}, next{nullptr} {}
+TokenList::TokenList(Token tk): curr{tk}, next{nullptr} {}
 
 bool TokenList::operator==(const TokenList& ref) const {
   const TokenList* refCurr = &ref;

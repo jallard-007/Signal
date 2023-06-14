@@ -55,9 +55,9 @@ enum class TokenType : uint8_t {
   BACK_SLASH,
   COLON,
 
-
   // BINARY
   // general
+  TERNARY,
   DOT,
   PTR_MEMBER_ACCESS,
   COMMA,
@@ -96,7 +96,6 @@ enum class TokenType : uint8_t {
   LESS_THAN_EQUAL,
   GREATER_THAN,
   GREATER_THAN_EQUAL,
-  TERNARY,
 
   // UNARY
   NOT,
@@ -109,13 +108,26 @@ enum class TokenType : uint8_t {
   NEGATIVE,
 
   // types
+  BOOL,
   CHAR_TYPE,
   INT_TYPE,
   FLOAT_TYPE,
   DOUBLE_TYPE,
-  REFERENCE,
   POINTER,
+  REFERENCE,
+  VOID,
+};
 
+struct Token {
+  uint32_t position;
+  uint32_t lineNum;
+  uint32_t linePos;
+  uint16_t length;
+  TokenType type;
+  Token() = delete;
+  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, lineNum{0}, linePos{0}, length{len}, type{t} {}
+  Token(uint32_t pos, uint32_t lineNum, uint32_t linePos, uint16_t len, TokenType t): position{pos}, lineNum{lineNum}, linePos{linePos}, length{len}, type{t} {}
+  bool operator==(const Token&) const;
 };
 
 const TokenType numToType [128] {
@@ -182,7 +194,7 @@ const TokenType numToType [128] {
   TokenType::LESS_THAN, // 60 <
   TokenType::ASSIGNMENT, // 61 =
   TokenType::GREATER_THAN, // 62 >
-  TokenType::TERNARY, // 63 ?
+  TokenType::BAD_VALUE, // 63 ? TokenType::TERNARY, but dont currently support it
   TokenType::ADDRESS_OF, // 64 @   
   TokenType::IDENTIFIER, // 65 A
   TokenType::IDENTIFIER, // 66 B
@@ -250,6 +262,7 @@ const TokenType numToType [128] {
 };
 
 bool isLiteral(TokenType);
+bool isLogicalOp(TokenType);
 bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
 bool isBinaryOp(TokenType);
@@ -279,6 +292,8 @@ const std::unordered_map<std::string, TokenType> stringToType {
   {"extern", TokenType::EXTERN},
   {"nullptr", TokenType::NULL_PTR},
   {"ptr", TokenType::POINTER},
+  {"void", TokenType::VOID},
+  {"bool", TokenType::BOOL},
   {"ref", TokenType::REFERENCE},
   {"return", TokenType::RETURN},
   {"struct", TokenType::STRUCT},
@@ -397,6 +412,8 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::TEMPLATE, "template "},
   {TokenType::WHILE, "while "},
   {TokenType::POINTER, "ptr"},
+  {TokenType::VOID, "void"},
+  {TokenType::BOOL, "bool"},
   {TokenType::NULL_PTR, "nullptr"},
   {TokenType::REFERENCE, "ref"},
   {TokenType::STRING_LITERAL, "\""},
@@ -405,11 +422,4 @@ const std::unordered_map<TokenType, std::string> typeToString {
 
 #define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)
 
-struct Token {
-  uint32_t position;
-  uint16_t length;
-  TokenType type;
-  Token() = delete;
-  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
-  bool operator==(const Token&) const;
-};
+

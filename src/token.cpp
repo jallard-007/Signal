@@ -9,11 +9,11 @@ bool isKeyword(TokenType type) {
 }
 
 bool isBuiltInType(TokenType type) {
-  return type >= TokenType::CHAR_TYPE && type <= TokenType::POINTER;
+  return type >= TokenType::BOOL && type <= TokenType::VOID;
 }
 
 bool isBinaryOp(TokenType type) {
-  return type >= TokenType::DOT && type <= TokenType::TERNARY;
+  return type >= TokenType::DOT && type <= TokenType::GREATER_THAN_EQUAL;
 }
 
 bool isUnaryOp(TokenType type) {
@@ -26,6 +26,10 @@ bool isKeywordWithBody(TokenType type) {
 
 bool isTypeDelimiter(TokenType type) {
   return type != TokenType::IDENTIFIER && !isBuiltInType(type);
+}
+
+bool isLogicalOp(TokenType type) {
+  return type >= TokenType::EQUAL && type <= TokenType::GREATER_THAN_EQUAL;
 }
 
 bool Token::operator==(const Token& tk) const {

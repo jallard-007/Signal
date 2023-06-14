@@ -69,10 +69,6 @@ Token Tokenizer::tokenizeNext() {
   uint16_t length = 0;
   TokenType type = TokenType::BAD_VALUE;
   char c = content[position];
-  // if (c > 127) {
-  //   std::cerr << "Invalid character: Extended ASCII not supported (Character with value greater than 127 found)\n";
-  //   exit(1);
-  // }
   type = numToType[(int)c];
   switch (type) {
     case TokenType::IDENTIFIER: {
@@ -98,8 +94,8 @@ Token Tokenizer::tokenizeNext() {
     case TokenType::STRING_LITERAL: {
       if (!movePastLiteral('"')) {
         error.type = TokenType::STRING_LITERAL;
-        error.position = position;
-        error.length = 0;
+        error.lineNum = lineNum;
+        error.linePos = position - lineStart;
         type = TokenType::BAD_VALUE;
       }
       break;
@@ -108,8 +104,8 @@ Token Tokenizer::tokenizeNext() {
     case TokenType::CHAR_LITERAL: {
       if (!movePastLiteral('\'')) {
         error.type = TokenType::CHAR_LITERAL;
-        error.position = position;
-        error.length = 0;
+        error.lineNum = lineNum;
+        error.linePos = position - lineStart;
         type = TokenType::BAD_VALUE;
       }
       // TODO: validate content of character. escaped characters :(
@@ -212,11 +208,12 @@ Token Tokenizer::tokenizeNext() {
           } else {
             type = TokenType::INCREMENT_PREFIX;
           }
-        } else if (c == '*' && (prevType == TokenType::OPEN_BRACE || prevType == TokenType::OPEN_PAREN || prevType == TokenType::OPEN_BRACKET || isBinaryOp(prevType))) {
-          type = TokenType::DEREFERENCE;
         }
         else {
           --position;
+          if (c == '*' && (prevType == TokenType::OPEN_BRACE || prevType == TokenType::OPEN_PAREN || prevType == TokenType::OPEN_BRACKET || isBinaryOp(prevType))) {
+            type = TokenType::DEREFERENCE;
+          }
         }
       }
       break;
@@ -228,7 +225,7 @@ Token Tokenizer::tokenizeNext() {
     exit(1);
   }
   prevType = type;
-  return {tokenStartPos, static_cast<uint16_t>(position - tokenStartPos), type};
+  return {tokenStartPos, lineNum, tokenStartPos + 1 - lineStart, static_cast<uint16_t>(position - tokenStartPos), type};
 }
 
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
@@ -295,6 +292,6 @@ void Tokenizer::moveToNewLine() {
   }
 }
 
-std::string Tokenizer::extractToken(Token token) {
+std::string Tokenizer::extractToken(Token &token) {
   return content.substr(token.position, token.length);
 }

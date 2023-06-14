@@ -36,6 +36,7 @@ struct TokenList {
   Token curr;
   TokenList *next;
   TokenList();
+  TokenList(Token);
   TokenList(TokenList&&) = default;
   ~TokenList() = default;
   bool operator==(const TokenList&) const;
@@ -67,6 +68,7 @@ typedef struct Scope Scope;
 typedef struct ForLoopHeader ForLoopHeader;
 typedef struct ArrOrStructLiteral ArrOrStructLiteral;
 typedef struct KeywordWithBody KeywordWithBody;
+typedef struct Declaration Declaration;
 
 enum class StatementType: uint8_t {
   NONE,
@@ -89,7 +91,7 @@ struct Statement {
   union {
     UnOp *unOp;
     BinOp *binOp;
-    VariableDec *varDec;
+    Declaration *dec;
     FunctionCall *funcCall;
     ArrayAccess *arrAccess;
     Statement *wrapped;
@@ -97,7 +99,7 @@ struct Statement {
     ArrOrStructLiteral *arrOrStructLiteral;
     ForLoopHeader *list;
     KeywordWithBody *keywBody;
-    Token var;
+    Token *var;
     TokenType key;
   };
   StatementType type = StatementType::NONE;
@@ -108,7 +110,7 @@ struct Statement {
   Statement(Statement&&) noexcept ;
   explicit Statement(UnOp *);
   explicit Statement(BinOp *);
-  explicit Statement(VariableDec *);
+  explicit Statement(Declaration *);
   explicit Statement(FunctionCall *);
   explicit Statement(ArrayAccess *);
   explicit Statement(Statement *);
@@ -116,8 +118,7 @@ struct Statement {
   explicit Statement(ForLoopHeader *);
   explicit Statement(KeywordWithBody *);
   explicit Statement(ArrOrStructLiteral *);
-
-  explicit Statement(Token);
+  explicit Statement(Token *);
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
   bool operator==(const Statement&) const;
@@ -156,8 +157,6 @@ struct KeywordWithBody {
   KeywordWithBody(TokenType);
   KeywordWithBody(KeywordWithBody&&);
   bool operator==(const KeywordWithBody&) const;
-  bool typeCheck();
-
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -189,6 +188,7 @@ struct ArrayAccess {
 struct BinOp {
   Statement leftSide;
   Statement rightSide;
+  Type *resultType;
   TokenType op;
   explicit BinOp(TokenType);
   BinOp(const BinOp&) = delete;
@@ -243,7 +243,7 @@ typedef struct Struct Struct;
 enum class DecType: uint8_t {
   NONE,
   FUNCTION,
-  VARIABLEDEC,
+  VARIABLE_DEC,
   TEMPLATE,
   STRUCT,
   ENUM

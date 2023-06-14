@@ -63,19 +63,19 @@ bool Parser::parse() {
         }
 
         if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACE);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::OPEN_BRACE);
         }
         tokenizer.consumePeek();
         token = tokenizer.peekNext();
         while (tokenizer.peeked.type != TokenType::CLOSE_BRACE) {
           if (token.type != TokenType::IDENTIFIER) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACE);
+            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::OPEN_BRACE);
           }
           if (token.type == TokenType::IDENTIFIER) {
             r.enm->members.emplace_back(token);
             tokenizer.consumePeek();
           } else {
-            unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
+            unexpected.emplace_back(token, token.lineNum, token.linePos);
             program.decs.pop_back();
             return false;
           }
@@ -90,18 +90,18 @@ bool Parser::parse() {
         // global variable declaration
         tokenizer.consumePeek();
         if (tokenizer.peekNext().type != TokenType::COLON) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::COLON);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::COLON);
           return false;
         }
         tokenizer.consumePeek();
         VariableDec ac{token};
         if (getType(ac.type).type != TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::SEMICOLON);
           return false;
         }
         tokenizer.consumePeek();
         if (ac.type.tokens.curr.type == TokenType::NOTHING) {
-          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart);
+          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.peeked.lineNum, tokenizer.peeked.linePos);
           return false;
         }
         program.decs.emplace_back(memPool.get(std::move(ac)));
@@ -110,7 +110,7 @@ bool Parser::parse() {
         
       default:
         // error, unexpected token
-        unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
+        unexpected.emplace_back(token, token.lineNum, token.linePos);
         return false;
     }
     token = tokenizer.peekNext();
@@ -122,12 +122,12 @@ bool Parser::functionDec(Declaration& dec) {
   const Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::IDENTIFIER);
+    expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, TokenType::IDENTIFIER);
     return false;
   }
   if (tokenizer.peekNext().type != TokenType::OPEN_PAREN) {
     // expected open paren
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position + 1 - tokenizer.lineStart, TokenType::OPEN_PAREN);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::OPEN_PAREN);
     return false;
   }
   FunctionDec funDec{token};
@@ -135,7 +135,7 @@ bool Parser::functionDec(Declaration& dec) {
   tokenizer.consumePeek();
   if (!getStatements(funDec.params, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
     if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-      expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_PAREN);
       return false;
     }
     else if (tokenizer.prevType == TokenType::BAD_VALUE) {
@@ -147,21 +147,21 @@ bool Parser::functionDec(Declaration& dec) {
   }
   if (tokenizer.peekNext().type != TokenType::COLON) {
     // expected a colon
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position + 1 - tokenizer.lineStart, TokenType::COLON);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::COLON);
     return false;
   }
   tokenizer.consumePeek();
   // get return type
   if (getType(funDec.returnType).type != TokenType::OPEN_BRACE) {
     // expected open brace after type
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::OPEN_BRACE);
     return false;
   }
   // consume open brace
   tokenizer.consumePeek();
   if (!getStatements(funDec.body.scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
     if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-      expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_BRACE);
       return false;
     }
     else if (tokenizer.prevType == TokenType::BAD_VALUE) {
@@ -181,11 +181,11 @@ bool Parser::structDec(Declaration& dec) {
   Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::IDENTIFIER);
+    expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, TokenType::IDENTIFIER);
     return false;
   }
   if (tokenizer.tokenizeNext().type != TokenType::OPEN_BRACE) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACE);
+    expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, TokenType::OPEN_BRACE);
     return false;
   }
   // now parse struct body
@@ -197,18 +197,18 @@ bool Parser::structDec(Declaration& dec) {
     if (token.type == TokenType::IDENTIFIER) {
       tokenizer.consumePeek();
       if (tokenizer.peekNext().type != TokenType::COLON) {
-        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::COLON);
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::COLON);
         return false;
       }
       tokenizer.consumePeek();
       VariableDec ac{token};
       if (getType(ac.type).type != TokenType::SEMICOLON) {
-        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::SEMICOLON);
         return false;
       }
       tokenizer.consumePeek();
       if (ac.type.tokens.curr.type == TokenType::NOTHING) {
-        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart);
+        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.peeked.lineNum, tokenizer.peeked.linePos);
       }
       sDec.decs.emplace_back(memPool.get(std::move(ac)));
     }
@@ -217,6 +217,7 @@ bool Parser::structDec(Declaration& dec) {
       auto& funcDec = sDec.decs.emplace_back();
       tokenizer.consumePeek();
       if (!functionDec(funcDec)) {
+        sDec.decs.pop_back();
         return false;
       }
     }
@@ -229,7 +230,7 @@ bool Parser::structDec(Declaration& dec) {
     }
     // invalid token
     else { 
-      unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
+      unexpected.emplace_back(token, token.lineNum, token.linePos);
       return false;
     }
     token = tokenizer.peekNext();
@@ -240,13 +241,13 @@ bool Parser::structDec(Declaration& dec) {
 bool Parser::templateDec(Declaration& dec) {
   Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::OPEN_BRACKET) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart, TokenType::OPEN_BRACKET);
+    expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, TokenType::OPEN_BRACKET);
     return false;
   }
   Template temp;
   if (!getStatements(temp.templateIdentifiers, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
     if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-      expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_BRACKET);
       return false;
     }
     else if (tokenizer.prevType == TokenType::BAD_VALUE) {
@@ -268,7 +269,7 @@ bool Parser::templateDec(Declaration& dec) {
       return false;
     }
   } else {
-    unexpected.emplace_back(token, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
+    unexpected.emplace_back(token, token.lineNum, token.linePos);
     return false;
   }
   dec.temp = memPool.get(std::move(temp));
@@ -288,7 +289,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
   Statement rootStatement;
   Token token = tokenizer.peekNext();
   if (token.type == TokenType::BAD_VALUE) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.error.position + 1 - tokenizer.lineStart, tokenizer.error.type);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.error.lineNum, tokenizer.error.linePos, tokenizer.error.type);
     return rootStatement;
   }
   if (token.type == delimiterA || token.type == delimiterB) {
@@ -296,11 +297,10 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
   }
 
   Statement *bottom = nullptr;
-  uint32_t lineNum = tokenizer.lineNum, lineStart = tokenizer.lineStart;
   tokenizer.consumePeek();
   Token lookAhead = tokenizer.peekNext();
   if (lookAhead.type == TokenType::BAD_VALUE) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.error.position + 1 - tokenizer.lineStart, tokenizer.error.type);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.error.lineNum, tokenizer.error.linePos, tokenizer.error.type);
     return rootStatement;
   }
   while (token.type != TokenType::END_OF_FILE) {
@@ -311,7 +311,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.type = StatementType::BINARY_OP;
         statement.binOp = memPool.get(BinOp{token.type});
         if (!bottom) {
-          expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+          expected.emplace_back(ExpectedType::EXPRESSION, token.lineNum, token.linePos);
         }
       } else {
         statement.type = StatementType::UNARY_OP;
@@ -365,7 +365,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
                 if (!childOfPrev ) {
                   // expected token between operators
                   if (statement.type == StatementType::BINARY_OP) {
-                    expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                    expected.emplace_back(ExpectedType::EXPRESSION, token.lineNum, token.linePos);
                   }
                 } else {
                   if (statement.type == StatementType::BINARY_OP) {
@@ -411,7 +411,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             if (!childOfPrev ) {
               // expected token between operators
               if (statement.type == StatementType::BINARY_OP) {
-                expected.emplace_back(ExpectedType::EXPRESSION, lineNum, token.position - lineStart);
+                expected.emplace_back(ExpectedType::EXPRESSION, token.lineNum, token.linePos);
               }
             } else {
               if (statement.type == StatementType::BINARY_OP) {
@@ -423,7 +423,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
             // END DUP CODE
 
             if (prev->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-              expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+              expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
               break;
             } else {
               if (prev->type == StatementType::BINARY_OP) {
@@ -448,7 +448,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         }
 
         else {
-          unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
+          unexpected.emplace_back(token, token.lineNum, token.linePos);
         }
       }
     }
@@ -464,7 +464,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         tokenizer.consumePeek();
         if (!getStatements(statement.funcCall->args, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
           if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_PAREN);
           }
           else if (tokenizer.prevType == TokenType::BAD_VALUE) {
             break;
@@ -491,20 +491,20 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
       // variable declaration: identifier :
       else if (lookAhead.type == TokenType::COLON && delimiterA != TokenType::COLON) {
-        statement.varDec = memPool.get(VariableDec{token});
+        statement.dec = memPool.get(Declaration{memPool.get(VariableDec{token})});
         statement.type = StatementType::VARIABLE_DEC;
         // consume the colon
         tokenizer.consumePeek();
-        lookAhead = getType(statement.varDec->type);
+        lookAhead = getType(statement.dec->varDec->type);
         if (lookAhead.type == TokenType::END_OF_FILE) {
           // never reached a type delimiter
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, delimiterB);
+          expected.emplace_back(ExpectedType::TOKEN, lookAhead.lineNum, lookAhead.linePos, delimiterB);
           break;
         } 
         // cant be keyword, unary op, 
         // can be binary op, delimiter
         else if (lookAhead.type != delimiterA && lookAhead.type != delimiterB && !isBinaryOp(lookAhead.type)) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, delimiterA);
+          expected.emplace_back(ExpectedType::TOKEN, lookAhead.lineNum, lookAhead.linePos, delimiterA);
           break;
         }
       }
@@ -512,7 +512,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       // we are using the identifier's actual value
       else {
         statement.type = StatementType::VALUE;
-        statement.var = token;
+        statement.var = memPool.get(Token{token});
       }
 
       // DUP CODE: adding leaf node to the tree by move
@@ -520,20 +520,20 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
     }
 
     else if (isLiteral(token.type)) {
-      Statement statement{token};
+      Statement statement{memPool.get(Token{token})};
       // DUP CODE: adding leaf node to the tree by move
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
@@ -549,7 +549,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.type = StatementType::KEYWORD;
         statement.key = token.type;
         if (lookAhead.type != TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+          expected.emplace_back(ExpectedType::TOKEN, lookAhead.lineNum, lookAhead.linePos, TokenType::SEMICOLON);
         }
       }
       else if (token.type == TokenType::RETURN) {
@@ -557,20 +557,20 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.type = StatementType::KEY_W_BODY;
         statement.keywBody->header = parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
         if (tokenizer.peekNext().type != TokenType::CLOSE_BRACE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::SEMICOLON);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::SEMICOLON);
           break;
         }
       }
       else {
         // unexpected
-        unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
+        unexpected.emplace_back(token, token.lineNum, token.linePos);
       }
       // DUP CODE: adding leaf node to the tree by move
       if (!bottom) {
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
@@ -583,7 +583,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.list = memPool.get(ForLoopHeader{});
         if (!getStatements(statement.list->list, TokenType::SEMICOLON, TokenType::CLOSE_PAREN)) {
           if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_PAREN);
           }
           else if (tokenizer.prevType == TokenType::BAD_VALUE) {
             break;
@@ -595,13 +595,13 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         statement.wrapped = memPool.get(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_PAREN));
         lookAhead = tokenizer.peekNext();
         if (statement.wrapped->type == StatementType::NONE) {
-          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+          expected.emplace_back(ExpectedType::EXPRESSION, lookAhead.lineNum, lookAhead.linePos);
         }
       }
 
       if (lookAhead.type != TokenType::CLOSE_PAREN) {
         // expected close paren
-        expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart, TokenType::CLOSE_PAREN);
+        expected.emplace_back(ExpectedType::TOKEN, lookAhead.lineNum, lookAhead.linePos, TokenType::CLOSE_PAREN);
         break;
       } else {
         // consume the close paren
@@ -614,7 +614,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
@@ -624,13 +624,13 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     else if (token.type == TokenType::OPEN_BRACE) {
       if (delimiterB != TokenType::CLOSE_BRACE) {
         // naughty naughty naughty
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterB);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterB);
         break;
       }
       Statement statement{memPool.get(Scope{})};
       if (!getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
         if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACE);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_BRACE);
         }
         else if (tokenizer.prevType == TokenType::BAD_VALUE) {
           break;
@@ -645,11 +645,10 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
-
       if ((rootStatement.type == StatementType::KEY_W_BODY || rootStatement.type == StatementType::SCOPE) && delimiterA == TokenType::SEMICOLON) {
         --tokenizer.position;
         tokenizer.peeked.type = TokenType::SEMICOLON;
@@ -664,7 +663,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       statement.type = StatementType::ARRAY_OR_STRUCT_LITERAL;
       if (!getStatements(statement.arrOrStructLiteral->list, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
         if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.peeked.position + 1 - tokenizer.lineStart, TokenType::CLOSE_BRACKET);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked.lineNum, tokenizer.peeked.linePos, TokenType::CLOSE_BRACKET);
         }
         else if (tokenizer.prevType == TokenType::BAD_VALUE) {
           break;
@@ -679,7 +678,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
         rootStatement = std::move(statement);
         bottom = &rootStatement;
       } else if (bottom->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-        expected.emplace_back(ExpectedType::TOKEN, lineNum, token.position + 1 - lineStart, delimiterA);
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, delimiterA);
         break;
       }
       // END DUP CODE
@@ -687,11 +686,11 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 
     else if (token.type != TokenType::COMMENT && token.type != TokenType::SEMICOLON) {
       // unexpected, i guess...
-      unexpected.emplace_back(token, lineNum, token.position + 1 - lineStart);
+      unexpected.emplace_back(token, token.lineNum, token.linePos);
     }
 
     if (lookAhead.type == TokenType::SEMICOLON && delimiterA != TokenType::SEMICOLON && delimiterB != TokenType::SEMICOLON) {
-      expected.emplace_back(ExpectedType::TOKEN, lineNum, lookAhead.position + 1 - lineStart, delimiterB);
+      expected.emplace_back(ExpectedType::TOKEN, lookAhead.lineNum, lookAhead.linePos, delimiterB);
       break;
     }
     
@@ -700,11 +699,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
     }
     
     token = tokenizer.tokenizeNext();
-    lineNum = tokenizer.lineNum;
-    lineStart = tokenizer.lineStart;
     lookAhead = tokenizer.peekNext();
     if (lookAhead.type == TokenType::BAD_VALUE) {
-      expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.error.position + 1 - tokenizer.lineStart, tokenizer.error.type);
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.error.lineNum, tokenizer.error.linePos, tokenizer.error.type);
       break;
     }
   }
@@ -712,10 +709,9 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
   if (bottom) {
     ExpectedType exType = bottom->isValid();
     if (exType != ExpectedType::NOTHING) {
-      expected.emplace_back(exType, tokenizer.lineNum, lookAhead.position + 1 - tokenizer.lineStart);
+      expected.emplace_back(exType, lookAhead.lineNum, lookAhead.linePos);
     }
   }
-
   return rootStatement;
 }
 
@@ -728,7 +724,7 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
 bool Parser::getStatements(StatementList& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
   Token token = tokenizer.peekNext();
   if (token.type == TokenType::BAD_VALUE) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.lineNum, tokenizer.error.position + 1 - tokenizer.lineStart, tokenizer.error.type);
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.error.lineNum, tokenizer.error.linePos, tokenizer.error.type);
     return false;
   }
   StatementList *prev = nullptr;
@@ -738,7 +734,7 @@ bool Parser::getStatements(StatementList& statements, const TokenType delimiterM
     Statement s = parseStatement(delimiterMinor, delimiterMajor);
     if (s.type == StatementType::NONE) {
       if (delimiterMinor == TokenType::COMMA && token.type != delimiterMajor) {
-        expected.emplace_back(ExpectedType::EXPRESSION, tokenizer.lineNum, token.position + 1 - tokenizer.lineStart);
+        expected.emplace_back(ExpectedType::EXPRESSION, token.lineNum, token.linePos);
       }
     } else {
       ptr->curr = std::move(s);
@@ -755,6 +751,9 @@ bool Parser::getStatements(StatementList& statements, const TokenType delimiterM
     }
     token = tokenizer.peekNext();
     if (token.type == delimiterMajor) {
+      if (ptr->curr.type != StatementType::SCOPE && ptr->curr.type != StatementType::KEY_W_BODY && delimiterMinor == TokenType::SEMICOLON && delimiterMajor == TokenType::CLOSE_BRACE && ptr->curr.type != StatementType::NONE) {
+        expected.emplace_back(ExpectedType::TOKEN, token.lineNum, token.linePos, TokenType::SEMICOLON);
+      }
       if (ptr->next) {
         memPool.release(ptr->next);
         ptr->next = nullptr;
@@ -781,30 +780,30 @@ bool Parser::getStatements(StatementList& statements, const TokenType delimiterM
 }
 
 /**
- * Returns the next token after the type list, adding tokens to Type as it goes
+ * Returns the next token after the type list, adding tokens to type as it goes. tokens are in reverse order
  * Does NOT consume the final token
 */
 Token Parser::getType(Type& type) {
   Token tp = tokenizer.peekNext();
-  TokenList * prev = nullptr;
-  TokenList * ptr = &type.tokens;
+  // int ptr ref
+  // ref -> ptr -> int
+  TokenList *curr = memPool.getTokenList();
   while (tp.type != TokenType::END_OF_FILE) {
     if (isTypeDelimiter(tp.type)) {
-      if (ptr->next) {
-        memPool.release(ptr->next);
-        ptr->next = nullptr;
-      }
-      if (prev && ptr->curr.type == TokenType::NOTHING) {
-        prev->next = nullptr;
-        memPool.release(ptr);
+      if (!curr->next) {
+        memPool.release(curr);
+      } else {
+        type.tokens.curr = curr->next->curr;
+        type.tokens.next = curr->next->next;
+        memPool.release(curr);
       }
       break;
     }
     tokenizer.consumePeek();
-    ptr->curr = tp;
-    ptr->next = memPool.getTokenList();
-    prev = ptr;
-    ptr = ptr->next;
+    curr->curr = tp;
+    TokenList *prev = curr;
+    curr = memPool.getTokenList();
+    curr->next = prev;
     tp = tokenizer.peekNext();
   }
   return tp;

@@ -8,15 +8,20 @@ void Type::prettyPrint(Tokenizer& tk, std::string& str) {
   if (tokens.curr.type == TokenType::NOTHING) {
     return;
   }
-  TokenList * iter = &tokens;
-  for (; iter->next; iter = iter->next) {
-    if (iter->curr.type != TokenType::POINTER) {
-      str += tk.extractToken(iter->curr) + " ";
-    } else {
-      str += typeToString.at(TokenType::POINTER);
-    }
+  std::vector<TokenList *> r;
+  for (TokenList * iter = &tokens; iter; iter = iter->next) {
+    r.emplace_back(iter);
   }
-  str += tk.extractToken(iter->curr);
+  if (!r.empty()) {
+    for (int i = r.size() - 1; i > 0 ; --i) {
+      if (r[i]->curr.type != TokenType::POINTER) {
+        str += tk.extractToken(r[i]->curr) + " ";
+      } else {
+        str += typeToString.at(TokenType::POINTER);
+      }
+    }
+    str += tk.extractToken(r.front()->curr);
+  }
 }
 
 void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
@@ -34,7 +39,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     case StatementType::BINARY_OP:
       binOp->prettyPrint(tk, str, indentation); break;
     case StatementType::VARIABLE_DEC:
-      varDec->prettyPrint(tk, str); break;
+      dec->prettyPrint(tk, str, indentation); break;
     case StatementType::FUNCTION_CALL:
       funcCall->prettyPrint(tk, str, indentation); break;
     case StatementType::ARRAY_ACCESS:
@@ -55,7 +60,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     case StatementType::KEYWORD:
       str += typeToString.at(key); break;
     case StatementType::VALUE:
-      str += tk.extractToken(var); break;
+      str += tk.extractToken(*var); break;
     default: break;
   }
 }
@@ -203,7 +208,7 @@ void Declaration::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
   switch (decType) {
     case DecType::FUNCTION:
       func->prettyPrint(tk, str, indentation); break;
-    case DecType::VARIABLEDEC:
+    case DecType::VARIABLE_DEC:
       varDec->prettyPrint(tk, str); break;
     case DecType::TEMPLATE:
       temp->prettyPrint(tk, str, indentation); break;
@@ -223,7 +228,7 @@ void Struct::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) 
   for (uint32_t i = 0; i < decs.size(); ++i) {
     str += std::string(indentation, ' ');
     decs[i].prettyPrint(tk, str, indentation);
-    if (decs[i].decType == DecType::VARIABLEDEC) {
+    if (decs[i].decType == DecType::VARIABLE_DEC) {
       str += ";\n";
     }
   }

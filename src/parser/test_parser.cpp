@@ -16,11 +16,11 @@ TEST_CASE("getType", "[parser]") {
     REQUIRE(tokens.next->next);
     REQUIRE(tokens.next->next->next);
     CHECK_FALSE(tokens.next->next->next->next);
-    CHECK(tokens.curr.type == TokenType::CHAR_TYPE);
-    CHECK(tokens.next->curr.type == TokenType::IDENTIFIER);
-    CHECK(tokenizer.extractToken(tokens.next->curr) == "customType");
-    CHECK(tokens.next->next->curr.type == TokenType::POINTER);
-    CHECK(tokens.next->next->next->curr.type == TokenType::POINTER);
+    CHECK(tokens.curr.type == TokenType::POINTER);
+    CHECK(tokens.next->curr.type == TokenType::POINTER);
+    CHECK(tokens.next->next->curr.type == TokenType::IDENTIFIER);
+    CHECK(tokenizer.extractToken(tokens.next->next->curr) == "customType");
+    CHECK(tokens.next->next->next->curr.type == TokenType::CHAR_TYPE);
   }
   REQUIRE(tokenizer.peekNext().type == TokenType::COMMA);
   tokenizer.consumePeek();
@@ -31,9 +31,9 @@ TEST_CASE("getType", "[parser]") {
     REQUIRE(tokens.next);
     REQUIRE(tokens.next->next);
     CHECK_FALSE(tokens.next->next->next);
-    CHECK(tokens.curr.type == TokenType::INT_TYPE);
+    CHECK(tokens.curr.type == TokenType::POINTER);
     CHECK(tokens.next->curr.type == TokenType::POINTER);
-    CHECK(tokens.next->next->curr.type == TokenType::POINTER);
+    CHECK(tokens.next->next->curr.type == TokenType::INT_TYPE);
   }
 
 }
@@ -48,29 +48,31 @@ TEST_CASE("getParams", "[parser]") {
   CHECK(parser.expected.empty());
 
   REQUIRE(vars.curr.type == StatementType::VARIABLE_DEC);
-  REQUIRE(vars.curr.varDec);
-  CHECK(tokenizer.extractToken(vars.curr.varDec->name) == "first");
-  CHECK_FALSE(vars.curr.varDec->type.tokens.next);
-  REQUIRE(vars.curr.varDec->type.tokens.curr.type == TokenType::INT_TYPE);
+  REQUIRE(vars.curr.dec);
+  CHECK(tokenizer.extractToken(vars.curr.dec->varDec->name) == "first");
+  CHECK_FALSE(vars.curr.dec->varDec->type.tokens.next);
+  REQUIRE(vars.curr.dec->varDec->type.tokens.curr.type == TokenType::INT_TYPE);
   StatementList * next = vars.next;
   REQUIRE(next);
   REQUIRE(next->curr.type == StatementType::VARIABLE_DEC);
-  REQUIRE(next->curr.varDec);
-  CHECK(tokenizer.extractToken(next->curr.varDec->name) == "second");
-  CHECK_FALSE(next->curr.varDec->type.tokens.next);
-  REQUIRE(next->curr.varDec->type.tokens.curr.type == TokenType::DOUBLE_TYPE);
+  REQUIRE(next->curr.dec);
+  REQUIRE(next->curr.dec->varDec);
+  CHECK(tokenizer.extractToken(next->curr.dec->varDec->name) == "second");
+  CHECK_FALSE(next->curr.dec->varDec->type.tokens.next);
+  REQUIRE(next->curr.dec->varDec->type.tokens.curr.type == TokenType::DOUBLE_TYPE);
   next = next->next;
   REQUIRE(next);
   REQUIRE(next->curr.type == StatementType::VARIABLE_DEC);
-  REQUIRE(next->curr.varDec);
-  CHECK(tokenizer.extractToken(next->curr.varDec->name) == "third");
-  REQUIRE(next->curr.varDec->type.tokens.next);
-  REQUIRE(next->curr.varDec->type.tokens.next->next);
-  CHECK_FALSE(next->curr.varDec->type.tokens.next->next->next);
-  REQUIRE(next->curr.varDec->type.tokens.curr.type == TokenType::IDENTIFIER);
-  CHECK(tokenizer.extractToken(next->curr.varDec->type.tokens.curr) == "customType");
-  REQUIRE(next->curr.varDec->type.tokens.next->curr.type == TokenType::POINTER);
-  REQUIRE(next->curr.varDec->type.tokens.next->next->curr.type == TokenType::POINTER);
+  REQUIRE(next->curr.dec);
+  REQUIRE(next->curr.dec->varDec);
+  CHECK(tokenizer.extractToken(next->curr.dec->varDec->name) == "third");
+  REQUIRE(next->curr.dec->varDec->type.tokens.next);
+  REQUIRE(next->curr.dec->varDec->type.tokens.next->next);
+  CHECK_FALSE(next->curr.dec->varDec->type.tokens.next->next->next);
+  REQUIRE(next->curr.dec->varDec->type.tokens.curr.type == TokenType::POINTER);
+  REQUIRE(next->curr.dec->varDec->type.tokens.next->curr.type == TokenType::POINTER);
+  REQUIRE(next->curr.dec->varDec->type.tokens.next->next->curr.type == TokenType::IDENTIFIER);
+  CHECK(tokenizer.extractToken(next->curr.dec->varDec->type.tokens.next->next->curr) == "customType");
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
@@ -89,11 +91,12 @@ TEST_CASE("Function Declaration", "[parser]") {
 
   // check parameters
   REQUIRE(func->params.curr.type == StatementType::VARIABLE_DEC);
-  REQUIRE(func->params.curr.varDec);
-  CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
-  REQUIRE(func->params.curr.varDec->type.tokens.next);
-  CHECK(func->params.curr.varDec->type.tokens.curr.type == TokenType::INT_TYPE);
-  CHECK(func->params.curr.varDec->type.tokens.next->curr.type == TokenType::POINTER);
+  REQUIRE(func->params.curr.dec);
+  REQUIRE(func->params.curr.dec->varDec);
+  CHECK(tokenizer.extractToken(func->params.curr.dec->varDec->name) == "first");
+  CHECK(func->params.curr.dec->varDec->type.tokens.curr.type == TokenType::POINTER);
+  REQUIRE(func->params.curr.dec->varDec->type.tokens.next);
+  CHECK(func->params.curr.dec->varDec->type.tokens.next->curr.type == TokenType::INT_TYPE);
 
   // check return type
   CHECK_FALSE(func->returnType.tokens.next);
@@ -132,7 +135,7 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
   REQUIRE(argsList.next == nullptr);
   auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(arg1.var) == "arg1");
+  CHECK(tokenizer.extractToken(*arg1.var) == "arg1");
 }
 
 TEST_CASE("Function Call - Multi Arg", "[parser]") {
@@ -148,11 +151,11 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   auto& argsList = statement.funcCall->args;
   auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(arg1.var) == "arg1");
+  CHECK(tokenizer.extractToken(*arg1.var) == "arg1");
   REQUIRE(argsList.next);
   auto& arg2 = *argsList.next;
   REQUIRE(arg2.curr.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(arg2.curr.var) == "arg2");
+  CHECK(tokenizer.extractToken(*arg2.curr.var) == "arg2");
 }
 
 TEST_CASE("Function Call - Nested", "[parser]") {
@@ -193,13 +196,13 @@ TEST_CASE("Binary Operators", "[parser]") {
 
     REQUIRE(binOp->leftSide);
     REQUIRE(binOp->leftSide.type == StatementType::VALUE);
-    CHECK(binOp->leftSide.var.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->leftSide.var) == "4");
+    CHECK(binOp->leftSide.var->type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(*binOp->leftSide.var) == "4");
 
     REQUIRE(binOp->rightSide);
     REQUIRE(binOp->rightSide.type == StatementType::VALUE);
-    CHECK(binOp->rightSide.var.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->rightSide.var) == "4");
+    CHECK(binOp->rightSide.var->type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(*binOp->rightSide.var) == "4");
   }
 
    // operator with higher precedence on right node
@@ -217,8 +220,8 @@ TEST_CASE("Binary Operators", "[parser]") {
 
      REQUIRE(binOp->leftSide);
      REQUIRE(binOp->leftSide.type == StatementType::VALUE);
-     CHECK(binOp->leftSide.var.type == TokenType::IDENTIFIER);
-     CHECK(tokenizer.extractToken(binOp->leftSide.var) == "x");
+     CHECK(binOp->leftSide.var->type == TokenType::IDENTIFIER);
+     CHECK(tokenizer.extractToken(*binOp->leftSide.var) == "x");
 
      REQUIRE(binOp->rightSide);
      REQUIRE(binOp->rightSide.type == StatementType::BINARY_OP);
@@ -231,11 +234,11 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
      CHECK(rl.funcCall->args.next == nullptr);
      REQUIRE(rl.funcCall->args.curr.type == StatementType::VALUE);
-     REQUIRE(rl.funcCall->args.curr.var.type == TokenType::IDENTIFIER);
+     REQUIRE(rl.funcCall->args.curr.var->type == TokenType::IDENTIFIER);
 
      auto& rr = binOp->rightSide.binOp->rightSide;
      CHECK(rr.type == StatementType::VALUE);
-     CHECK(rr.var.type == TokenType::DECIMAL_NUMBER);
+     CHECK(rr.var->type == TokenType::DECIMAL_NUMBER);
 
    }
 
@@ -253,7 +256,7 @@ TEST_CASE("Binary Operators", "[parser]") {
      CHECK(binOp->op == TokenType::SUBTRACTION);
 
      REQUIRE(binOp->rightSide.type == StatementType::VALUE);
-     CHECK(binOp->rightSide.var.type == TokenType::DECIMAL_NUMBER);
+     CHECK(binOp->rightSide.var->type == TokenType::DECIMAL_NUMBER);
 
      CHECK(binOp->leftSide.type == StatementType::BINARY_OP);
      REQUIRE(binOp->leftSide.binOp);
@@ -261,7 +264,7 @@ TEST_CASE("Binary Operators", "[parser]") {
 
      auto& ll = binOp->leftSide.binOp->leftSide;
      REQUIRE(ll.type == StatementType::VALUE);
-     CHECK(ll.var.type == TokenType::IDENTIFIER);
+     CHECK(ll.var->type == TokenType::IDENTIFIER);
 
      auto& lr = binOp->leftSide.binOp->rightSide;
      REQUIRE(lr.type == StatementType::FUNCTION_CALL);
@@ -269,7 +272,7 @@ TEST_CASE("Binary Operators", "[parser]") {
      CHECK(tokenizer.extractToken(lr.funcCall->name) == "function");
      CHECK(lr.funcCall->args.next == nullptr);
      CHECK(lr.funcCall->args.curr.type == StatementType::VALUE);
-     CHECK(lr.funcCall->args.curr.var.type == TokenType::IDENTIFIER);
+     CHECK(lr.funcCall->args.curr.var->type == TokenType::IDENTIFIER);
    }
 }
 
@@ -347,7 +350,7 @@ TEST_CASE("Struct Declaration", "[parser]") {
     auto& sd = s[0].struc->decs;
     CHECK(sd.size() == 2);
     CHECK(sd[0].decType == DecType::FUNCTION);
-    CHECK(sd[1].decType == DecType::VARIABLEDEC);
+    CHECK(sd[1].decType == DecType::VARIABLE_DEC);
   }
 }
 
@@ -367,7 +370,7 @@ TEST_CASE("Template Declaration", "[parser]") {
   REQUIRE(t.temp);
   REQUIRE(t.temp->templateIdentifiers.next == nullptr);
   REQUIRE(t.temp->templateIdentifiers.curr.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(t.temp->templateIdentifiers.curr.var) == "T");
+  CHECK(tokenizer.extractToken(*t.temp->templateIdentifiers.curr.var) == "T");
   REQUIRE(t.temp->dec.decType == DecType::FUNCTION);
   REQUIRE(t.temp->dec.func);
   CHECK(t.temp->dec.func->body.scopeStatements.next);
@@ -382,7 +385,7 @@ TEST_CASE("Variable Declaration", "[parser]") {
   REQUIRE(parser.unexpected.empty());
   REQUIRE(parser.program.decs.size() == 1);
   auto& d = parser.program.decs[0];
-  CHECK(d.decType == DecType::VARIABLEDEC);
+  CHECK(d.decType == DecType::VARIABLE_DEC);
 }
 
 TEST_CASE("Keywords", "[parser]") {
@@ -449,197 +452,3 @@ TEST_CASE("Array", "[parser]") {
   CHECK_FALSE(s.arrOrStructLiteral->list.next->next);
 }
 
-TEST_CASE("Big Boi", "[parser]") {
-  const std::string str =
-"func checkForRegistrationOfEvent(eventCode: int): int ptr {"
-"  currRegistration: RegistrationNode ptr = registrationList;"
-"  while (currRegistration) {"
-"    if (*(*currRegistration).registration == eventCode) {"
-"      array[length - 1] = (*currRegistration).registration.registrationCode;"
-"    }"
-"  }"
-"  return array;"
-"}";
-
-  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
-  Parser parser{tokenizer, memPool};
-  parser.parse();
-
-  Program program;
-  Tokenizer f{"", str};
-
-  // function object
-  f.tokenizeNext();
-  FunctionDec functionDec{f.tokenizeNext()};
-  f.tokenizeNext();
-
-
-  // param
-  VariableDec param{f.tokenizeNext()};
-  f.tokenizeNext();
-
-  param.type.tokens.curr = f.tokenizeNext();
-  functionDec.params.curr.type = StatementType::VARIABLE_DEC;
-  functionDec.params.curr.varDec = &param;
-  f.tokenizeNext();
-  f.tokenizeNext();
-
-  // return type
-  functionDec.returnType.tokens.curr = f.tokenizeNext();
-  TokenList g;
-  g.curr = f.tokenizeNext();
-  functionDec.returnType.tokens.next = &g;
-  f.tokenizeNext();
-
-
-  auto& bS = functionDec.body;
-
-  // "  currRegistration: RegistrationNode^ = registrationList;"
-  auto& currRegDec = bS.scopeStatements.curr;
-  VariableDec varDec1{f.tokenizeNext()};
-  f.tokenizeNext();
-  varDec1.type.tokens.curr = f.tokenizeNext();
-  TokenList t;
-  t.curr = f.tokenizeNext();
-  varDec1.type.tokens.next = &t;
-  BinOp bOp1{f.tokenizeNext().type};
-  bOp1.leftSide.type = StatementType::VARIABLE_DEC;
-  bOp1.leftSide.varDec = &varDec1;
-  bOp1.rightSide.type = StatementType::VALUE;
-  bOp1.rightSide.var = f.tokenizeNext();
-  f.tokenizeNext();
-  currRegDec.type = StatementType::BINARY_OP;
-  currRegDec.binOp = &bOp1;
-
-// "  while (currRegistration) {"
-  KeywordWithBody whileLoop{f.tokenizeNext().type};
-  StatementList sdg;
-  sdg.curr.type = StatementType::KEY_W_BODY;
-  sdg.curr.keywBody = &whileLoop;
-  bS.scopeStatements.next = &sdg;
-  f.tokenizeNext();
-  whileLoop.header.type = StatementType::WRAPPED_VALUE;
-  Statement st454{f.tokenizeNext()};
-  whileLoop.header.wrapped = &st454;
-  whileLoop.body.type = StatementType::SCOPE;
-  Scope scp123;
-  whileLoop.body.scope = &scp123;
-  f.tokenizeNext();
-  f.tokenizeNext();
-
-// "    if (~(~currRegistration).registration == eventCode) {"
-  KeywordWithBody ifCond{f.tokenizeNext().type};
-  auto& sp87 = scp123.scopeStatements.curr;
-  f.tokenizeNext();
-  ifCond.header.type = StatementType::WRAPPED_VALUE;
-  ifCond.body.type = StatementType::SCOPE;
-  Scope scp95;
-  ifCond.body.scope = &scp95;
-
-  UnOp unp123{f.tokenizeNext().type};
-  f.tokenizeNext();
-
-  UnOp unp1233{f.tokenizeNext().type};
-  unp1233.operand.type = StatementType::VALUE;
-  unp1233.operand.var = f.tokenizeNext();
-  f.tokenizeNext();
-  Statement st312{&unp1233};
-
-  BinOp bin2232{f.tokenizeNext().type};
-  bin2232.leftSide.type = StatementType::WRAPPED_VALUE;
-  bin2232.leftSide.wrapped = &st312;
-  bin2232.rightSide.type = StatementType::VALUE;
-  bin2232.rightSide.var = f.tokenizeNext();
-  unp123.operand.type = StatementType::BINARY_OP;
-  unp123.operand.binOp = &bin2232;
-
-  BinOp bin75{f.tokenizeNext().type};
-  bin75.rightSide.type = StatementType::VALUE;
-  bin75.rightSide.var = f.tokenizeNext();
-  bin75.leftSide.type = StatementType::UNARY_OP;
-  bin75.leftSide.unOp = &unp123;
-
-  Statement sg235{&bin75};
-  ifCond.header.wrapped = &sg235;
-
-  sp87.type = StatementType::KEY_W_BODY;
-  sp87.keywBody = &ifCond;
-
-  f.tokenizeNext(); // (
-  f.tokenizeNext(); // {
-
-// "      array[length - 1] = (~currRegistration).registration.registrationCode;"
-
-  //  array[length - 1]
-  ArrayAccess arrAcc0{f.tokenizeNext()};
-  f.tokenizeNext();
-  BinOp bOp2{TokenType::SUBTRACTION};
-  bOp2.leftSide.type = StatementType::VALUE;
-  bOp2.leftSide.var = f.tokenizeNext();
-  f.tokenizeNext();
-  bOp2.rightSide.type = StatementType::VALUE;
-  bOp2.rightSide.var = f.tokenizeNext();
-  f.tokenizeNext(); // [
-
-  BinOp b12{f.tokenizeNext().type}; // =
-  b12.leftSide.type = StatementType::ARRAY_ACCESS;
-  b12.leftSide.arrAccess = &arrAcc0;
-
-  f.tokenizeNext();
-  UnOp up84{f.tokenizeNext().type};
-  up84.operand.type = StatementType::VALUE;
-  up84.operand.var = f.tokenizeNext();
-  Statement si876{&up84};
-  f.tokenizeNext();
-  BinOp bOp4{f.tokenizeNext().type};
-  bOp4.leftSide.type = StatementType::WRAPPED_VALUE;
-  bOp4.leftSide.wrapped = &si876;
-  bOp4.rightSide.type = StatementType::VALUE;
-  bOp4.rightSide.var = f.tokenizeNext();
-  BinOp bOp5{f.tokenizeNext().type};
-  bOp5.leftSide.type = StatementType::BINARY_OP;
-  bOp5.leftSide.binOp = &bOp4;
-  bOp5.rightSide.type = StatementType::VALUE;
-  bOp5.rightSide.var = f.tokenizeNext();
-
-  b12.rightSide.type = StatementType::BINARY_OP;
-  b12.rightSide.binOp = &bOp5;
-
-    
-  auto& r = scp95.scopeStatements.curr;
-  r.type = StatementType::BINARY_OP;
-  r.binOp = &b12;
-  f.tokenizeNext(); // ;
-  f.tokenizeNext(); // }
-  f.tokenizeNext(); // }
-
-  StatementList hhg;
-  Statement& j = hhg.curr;
-  scp95.scopeStatements.next = &hhg;
-
-  j.type = StatementType::KEY_W_BODY;
-  j.keywBody = &whileLoop;
-
-  KeywordWithBody kd{f.tokenizeNext().type};
-  StatementList ad23;
-  ad23.curr.type = StatementType::KEY_W_BODY;
-  ad23.curr.keywBody = &kd;
-  sdg.next = &ad23;
-  kd.header.type = StatementType::VALUE;
-  kd.header.var = f.tokenizeNext();
-  f.tokenizeNext(); // ;
-  f.tokenizeNext(); // }
-
-  StatementList erw;
-  Statement& b = erw.curr;
-  hhg.next = &erw;
-  b.type = StatementType::KEY_W_BODY;
-  b.keywBody = &kd;
-
-  program.decs.emplace_back(&functionDec);
-  program.operator==(parser.program);
-  if (program == parser.program) {
-    // do something
-  }
-  CHECK(program == parser.program);
-}

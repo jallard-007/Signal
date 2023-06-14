@@ -6,6 +6,8 @@
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
+  MemPool<Declaration> decs;
+  MemPool<Token> tokens;
   MemPool<VariableDec> varDecs;
   MemPool<FunctionCall> funcCalls;
   MemPool<ArrayAccess> arrayAccesses;
@@ -25,6 +27,8 @@ public:
   void reset() {
     unOps.reset();
     binOps.reset();
+    decs.reset();
+    tokens.reset();
     varDecs.reset();
     funcCalls.reset();
     arrayAccesses.reset();
@@ -43,9 +47,11 @@ public:
 
   UnOp* get(UnOp&& ref) {return unOps.get(std::move(ref));}
   BinOp* get(BinOp&& ref) {return binOps.get(std::move(ref));}
+  Declaration* get(Declaration&& ref) {return decs.get(std::move(ref));}
   VariableDec* get(VariableDec&& ref) {return varDecs.get(std::move(ref));}
   FunctionCall* get(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
   ArrayAccess* get(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
+  Token* get(Token&& ref) {return tokens.get(std::move(ref));}
   Statement* get(Statement&& ref) {return statements.get(std::move(ref));}
   Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
   ArrOrStructLiteral* get(ArrOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
@@ -60,7 +66,9 @@ public:
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
+  void release(Declaration* ptr) { decs.release(ptr);}
   void release(VariableDec* ptr) { varDecs.release(ptr);}
+  void release(Token* ptr) { tokens.release(ptr);}
   void release(FunctionCall* ptr) { funcCalls.release(ptr);}
   void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
   void release(Statement* ptr) { statements.release(ptr);}
