@@ -2,14 +2,13 @@
 #include <iostream>
 
 bool hasData(StatementType type) {
-  return type >= StatementType::BINARY_OP && type <= StatementType::ARRAY_OR_STRUCT_LITERAL;
+  return type >= StatementType::BINARY_OP && type <= StatementType::WRAPPED_VALUE;
 }
 
-Unexpected::Unexpected(Token token, uint32_t line, uint32_t column):
-  token{token}, line{line}, column{column} {}
+Unexpected::Unexpected(Token token): token{token} {}
 
 bool Unexpected::operator==(const Unexpected &ref) const {
-  return ref.column == column && ref.line == line && ref.token == token;
+  return ref.token == token;
 }
 
 Expected::Expected(ExpectedType type, uint32_t line, uint32_t column):
@@ -26,10 +25,18 @@ bool Type::operator==(const Type& tk) const {
   return tk.tokens == tokens;
 }
 
-VariableDec::VariableDec(Token token): type{}, name{token} {}
+VariableDec::VariableDec(Token token): type{}, name{token}, initialAssignment{nullptr} {}
 
 bool VariableDec::operator==(const VariableDec& varDec) const {
-  return name == varDec.name && type == varDec.type;
+  if (!(name == varDec.name) && !(type == varDec.type)) {
+    return false;
+  }
+  if (!initialAssignment && !varDec.initialAssignment) {
+    return true;
+  } else if (!initialAssignment || !varDec.initialAssignment) {
+    return false;
+  }
+  return *initialAssignment == *varDec.initialAssignment;
 }
 
 Statement::Statement(): unOp{nullptr}, type{StatementType::NONE} {}
@@ -58,7 +65,7 @@ void Statement::operator=(Statement&& st) noexcept {
     case StatementType::FOR_LOOP_HEADER:
       list = st.list; st.list = nullptr; break;
     case StatementType::KEY_W_BODY:
-      keywBody = st.keywBody; st.keywBody = nullptr; break;
+      keyWBody = st.keyWBody; st.keyWBody = nullptr; break;
     case StatementType::KEYWORD:
       key = st.key; break;
     case StatementType::VALUE:
@@ -174,6 +181,9 @@ Statement::Statement(BinOp *ptr) {
   type = StatementType::BINARY_OP;
 }
 
+/**
+ * ptr has to point to a declaration which points to a variable declaration, otherwise bad things might happen
+*/
 Statement::Statement(Declaration *ptr) {
   dec = ptr;
   type = StatementType::VARIABLE_DEC;
@@ -205,7 +215,7 @@ Statement::Statement(ArrOrStructLiteral *ptr) {
 }
 
 Statement::Statement(KeywordWithBody *ptr) {
-  keywBody = ptr;
+  keyWBody = ptr;
   type = StatementType::KEY_W_BODY;
 }
 
@@ -236,6 +246,10 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (unOp->operand) {
         return ExpectedType::TOKEN;
       }
+      // bin op, un op, value, funcCall, array access, wrapped
+      if (!hasData(st.type)) {
+        return ExpectedType::BAD;
+      }
       unOp->operand = std::move(st);
       return ExpectedType::NOTHING;
 
@@ -243,23 +257,45 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (binOp->rightSide) {
         return ExpectedType::TOKEN;
       }
-
+      // bin op, un op, value, funcCall, array access, wrapped
+      if (!hasData(st.type)) {
+        return ExpectedType::BAD;
+      }
       binOp->rightSide = std::move(st);
       return ExpectedType::NOTHING;
 
     case StatementType::KEY_W_BODY:
-      if (keywBody->body) {
+      if (keyWBody->body) {
+        return ExpectedType::BAD;
+      }
+      if (!keyWBody->header && keyWBody->keyword.type != TokenType::ELSE) {
+        if (keyWBody->keyword.type == TokenType::FOR) {
+          if (st.type == StatementType::FOR_LOOP_HEADER) {
+            keyWBody->header = std::move(st);
+            return ExpectedType::NOTHING;
+          } else {
+            return ExpectedType::FOR_LOOP_HEADER;
+          }
+        }
+        else if (hasData(st.type)) {
+          keyWBody->header = std::move(st);
+          return ExpectedType::NOTHING;
+        } else if (st.type == StatementType::ARRAY_OR_STRUCT_LITERAL && keyWBody->keyword.type == TokenType::RETURN) {
+          keyWBody->header = std::move(st);
+          return ExpectedType::NOTHING;
+        } else {
+          return ExpectedType::EXPRESSION;
+        }
+      }
+      if (keyWBody->keyword.type == TokenType::RETURN) {
         return ExpectedType::TOKEN;
       }
-      if ((hasData(st.type) || st.type == StatementType::FOR_LOOP_HEADER) && !keywBody->header) {
-        keywBody->header = std::move(st);
+      if (st.type == StatementType::SCOPE) {
+        keyWBody->body.scopeStatements.curr = std::move( st.scope->scopeStatements.curr);
+        keyWBody->body.scopeStatements.next = st.scope->scopeStatements.next;
         return ExpectedType::NOTHING;
       }
-      else if (st.type == StatementType::SCOPE && keywBody->keyword != TokenType::RETURN) {
-        keywBody->body = std::move(st);
-        return ExpectedType::NOTHING;
-      }
-      return ExpectedType::TOKEN;
+      return ExpectedType::SCOPE;
 
     default:
       return ExpectedType::TOKEN;
@@ -278,16 +314,19 @@ ExpectedType Statement::isValid() const {
         return ExpectedType::EXPRESSION;
       }
       break;
+    case StatementType::KEY_W_BODY: {
+      // if, elif, while, for, switch
+    }
     default:
       break;
   }
   return ExpectedType::NOTHING;
 }
 
-KeywordWithBody::KeywordWithBody(TokenType type): body{}, header{}, keyword{type} {}
+KeywordWithBody::KeywordWithBody(Token token): body{}, header{}, keyword{token} {}
 
 KeywordWithBody::KeywordWithBody(KeywordWithBody&& rval): body{std::move(rval.body)}, header{std::move(rval.header)}, keyword{rval.keyword} {
-  rval.keyword = TokenType::NOTHING;
+  rval.keyword.type = TokenType::NOTHING;
 }
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}
@@ -300,14 +339,14 @@ bool Scope::operator==(const Scope& sp) const {
   return sp.scopeStatements == scopeStatements;
 }
 
-BinOp::BinOp(TokenType op): leftSide{}, rightSide{}, resultType{}, op{op} {}
+BinOp::BinOp(Token op): leftSide{}, rightSide{}, op{op} {}
 
-BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, resultType{}, op{binOp.op} {
-  binOp.op = TokenType::NOTHING;
+BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {
+  binOp.op.type = TokenType::NOTHING;
 }
 
 bool BinOp::operator==(const BinOp& bo) const {
-  if (op != bo.op) {
+  if (!(op == bo.op)) {
     return false;
   }
   // short circuit right side
@@ -333,7 +372,7 @@ bool BinOp::operator==(const BinOp& bo) const {
   return true;
 }
 
-UnOp::UnOp(TokenType op): op{op} {}
+UnOp::UnOp(Token op): op{op} {}
 
 UnOp::UnOp(UnOp&& unOp) noexcept : operand{std::move(unOp.operand)} , op{unOp.op} {}
 
@@ -476,7 +515,7 @@ bool Program::operator==(const Program& ref) const {
 }
 
 bool KeywordWithBody::operator==(const KeywordWithBody& ref) const {
-  if (ref.keyword != keyword) {
+  if (!(ref.keyword == keyword)) {
     return false;
   }
   if (ref.body && body) {
@@ -542,16 +581,28 @@ bool StatementList::operator==(const StatementList& ref) const {
 StatementList::StatementList(): curr{}, next{} {}
 
 std::string Expected::getErrorMessage(const std::string& file) {
+  std::string message = file + ':' + std::to_string(line) + ':' + std::to_string(column) + '\n';
   if (expectedType == ExpectedType::TOKEN) {
-    return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
-    "\nExpected token: " + typeToString.at(this->tokenType) + '\n';
-  } else {
-    return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
-    "\nExpected expression\n";
+    if (tokenType == TokenType::IDENTIFIER) {
+      return message + "\nExpected Identifier\n";
+    }
+    return message + "\nExpected Token: " + typeToString.at(tokenType) + '\n';
+  } else if (expectedType == ExpectedType::EXPRESSION) {
+    return message + "\nExpected Expression\n";
+  } else if (expectedType == ExpectedType::SCOPE) {
+    return message + "\nExpected Scope\n";
   }
+  return message;
 }
 
 std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
-  return file + ":" + std::to_string(line) + ":" + std::to_string(column) +
+  return file + ":" + std::to_string(token.lineNum) + ":" + std::to_string(token.linePos) +
   "\nUnexpected token: " + tk.extractToken(token) + '\n';
+}
+
+StatementList::operator bool() const {
+  return curr.type != StatementType::NONE;
+}
+Scope::operator bool() const {
+  return scopeStatements;
 }

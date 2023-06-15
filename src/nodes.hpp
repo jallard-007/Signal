@@ -6,18 +6,19 @@
 
 struct Unexpected {
   Token token;
-  uint32_t line;
-  uint32_t column;
   Unexpected() = delete;
-  Unexpected(Token, uint32_t, uint32_t);
+  Unexpected(Token);
   bool operator==(const Unexpected&) const;
   std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
 enum class ExpectedType : uint8_t {
   NOTHING,
+  BAD,
   EXPRESSION,
+  FOR_LOOP_HEADER,
   TOKEN,
+  SCOPE,
 };
 
 struct Expected {
@@ -50,16 +51,6 @@ struct Type {
   void prettyPrint(Tokenizer&, std::string&);
 };
 
-struct VariableDec {
-  Type type;
-  Token name;
-  VariableDec() = delete;
-  explicit VariableDec(Token);
-  VariableDec(VariableDec&&) = default;
-  bool operator==(const VariableDec&) const;
-  void prettyPrint(Tokenizer&, std::string&);
-};
-
 typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
@@ -69,6 +60,7 @@ typedef struct ForLoopHeader ForLoopHeader;
 typedef struct ArrOrStructLiteral ArrOrStructLiteral;
 typedef struct KeywordWithBody KeywordWithBody;
 typedef struct Declaration Declaration;
+typedef struct VariableDec VariableDec;
 
 enum class StatementType: uint8_t {
   NONE,
@@ -76,10 +68,10 @@ enum class StatementType: uint8_t {
   BINARY_OP,
   UNARY_OP,
   VALUE,
-  VARIABLE_DEC,
   FUNCTION_CALL,
   ARRAY_ACCESS,
   WRAPPED_VALUE,
+  VARIABLE_DEC,
   ARRAY_OR_STRUCT_LITERAL,
   FOR_LOOP_HEADER,
   SCOPE,
@@ -98,7 +90,7 @@ struct Statement {
     Scope *scope;
     ArrOrStructLiteral *arrOrStructLiteral;
     ForLoopHeader *list;
-    KeywordWithBody *keywBody;
+    KeywordWithBody *keyWBody;
     Token *var;
     TokenType key;
   };
@@ -137,26 +129,27 @@ struct StatementList {
   StatementList(StatementList&&) = default;
   ~StatementList() = default;
   bool operator==(const StatementList&) const;
+  operator bool() const;
 };
 
 bool hasData(StatementType);
+
+struct VariableDec {
+  Type type;
+  Token name;
+  Statement *initialAssignment;
+  VariableDec() = delete;
+  explicit VariableDec(Token);
+  VariableDec(VariableDec&&) = default;
+  bool operator==(const VariableDec&) const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
 
 struct ArrOrStructLiteral {
   StatementList list;
   ArrOrStructLiteral() = default;
   ArrOrStructLiteral(ArrOrStructLiteral&&) = default;
   bool operator==(const ArrOrStructLiteral&) const;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-};
-
-struct KeywordWithBody {
-  Statement body;
-  Statement header;
-  TokenType keyword;
-  KeywordWithBody() = delete;
-  KeywordWithBody(TokenType);
-  KeywordWithBody(KeywordWithBody&&);
-  bool operator==(const KeywordWithBody&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -172,6 +165,18 @@ struct Scope {
   StatementList scopeStatements;
   Scope() = default;
   bool operator==(const Scope&) const;
+  operator bool() const;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+struct KeywordWithBody {
+  Scope body;
+  Statement header;
+  Token keyword;
+  KeywordWithBody() = delete;
+  KeywordWithBody(Token);
+  KeywordWithBody(KeywordWithBody&&);
+  bool operator==(const KeywordWithBody&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -188,9 +193,8 @@ struct ArrayAccess {
 struct BinOp {
   Statement leftSide;
   Statement rightSide;
-  Type *resultType;
-  TokenType op;
-  explicit BinOp(TokenType);
+  Token op;
+  explicit BinOp(Token);
   BinOp(const BinOp&) = delete;
   BinOp(BinOp&&) noexcept;
   bool operator==(const BinOp&) const;
@@ -199,8 +203,8 @@ struct BinOp {
 
 struct UnOp {
   Statement operand;
-  TokenType op;
-  explicit UnOp(TokenType);
+  Token op;
+  explicit UnOp(Token);
   UnOp(const UnOp&) = delete;
   UnOp(UnOp&&) noexcept;
   bool operator==(const UnOp&) const;
@@ -258,6 +262,7 @@ struct Declaration {
     Enum *enm;
   };
   DecType decType;
+  bool isValid;
   Declaration();
   Declaration(Declaration&&) noexcept;
   explicit Declaration(FunctionDec *);
@@ -279,7 +284,7 @@ struct Struct {
 };
 
 struct Template {
-  StatementList templateIdentifiers;
+  TokenList templateIdentifiers;
   Declaration dec;
   Template() = default;
   Template(const Template&) = delete;

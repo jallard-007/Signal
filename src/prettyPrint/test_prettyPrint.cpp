@@ -55,6 +55,8 @@ R"(func getType(type: Type ref): Token {
   Tokenizer tokenizer{"./src/prettyPrint/test_prettyPrint.cpp",  str};
   Parser parser{tokenizer, memPool2};
   parser.parse();
+  REQUIRE(parser.expected.empty());
+  REQUIRE(parser.unexpected.empty());
   std::string output;
   parser.program.prettyPrint(tokenizer, output);
   CHECK(str == output);

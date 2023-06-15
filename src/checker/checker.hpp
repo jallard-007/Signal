@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../nodes.hpp"
+#include "../nodeMemPool.hpp"
 #include <map>
 
 enum class CheckerErrorType {
@@ -11,6 +12,7 @@ enum class CheckerErrorType {
   VOID_TYPE,
   TYPE_DOES_NOT_MATCH,
   EXPECTING_N_ARGS,
+  UNEXPECTED_TYPE,
 
   // no such
   NO_SUCH_FUNCTION,
@@ -38,6 +40,7 @@ enum class CheckerErrorType {
   NOT_A_VARIABLE,
   NOT_A_FUNCTION,
 
+  WRONG_NUMBER_OF_ARGS,
 
   MISSING_TYPE,
 
@@ -47,12 +50,13 @@ enum class CheckerErrorType {
 };
 
 struct CheckerError {
-  const Token &token;
+  Token *token;
   CheckerErrorType type;
   Declaration *dec;
   CheckerError() = delete;
-  CheckerError(CheckerErrorType, const Token &);
-  CheckerError(CheckerErrorType, const Token &, Declaration*);
+  CheckerError(CheckerErrorType, Token *);
+  CheckerError(CheckerErrorType, Statement *, Declaration*);
+  CheckerError(CheckerErrorType, Token *, Declaration*);
 };
 
 struct Checker {
@@ -61,21 +65,25 @@ struct Checker {
   std::vector<CheckerError> errors;
   Program& program;
   Tokenizer& tokenizer;
-  const TokenList boolValue {Token{0,0,TokenType::BOOL}};
-  const TokenList intValue {Token{0,0,TokenType::INT_TYPE}};
-  const TokenList charValue {Token{0,0,TokenType::CHAR_TYPE}};
-  const TokenList stringValue {Token{0,0,TokenType::STRING_LITERAL}};
-  const TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
-  const TokenList pointerValue {Token{0,0,TokenType::POINTER}};
+  NodeMemPool &memPool;
+  TokenList boolValue {Token{0,0,TokenType::BOOL}};
+  TokenList intValue {Token{0,0,TokenType::INT_TYPE}};
+  TokenList charValue {Token{0,0,TokenType::CHAR_TYPE}};
+  TokenList stringValue {Token{0,0,TokenType::STRING_LITERAL}};
+  TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
+  TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
 
-  Checker(Program&, Tokenizer&);
+  Checker(Program&, Tokenizer&, NodeMemPool &);
   
-  void scanTopLevel();
+  void firstTopLevelScan();
+  void secondTopLevelScan();
 
   bool checkFunction(FunctionDec&);
+  bool validateFunctionHeader(FunctionDec&);
+  
   bool checkScope(Scope&, std::vector<std::string>&, Type&, bool, bool, bool);
 
-  const TokenList *checkStatement(Statement&);
+  TokenList *checkStatement(Statement&);
 
   bool checkType(Type&);
 };

@@ -11,8 +11,8 @@ TEST_CASE("scanTopLevel", "[checker]") {
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk};
-  tc.scanTopLevel();
+  Checker tc{pr.program, tk, mem3};
+  tc.firstTopLevelScan();
   CHECK(tc.errors.empty());
   CHECK(tc.lookUp["funcName"]);
   CHECK(tc.lookUp["var"]);
@@ -30,26 +30,27 @@ TEST_CASE("checkType", "[checker]") {
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk};
-  tc.scanTopLevel();
+  Checker tc{pr.program, tk, mem3};
+  tc.firstTopLevelScan();
   {
-    Type isAType;
-    isAType.tokens.curr.length = 5;
-    isAType.tokens.curr.position = 7;
-    isAType.tokens.curr.type = TokenType::IDENTIFIER;
-    CHECK(tc.checkType(isAType));
-    TokenList nextType;
-    isAType.tokens.next = &nextType;
-    nextType.curr.type = TokenType::POINTER;
-    CHECK(tc.checkType(isAType));
-    TokenList nextNextType;
-    nextType.next = &nextNextType;
-    nextNextType.curr.type = TokenType::REFERENCE;
-    CHECK(tc.checkType(isAType));
-    TokenList nextNextNextType;
-    nextNextType.next = &nextNextNextType;
-    nextNextNextType.curr.type = TokenType::POINTER;
-    CHECK_FALSE(tc.checkType(isAType));
+    Type typeList;
+    TokenList type;
+    typeList.tokens.curr.length = 5;
+    typeList.tokens.curr.position = 7;
+    typeList.tokens.curr.type = TokenType::IDENTIFIER;
+    CHECK(tc.checkType(typeList));
+    TokenList nextType = std::move(typeList.tokens);
+    typeList.tokens.next = &nextType;
+    typeList.tokens.curr.type = TokenType::POINTER;
+    CHECK(tc.checkType(typeList));
+    TokenList nextNextType = std::move(typeList.tokens);
+    typeList.tokens.next = &nextNextType;
+    typeList.tokens.curr.type = TokenType::REFERENCE;
+    CHECK(tc.checkType(typeList));
+    TokenList nextNextNextType = std::move(typeList.tokens);
+    typeList.tokens.next = &nextNextNextType;
+    typeList.tokens.curr.type = TokenType::POINTER;
+    CHECK_FALSE(tc.checkType(typeList));
   }
 
   {

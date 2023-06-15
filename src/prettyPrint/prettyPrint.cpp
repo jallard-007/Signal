@@ -24,9 +24,13 @@ void Type::prettyPrint(Tokenizer& tk, std::string& str) {
   }
 }
 
-void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
+void VariableDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += tk.extractToken(name) + ": ";
   type.prettyPrint(tk, str);
+  if (initialAssignment) {
+    str += " = ";
+    initialAssignment->prettyPrint(tk, str, indentation);
+  }
 }
 
 void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
@@ -56,7 +60,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     case StatementType::FOR_LOOP_HEADER:
       list->prettyPrint(tk, str, indentation); break;
     case StatementType::KEY_W_BODY:
-      keywBody->prettyPrint(tk, str, indentation); break;
+      keyWBody->prettyPrint(tk, str, indentation); break;
     case StatementType::KEYWORD:
       str += typeToString.at(key); break;
     case StatementType::VALUE:
@@ -66,18 +70,18 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
 }
 
 void UnOp::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  if (op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX) {
+  if (op.type == TokenType::DECREMENT_POSTFIX || op.type == TokenType::INCREMENT_POSTFIX) {
     operand.prettyPrint(tk, str, indentation);
-    str += typeToString.at(op);
+    str += typeToString.at(op.type);
   } else {
-    str += typeToString.at(op);
+    str += typeToString.at(op.type);
     operand.prettyPrint(tk, str, indentation);
   }
 }
 
 void BinOp::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation ) {
   leftSide.prettyPrint(tk, str, indentation);
-  str += typeToString.at(op);
+  str += typeToString.at(op.type);
   rightSide.prettyPrint(tk, str, indentation);
 }
 
@@ -111,7 +115,7 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
     for (StatementList * iter = &scopeStatements; iter; iter = iter->next) {
       str += std::string(indentation, ' ');
       iter->curr.prettyPrint(tk, str, indentation);
-      if (iter->curr.type != StatementType::SCOPE && !(iter->curr.type == StatementType::KEY_W_BODY && iter->curr.keywBody->keyword != TokenType::RETURN)) {
+      if (iter->curr.type != StatementType::SCOPE && !(iter->curr.type == StatementType::KEY_W_BODY && iter->curr.keyWBody->keyword.type != TokenType::RETURN)) {
         str += ";\n";
       }
     }
@@ -139,17 +143,19 @@ void ForLoopHeader::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indent
 }
 
 void KeywordWithBody::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  str += typeToString.at(keyword);
-  if (keyword == TokenType::RETURN) {
+  str += typeToString.at(keyword.type);
+  if (keyword.type == TokenType::RETURN) {
     if (header.type != StatementType::NONE) {
       str += ' ';
     }
   }
   header.prettyPrint(tk, str, indentation);
-  if (keyword == TokenType::IF || keyword == TokenType::FOR || keyword == TokenType::ELIF || keyword == TokenType::WHILE) {
+  if (keyword.type == TokenType::IF || keyword.type == TokenType::FOR || keyword.type == TokenType::ELIF || keyword.type == TokenType::WHILE) {
     str += ' ';
   }
-  body.prettyPrint(tk, str, indentation);
+  if (keyword.type != TokenType::RETURN) {
+    body.prettyPrint(tk, str, indentation);
+  }
 }
 
 void ArrOrStructLiteral::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
@@ -209,7 +215,7 @@ void Declaration::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
     case DecType::FUNCTION:
       func->prettyPrint(tk, str, indentation); break;
     case DecType::VARIABLE_DEC:
-      varDec->prettyPrint(tk, str); break;
+      varDec->prettyPrint(tk, str, indentation); break;
     case DecType::TEMPLATE:
       temp->prettyPrint(tk, str, indentation); break;
     case DecType::STRUCT:
@@ -240,13 +246,13 @@ void Struct::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) 
 void Template::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::TEMPLATE);
   str += '[';
-  if (templateIdentifiers.curr.type != StatementType::NONE) {
-    StatementList * iter = &templateIdentifiers;
+  if (templateIdentifiers.curr.type != TokenType::NOTHING) {
+    TokenList * iter = &templateIdentifiers;
     for (; iter->next; iter = iter->next) {
-      iter->curr.prettyPrint(tk, str, indentation);
+      str += tk.extractToken(iter->curr);
       str += ", ";
     }
-    iter->curr.prettyPrint(tk, str, indentation);
+    str += tk.extractToken(iter->curr);
   }
   str += "] ";
   dec.prettyPrint(tk, str, indentation);

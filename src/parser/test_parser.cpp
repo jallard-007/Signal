@@ -192,7 +192,7 @@ TEST_CASE("Binary Operators", "[parser]") {
     REQUIRE(statement.type == StatementType::BINARY_OP);
     auto &binOp = statement.binOp;
     REQUIRE(binOp);
-    CHECK(binOp->op == TokenType::ADDITION);
+    CHECK(binOp->op.type == TokenType::ADDITION);
 
     REQUIRE(binOp->leftSide);
     REQUIRE(binOp->leftSide.type == StatementType::VALUE);
@@ -216,7 +216,7 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(statement.type == StatementType::BINARY_OP);
      auto &binOp = statement.binOp;
      REQUIRE(binOp);
-     CHECK(binOp->op == TokenType::SUBTRACTION);
+     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
      REQUIRE(binOp->leftSide);
      REQUIRE(binOp->leftSide.type == StatementType::VALUE);
@@ -226,7 +226,7 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(binOp->rightSide);
      REQUIRE(binOp->rightSide.type == StatementType::BINARY_OP);
      REQUIRE(binOp->rightSide.binOp);
-     CHECK(binOp->rightSide.binOp->op == TokenType::MULTIPLICATION);
+     CHECK(binOp->rightSide.binOp->op.type == TokenType::MULTIPLICATION);
 
      auto& rl = binOp->rightSide.binOp->leftSide;
      REQUIRE(rl.type == StatementType::FUNCTION_CALL);
@@ -253,14 +253,14 @@ TEST_CASE("Binary Operators", "[parser]") {
      REQUIRE(statement.type == StatementType::BINARY_OP);
      auto &binOp = statement.binOp;
      REQUIRE(binOp);
-     CHECK(binOp->op == TokenType::SUBTRACTION);
+     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
      REQUIRE(binOp->rightSide.type == StatementType::VALUE);
      CHECK(binOp->rightSide.var->type == TokenType::DECIMAL_NUMBER);
 
      CHECK(binOp->leftSide.type == StatementType::BINARY_OP);
      REQUIRE(binOp->leftSide.binOp);
-     CHECK(binOp->leftSide.binOp->op == TokenType::MULTIPLICATION);
+     CHECK(binOp->leftSide.binOp->op.type == TokenType::MULTIPLICATION);
 
      auto& ll = binOp->leftSide.binOp->leftSide;
      REQUIRE(ll.type == StatementType::VALUE);
@@ -276,20 +276,8 @@ TEST_CASE("Binary Operators", "[parser]") {
    }
 }
 
-TEST_CASE("Expected tokens", "[parser]") {
-  {
-    const std::string str = " x var - 9;";
-    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
-    Parser parser{tokenizer, memPool};
-    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
-    REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].line == 1);
-    CHECK(parser.expected[0].column == 4);
-    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
-    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-  }
-
-  {
+TEST_CASE("Expected tokens/expressions", "[parser]") {
+  { // missing semicolon
     const std::string str = " var - 9 thing() ; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
@@ -300,7 +288,7 @@ TEST_CASE("Expected tokens", "[parser]") {
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
-  {
+  { // missing part of expression
     const std::string str = " var - ; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
@@ -310,21 +298,99 @@ TEST_CASE("Expected tokens", "[parser]") {
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
-  {
-    const std::string str = "\n\n x + () \n4 ;";
+  { // missing expression for keyword
+    const std::string str = " if () { do.something(); } ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
-    
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 6);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing parentheses for keyword
+    const std::string str = " if { do.something(); } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 5);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // empty paren in expression
+    const std::string str = "x + ();";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     auto& ex = parser.expected;
-    REQUIRE(ex.size() == 2);
+    REQUIRE(ex.size() == 1);
     CHECK(ex[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(ex[0].line == 3);
-    CHECK(ex[0].column == 7);
-    CHECK(ex[1].expectedType == ExpectedType::TOKEN);
-    CHECK(ex[1].line == 4);
-    CHECK(ex[1].column == 1);
-    CHECK(ex[1].tokenType == TokenType::SEMICOLON);
+    CHECK(ex[0].column == 6);
+  }
+
+  { // missing colon
+    const std::string str = " thing ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].tokenType == TokenType::COLON);
+  }
+
+  { // missing type
+    const std::string str = " thing: ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+  }
+
+  { // missing type in template
+    const std::string str = "template [] struct thingTemplate { var:int; }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].column == 11);
+    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+  }
+
+  { // dangling comma in template type
+    const std::string str = "template [ T , ] struct thingTemplate { var:int; }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].column == 16);
+    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+  }
+
+  { // leading comma in template type
+    const std::string str = "template [ , T ] struct thingTemplate { var:int; }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].column == 12);
+    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+  }
+
+  { // missing comma in template type
+    const std::string str = "template [ T T ] struct thingTemplate { var:int; }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].column == 14);
+    CHECK(parser.expected[0].tokenType == TokenType::COMMA);
   }
 }
 
@@ -369,8 +435,7 @@ TEST_CASE("Template Declaration", "[parser]") {
   REQUIRE(t.decType == DecType::TEMPLATE);
   REQUIRE(t.temp);
   REQUIRE(t.temp->templateIdentifiers.next == nullptr);
-  REQUIRE(t.temp->templateIdentifiers.curr.type == StatementType::VALUE);
-  CHECK(tokenizer.extractToken(*t.temp->templateIdentifiers.curr.var) == "T");
+  CHECK(tokenizer.extractToken(t.temp->templateIdentifiers.curr) == "T");
   REQUIRE(t.temp->dec.decType == DecType::FUNCTION);
   REQUIRE(t.temp->dec.func);
   CHECK(t.temp->dec.func->body.scopeStatements.next);
@@ -397,13 +462,11 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
     CHECK(s.type == StatementType::KEY_W_BODY);
-    REQUIRE(s.keywBody);
-    CHECK(s.keywBody->keyword == TokenType::IF);
-    CHECK(s.keywBody->header.type == StatementType::WRAPPED_VALUE);
-    REQUIRE(s.keywBody->header.wrapped);
-    CHECK(s.keywBody->header.wrapped->type == StatementType::VALUE);
-    REQUIRE(s.keywBody->body);
-    CHECK(s.keywBody->body.type == StatementType::SCOPE);
+    REQUIRE(s.keyWBody);
+    CHECK(s.keyWBody->keyword.type == TokenType::IF);
+    CHECK(s.keyWBody->header.type == StatementType::WRAPPED_VALUE);
+    REQUIRE(s.keyWBody->header.wrapped);
+    CHECK(s.keyWBody->header.wrapped->type == StatementType::VALUE);
   }
 
   {
@@ -414,13 +477,13 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
     CHECK(s.type == StatementType::KEY_W_BODY);
-    REQUIRE(s.keywBody);
-    CHECK(s.keywBody->keyword == TokenType::RETURN);
-    REQUIRE(s.keywBody->header);
-    CHECK(s.keywBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
-    REQUIRE(s.keywBody->header.arrOrStructLiteral);
-    CHECK(s.keywBody->header.arrOrStructLiteral->list.next);
-    REQUIRE(!s.keywBody->body);
+    REQUIRE(s.keyWBody);
+    CHECK(s.keyWBody->keyword.type == TokenType::RETURN);
+    REQUIRE(s.keyWBody->header);
+    CHECK(s.keyWBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
+    REQUIRE(s.keyWBody->header.arrOrStructLiteral);
+    CHECK(s.keyWBody->header.arrOrStructLiteral->list.next);
+    REQUIRE(!s.keyWBody->body);
   }
 
   {
@@ -431,12 +494,12 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(parser.expected.empty());
     CHECK(parser.unexpected.empty());
     REQUIRE(s.type == StatementType::KEY_W_BODY);
-    REQUIRE(s.keywBody);
-    CHECK(s.keywBody->keyword == TokenType::FOR);
-    REQUIRE(s.keywBody->header.type == StatementType::FOR_LOOP_HEADER);
-    REQUIRE(s.keywBody->header.list);
-    REQUIRE(s.keywBody->header.list->list.next);
-    CHECK(s.keywBody->header.list->list.next->next);
+    REQUIRE(s.keyWBody);
+    CHECK(s.keyWBody->keyword.type == TokenType::FOR);
+    REQUIRE(s.keyWBody->header.type == StatementType::FOR_LOOP_HEADER);
+    REQUIRE(s.keyWBody->header.list);
+    REQUIRE(s.keyWBody->header.list->list.next);
+    CHECK(s.keyWBody->header.list->list.next->next);
   }
 }
 
@@ -452,3 +515,6 @@ TEST_CASE("Array", "[parser]") {
   CHECK_FALSE(s.arrOrStructLiteral->list.next->next);
 }
 
+TEST_CASE("types", "[parser]") {
+
+}
