@@ -5,6 +5,7 @@
 #include "../token.hpp"
 
 struct Tokenizer {
+  std::vector<Token> badTokens;
   const std::string& filePath;
   const std::string& content;
   Token peeked;

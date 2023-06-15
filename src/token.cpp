@@ -24,8 +24,8 @@ bool isKeywordWithBody(TokenType type) {
   return type >= TokenType::IF && type <= TokenType::WHILE;
 }
 
-bool isTypeDelimiter(TokenType type) {
-  return type != TokenType::IDENTIFIER && !isBuiltInType(type);
+bool isConcreteType(TokenType type) {
+  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::DOUBLE_TYPE);
 }
 
 bool isLogicalOp(TokenType type) {

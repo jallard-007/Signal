@@ -8,7 +8,6 @@ struct Unexpected {
   Token token;
   Unexpected() = delete;
   Unexpected(Token);
-  bool operator==(const Unexpected&) const;
   std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
@@ -29,7 +28,6 @@ struct Expected {
   Expected() = delete;
   Expected(ExpectedType, uint32_t, uint32_t);
   Expected(ExpectedType, uint32_t, uint32_t, TokenType);
-  bool operator==(const Expected&) const;
   std::string getErrorMessage(const std::string&);
 };
 
@@ -47,7 +45,6 @@ struct Type {
   TokenList tokens;
   Type() = default;
   Type(Type&&) = default;
-  bool operator==(const Type&) const;
   void prettyPrint(Tokenizer&, std::string&);
 };
 
@@ -64,7 +61,7 @@ typedef struct VariableDec VariableDec;
 
 enum class StatementType: uint8_t {
   NONE,
-  BAD,
+  SET,
   BINARY_OP,
   UNARY_OP,
   VALUE,
@@ -113,7 +110,6 @@ struct Statement {
   explicit Statement(Token *);
   void operator=(Statement&&) noexcept;
   void operator=(const Statement&) = delete;
-  bool operator==(const Statement&) const;
   explicit operator bool() const;
 
   ExpectedType addStatementToNode(Statement&&);
@@ -128,7 +124,6 @@ struct StatementList {
   StatementList();
   StatementList(StatementList&&) = default;
   ~StatementList() = default;
-  bool operator==(const StatementList&) const;
   operator bool() const;
 };
 
@@ -141,7 +136,6 @@ struct VariableDec {
   VariableDec() = delete;
   explicit VariableDec(Token);
   VariableDec(VariableDec&&) = default;
-  bool operator==(const VariableDec&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -149,14 +143,12 @@ struct ArrOrStructLiteral {
   StatementList list;
   ArrOrStructLiteral() = default;
   ArrOrStructLiteral(ArrOrStructLiteral&&) = default;
-  bool operator==(const ArrOrStructLiteral&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 struct ForLoopHeader {
   StatementList list;
   ForLoopHeader() = default;
-  bool operator==(const ForLoopHeader&) const;
   ForLoopHeader(ForLoopHeader&&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
@@ -164,7 +156,6 @@ struct ForLoopHeader {
 struct Scope {
   StatementList scopeStatements;
   Scope() = default;
-  bool operator==(const Scope&) const;
   operator bool() const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
@@ -173,10 +164,10 @@ struct KeywordWithBody {
   Scope body;
   Statement header;
   Token keyword;
+  bool isValid;
   KeywordWithBody() = delete;
   KeywordWithBody(Token);
   KeywordWithBody(KeywordWithBody&&);
-  bool operator==(const KeywordWithBody&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -186,7 +177,6 @@ struct ArrayAccess {
 
   ArrayAccess() = delete;
   explicit ArrayAccess(Token);
-  bool operator==(const ArrayAccess&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -197,7 +187,6 @@ struct BinOp {
   explicit BinOp(Token);
   BinOp(const BinOp&) = delete;
   BinOp(BinOp&&) noexcept;
-  bool operator==(const BinOp&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -207,7 +196,6 @@ struct UnOp {
   explicit UnOp(Token);
   UnOp(const UnOp&) = delete;
   UnOp(UnOp&&) noexcept;
-  bool operator==(const UnOp&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -216,7 +204,6 @@ struct FunctionCall {
   Token name;
   FunctionCall() = delete;
   explicit FunctionCall(Token);
-  bool operator==(const FunctionCall&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -225,7 +212,6 @@ struct Enum {
   std::vector<Token> members;
   Token name;
   Enum();
-  bool operator==(const Enum&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -237,7 +223,6 @@ struct FunctionDec {
   FunctionDec() = delete;
   explicit FunctionDec(Token);
   FunctionDec(FunctionDec&&);
-  bool operator==(const FunctionDec&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -270,7 +255,6 @@ struct Declaration {
   explicit Declaration(Template *);
   explicit Declaration(Struct *);
   explicit Declaration(Enum *);
-  bool operator==(const Declaration&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -279,7 +263,6 @@ struct Struct {
   Token name;
   Struct(Token);
   Struct(Struct&&) = default;
-  bool operator==(const Struct&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -289,7 +272,6 @@ struct Template {
   Template() = default;
   Template(const Template&) = delete;
   Template(Template&&) = default;
-  bool operator==(const Template&) const;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -298,6 +280,5 @@ struct Program {
   std::vector<Declaration> decs;
   Program() = default;
   Program(Program&&) noexcept;
-  bool operator==(const Program&) const;
   void prettyPrint(Tokenizer&, std::string&);
 };

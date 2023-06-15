@@ -10,3 +10,4 @@ Makefile
 !CMakeLists.txt
 Testing
 gmon.out
+coverage

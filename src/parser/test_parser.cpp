@@ -5,7 +5,7 @@
 NodeMemPool memPool;
 
 TEST_CASE("getType", "[parser]") {
-  const std::string str = " char customType ptr ptr , int ptr ptr )";
+  const std::string str = " char ptr ptr , int ptr ptr )";
   Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   {
@@ -14,13 +14,10 @@ TEST_CASE("getType", "[parser]") {
     auto& tokens = type.tokens;
     REQUIRE(tokens.next);
     REQUIRE(tokens.next->next);
-    REQUIRE(tokens.next->next->next);
-    CHECK_FALSE(tokens.next->next->next->next);
+    CHECK_FALSE(tokens.next->next->next);
     CHECK(tokens.curr.type == TokenType::POINTER);
     CHECK(tokens.next->curr.type == TokenType::POINTER);
-    CHECK(tokens.next->next->curr.type == TokenType::IDENTIFIER);
-    CHECK(tokenizer.extractToken(tokens.next->next->curr) == "customType");
-    CHECK(tokens.next->next->next->curr.type == TokenType::CHAR_TYPE);
+    CHECK(tokens.next->next->curr.type == TokenType::CHAR_TYPE);
   }
   REQUIRE(tokenizer.peekNext().type == TokenType::COMMA);
   tokenizer.consumePeek();
@@ -288,6 +285,17 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
+  { // missing semicolon
+    const std::string str = " var: int  thing: other;";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 12);
+    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+  }
+
   { // missing part of expression
     const std::string str = " var - ; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
@@ -296,6 +304,58 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].column == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing part of expression
+    const std::string str = "  + var ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 3);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing part of expression
+    const std::string str = " var * + var ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 8);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing part of expression
+    const std::string str = " var || thing * + var ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 17);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing part of expression
+    const std::string str = " var + / var ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 8);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing part of expression
+    const std::string str = " var || / + var ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 2);
+    CHECK(parser.expected[0].column == 9);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[1].column == 11);
+    CHECK(parser.expected[1].expectedType == ExpectedType::EXPRESSION);
   }
 
   { // missing expression for keyword
@@ -308,7 +368,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
-  { // missing parentheses for keyword
+  { // missing expression for keyword
     const std::string str = " if { do.something(); } ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
@@ -316,6 +376,69 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].column == 5);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing expression for keyword
+    const std::string str = " for { do.something(); } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 6);
+    CHECK(parser.expected[0].expectedType == ExpectedType::FOR_LOOP_HEADER);
+  }
+
+  { // missing expression for keyword
+    const std::string str = " while  } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 9);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+  }
+
+  { // missing scope for keyword
+    const std::string str = " while 1 }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 10);
+    CHECK(parser.expected[0].expectedType == ExpectedType::SCOPE);
+  }
+  
+  { // missing close brace for function
+    const std::string str = " func ti(): int { while (1) {} ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 32);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].tokenType == TokenType::CLOSE_BRACE);
+  }
+
+  { // missing close brace for struct
+    const std::string str = "struct t { var:int; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 21);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].tokenType == TokenType::CLOSE_BRACE);
+  }
+  
+  { // semicolon missing after return value
+    const std::string str = " return 1 1;  } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].column == 11);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
   }
 
   { // empty paren in expression
@@ -360,7 +483,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
   }
 
-  { // dangling comma in template type
+  { // trailing comma in template type
     const std::string str = "template [ T , ] struct thingTemplate { var:int; }";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
     Parser parser{tokenizer, memPool};
@@ -392,9 +515,40 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(parser.expected[0].column == 14);
     CHECK(parser.expected[0].tokenType == TokenType::COMMA);
   }
+
+  { // extra commas in function call
+    const std::string str = " functionName( , thing , ); ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 2);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[0].column == 16);
+    CHECK(parser.expected[1].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[1].column == 26);
+  }
 }
 
 TEST_CASE("Unexpected tokens", "[parser]") {
+  { // unexpected top level token
+    const std::string str = " while (1) { do.something(); } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.unexpected.size() == 1);
+    CHECK(parser.unexpected[0].token.linePos == 2);
+    CHECK(parser.unexpected[0].token.type == TokenType::WHILE);
+  }
+
+  { // invalid top level operation
+    const std::string str = "var:int; ++var;";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.unexpected.size() == 1);
+    CHECK(parser.unexpected[0].token.linePos == 10);
+    CHECK(parser.unexpected[0].token.type == TokenType::INCREMENT_PREFIX);
+  }
 }
 
 TEST_CASE("Struct Declaration", "[parser]") {
@@ -483,7 +637,7 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(s.keyWBody->header.type == StatementType::ARRAY_OR_STRUCT_LITERAL);
     REQUIRE(s.keyWBody->header.arrOrStructLiteral);
     CHECK(s.keyWBody->header.arrOrStructLiteral->list.next);
-    REQUIRE(!s.keyWBody->body);
+    CHECK(s.keyWBody->body);
   }
 
   {
@@ -515,6 +669,12 @@ TEST_CASE("Array", "[parser]") {
   CHECK_FALSE(s.arrOrStructLiteral->list.next->next);
 }
 
-TEST_CASE("types", "[parser]") {
-
+TEST_CASE("Scope", "[parser]") {
+  const std::string str = " { var:int; } } ";
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+  Parser parser{tokenizer, memPool};
+  Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+  CHECK(parser.expected.empty());
+  CHECK(parser.unexpected.empty());
+  REQUIRE(s.type == StatementType::SCOPE);
 }

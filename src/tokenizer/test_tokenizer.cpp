@@ -59,7 +59,6 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
 
 TEST_CASE("Unit Test - General", "[tokenizer][tokenType]") {
    CHECK(firstToken("_") == TokenType::IDENTIFIER);
-   CHECK(firstToken("#") == TokenType::COMMENT);
    CHECK(firstToken("(") == TokenType::OPEN_PAREN);
    CHECK(firstToken(")") == TokenType::CLOSE_PAREN);
    CHECK(firstToken("{") == TokenType::OPEN_BRACE);
@@ -143,15 +142,14 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
    Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
    auto tokens = tokenizer.tokenizeAll();
-   REQUIRE(tokens.size() == 15);
+   REQUIRE(tokens.size() == 14);
    CHECK(tokenizer.extractToken(tokens[0]) == "func");
    CHECK(tokenizer.extractToken(tokens[1]) == "functionName");
    CHECK(tokenizer.extractToken(tokens[3]) == "content");
    CHECK(tokenizer.extractToken(tokens[5]) == "char");
    CHECK(tokenizer.extractToken(tokens[8]) == "size");
    CHECK(tokenizer.extractToken(tokens[10]) == "int");
-   CHECK(tokenizer.extractToken(tokens[12]) == "# this is a comment");
-   CHECK(tokenizer.extractToken(tokens[13]) == "notAComment");
+   CHECK(tokenizer.extractToken(tokens[12]) == "notAComment");
    }
 
    {

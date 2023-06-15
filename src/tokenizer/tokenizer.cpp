@@ -2,7 +2,7 @@
 #include "tokenizer.hpp"
 
 Tokenizer::Tokenizer(const std::string& filePath, const std::string& fileContent):
-  filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
+  badTokens{}, filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -26,10 +26,6 @@ std::vector<Token> Tokenizer::tokenizeAll() {
 */
 Token Tokenizer::peekNext() {
   if (peeked.type != TokenType::NOTHING) {
-    if (prevType == TokenType::BAD_VALUE) {
-      // fatal error not handled
-      exit(55);
-    }
     return peeked;
   }
   peeked = tokenizeNext();
@@ -40,10 +36,6 @@ Token Tokenizer::peekNext() {
 
 void Tokenizer::consumePeek() {
   if (peeked.type != TokenType::NOTHING) {
-    if (prevType == TokenType::BAD_VALUE) {
-      // fatal error not handled
-      exit(55);
-    }
     peeked.type = TokenType::NOTHING;
     position = peeked.position + peeked.length;
   }
@@ -51,10 +43,6 @@ void Tokenizer::consumePeek() {
 
 Token Tokenizer::tokenizeNext() {
   if (peeked.type != TokenType::NOTHING) {
-    if (prevType == TokenType::BAD_VALUE) {
-      // fatal error not handled
-      exit(55);
-    }
     const Token temp = peeked;
     peeked.type = TokenType::NOTHING;
     position = peeked.position + peeked.length;
@@ -62,14 +50,13 @@ Token Tokenizer::tokenizeNext() {
   }
   moveToNextNonWhiteSpaceChar();
   if (position >= size) {
-    return {size, 0, TokenType::END_OF_FILE};
+    return {position, lineNum, (uint16_t)(position + 1 - lineStart), 0, TokenType::END_OF_FILE};
   }
 
   const uint32_t tokenStartPos = position;
   uint16_t length = 0;
-  TokenType type = TokenType::BAD_VALUE;
   char c = content[position];
-  type = numToType[(int)c];
+  TokenType type = numToType[(int)c];
   switch (type) {
     case TokenType::IDENTIFIER: {
       movePastKeywordOrIdentifier();
@@ -93,20 +80,14 @@ Token Tokenizer::tokenizeNext() {
 
     case TokenType::STRING_LITERAL: {
       if (!movePastLiteral('"')) {
-        error.type = TokenType::STRING_LITERAL;
-        error.lineNum = lineNum;
-        error.linePos = position - lineStart;
-        type = TokenType::BAD_VALUE;
+        badTokens.emplace_back(position, lineNum, position - lineStart, 0, TokenType::STRING_LITERAL);
       }
       break;
     }
 
     case TokenType::CHAR_LITERAL: {
       if (!movePastLiteral('\'')) {
-        error.type = TokenType::CHAR_LITERAL;
-        error.lineNum = lineNum;
-        error.linePos = position - lineStart;
-        type = TokenType::BAD_VALUE;
+        badTokens.emplace_back(position, lineNum, position - lineStart, 0, TokenType::CHAR_LITERAL);
       }
       // TODO: validate content of character. escaped characters :(
       // maybe do this during type checking?
@@ -116,7 +97,13 @@ Token Tokenizer::tokenizeNext() {
 
     case TokenType::COMMENT: {
       moveToNewLine();
-      break;
+      Token tk = tokenizeNext();
+      while (tk.type == TokenType::COMMENT) {
+        tk = tokenizeNext();
+      }
+      type = tk.type;
+      prevType = type;
+      return tk;
     }
 
     case TokenType::NEWLINE: {

@@ -1,5 +1,4 @@
 #include "../nodes.hpp"
-#include "../tokenizer/tokenizer.hpp"
 #include <iostream>
 
 const uint8_t indentationSize = 2;
@@ -110,7 +109,7 @@ void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
 
 void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += "{\n";
-  if (scopeStatements.curr.type != StatementType::NONE) {
+  if (scopeStatements.curr.type != StatementType::NONE && scopeStatements.curr.type != StatementType::SET) {
     indentation += indentationSize;
     for (StatementList * iter = &scopeStatements; iter; iter = iter->next) {
       str += std::string(indentation, ' ');

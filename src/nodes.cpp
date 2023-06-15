@@ -7,37 +7,13 @@ bool hasData(StatementType type) {
 
 Unexpected::Unexpected(Token token): token{token} {}
 
-bool Unexpected::operator==(const Unexpected &ref) const {
-  return ref.token == token;
-}
-
 Expected::Expected(ExpectedType type, uint32_t line, uint32_t column):
   line{line}, column{column}, tokenType{TokenType::NOTHING}, expectedType{type} {}
 
 Expected::Expected(ExpectedType type, uint32_t line, uint32_t column, TokenType tokenType):
   line{line}, column{column}, tokenType{tokenType}, expectedType{type} {}
 
-bool Expected::operator==(const Expected &ref) const {
-  return ref.tokenType == tokenType && ref.expectedType == expectedType && ref.column == column && ref.line == line;
-}
-
-bool Type::operator==(const Type& tk) const {
-  return tk.tokens == tokens;
-}
-
 VariableDec::VariableDec(Token token): type{}, name{token}, initialAssignment{nullptr} {}
-
-bool VariableDec::operator==(const VariableDec& varDec) const {
-  if (!(name == varDec.name) && !(type == varDec.type)) {
-    return false;
-  }
-  if (!initialAssignment && !varDec.initialAssignment) {
-    return true;
-  } else if (!initialAssignment || !varDec.initialAssignment) {
-    return false;
-  }
-  return *initialAssignment == *varDec.initialAssignment;
-}
 
 Statement::Statement(): unOp{nullptr}, type{StatementType::NONE} {}
 
@@ -73,98 +49,6 @@ void Statement::operator=(Statement&& st) noexcept {
     default: break;
   }
   st.type = StatementType::NONE;
-}
-
-bool Statement::operator==(const Statement& st) const {
-  if (type != st.type) {
-    return false;
-  }
-  switch (type) {
-    case StatementType::UNARY_OP:
-      if (!unOp && !st.unOp) {
-        return true;
-      }
-      if (!unOp || !st.unOp) {
-        return false;
-      }
-      return *unOp == *st.unOp;
-    case StatementType::BINARY_OP:
-      if (!binOp && !st.binOp) {
-        return true;
-      }
-      if (!binOp || !st.binOp) {
-        return false;
-      }
-      return *binOp == *st.binOp;
-    case StatementType::VARIABLE_DEC:
-      if (!dec && !st.dec) {
-        return true;
-      }
-      if (!dec || !st.dec) {
-        return false;
-      }
-      return *dec == *st.dec;
-    case StatementType::FUNCTION_CALL:
-      if (!funcCall && !st.funcCall) {
-        return true;
-      }
-      if (!funcCall || !st.funcCall) {
-        return false;
-      }
-      return *funcCall == *st.funcCall;
-    case StatementType::ARRAY_ACCESS:
-      if (!arrAccess && !st.arrAccess) {
-        return true;
-      }
-      if (!arrAccess || !st.arrAccess) {
-        return false;
-      }
-      return *arrAccess == *st.arrAccess;
-    case StatementType::WRAPPED_VALUE:
-      if (!wrapped && !st.wrapped) {
-        return true;
-      }
-      if (!wrapped || !st.wrapped) {
-        return false;
-      }
-      return *wrapped == *st.wrapped;
-    case StatementType::ARRAY_OR_STRUCT_LITERAL:
-      if (!arrOrStructLiteral && !st.arrOrStructLiteral) {
-        return true;
-      }
-      if (!arrOrStructLiteral || !st.arrOrStructLiteral) {
-        return false;
-      }
-      return *arrOrStructLiteral == *st.arrOrStructLiteral;
-    case StatementType::FOR_LOOP_HEADER:
-      if (!list && !st.list) {
-        return true;
-      }
-      if (!list || !st.list) {
-        return false;
-      }
-      return *list == *st.list;
-    case StatementType::SCOPE:
-      if (!scope && !st.scope) {
-        return true;
-      }
-      if (!scope || !st.scope) {
-        return false;
-      }
-      return *scope == *st.scope;
-    case StatementType::KEYWORD:
-      return key == st.key;
-    case StatementType::VALUE:
-      if (!var && !st.var) {
-        return true;
-      }
-      if (!var || !st.var) {
-        return false;
-      }
-      return *var == *st.var;
-    default:
-      return true;
-  }
 }
 
 Statement::Statement(Statement&& st) noexcept {
@@ -232,8 +116,14 @@ Statement::Statement(Token *ptr) {
 Statement *Statement::getChild() {
   switch (type) {
     case StatementType::UNARY_OP:
+      if (unOp->operand.type == StatementType::NONE) {
+        return nullptr;
+      }
       return &unOp->operand;
     case StatementType::BINARY_OP:
+      if (binOp->rightSide.type == StatementType::NONE) {
+        return nullptr;
+      }
       return &binOp->rightSide;
     default:
       return nullptr;
@@ -266,34 +156,48 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
 
     case StatementType::KEY_W_BODY:
       if (keyWBody->body) {
+        if (keyWBody->keyword.type == TokenType::RETURN) {
+          return ExpectedType::TOKEN;
+        }
         return ExpectedType::BAD;
       }
+      ExpectedType exType;
       if (!keyWBody->header && keyWBody->keyword.type != TokenType::ELSE) {
         if (keyWBody->keyword.type == TokenType::FOR) {
           if (st.type == StatementType::FOR_LOOP_HEADER) {
             keyWBody->header = std::move(st);
             return ExpectedType::NOTHING;
           } else {
-            return ExpectedType::FOR_LOOP_HEADER;
+            exType = ExpectedType::FOR_LOOP_HEADER;
           }
         }
         else if (hasData(st.type)) {
           keyWBody->header = std::move(st);
+          if (keyWBody->keyword.type == TokenType::RETURN) {
+            keyWBody->body.scopeStatements.curr.type = StatementType::SET;
+          }
           return ExpectedType::NOTHING;
         } else if (st.type == StatementType::ARRAY_OR_STRUCT_LITERAL && keyWBody->keyword.type == TokenType::RETURN) {
+          keyWBody->body.scopeStatements.curr.type = StatementType::SET;
           keyWBody->header = std::move(st);
           return ExpectedType::NOTHING;
         } else {
-          return ExpectedType::EXPRESSION;
+          exType = ExpectedType::EXPRESSION;
         }
       }
-      if (keyWBody->keyword.type == TokenType::RETURN) {
-        return ExpectedType::TOKEN;
-      }
-      if (st.type == StatementType::SCOPE) {
-        keyWBody->body.scopeStatements.curr = std::move( st.scope->scopeStatements.curr);
+      if (st.type == StatementType::SCOPE && keyWBody->keyword.type != TokenType::RETURN) {
+        keyWBody->body.scopeStatements.curr = std::move(st.scope->scopeStatements.curr);
+        if (keyWBody->body.scopeStatements.curr.type == StatementType::NONE) {
+          keyWBody->body.scopeStatements.curr.type = StatementType::SET;
+        }
         keyWBody->body.scopeStatements.next = st.scope->scopeStatements.next;
+        if (exType != ExpectedType::NOTHING) {
+          return exType;
+        }
         return ExpectedType::NOTHING;
+      }
+      if (exType != ExpectedType::NOTHING) {
+        return exType;
       }
       return ExpectedType::SCOPE;
 
@@ -315,8 +219,22 @@ ExpectedType Statement::isValid() const {
       }
       break;
     case StatementType::KEY_W_BODY: {
-      // if, elif, while, for, switch
+      if (keyWBody->body.scopeStatements.curr.type != StatementType::NONE) {
+        return ExpectedType::NOTHING;
+      }
+      
+      if (!keyWBody->header && keyWBody->keyword.type != TokenType::ELSE) {
+        if (keyWBody->keyword.type == TokenType::FOR) {
+          return ExpectedType::FOR_LOOP_HEADER;
+        }
+        return ExpectedType::EXPRESSION;
+      }
+      if (keyWBody->keyword.type == TokenType::RETURN) {
+         return ExpectedType::EXPRESSION;
+      }
+      return ExpectedType::SCOPE;
     }
+
     default:
       break;
   }
@@ -331,61 +249,15 @@ KeywordWithBody::KeywordWithBody(KeywordWithBody&& rval): body{std::move(rval.bo
 
 ArrayAccess::ArrayAccess(Token token): array{token} {}
 
-bool ArrayAccess::operator==(const ArrayAccess& arrAcc) const {
-  return array == arrAcc.array && offset == arrAcc.offset;
-}
-
-bool Scope::operator==(const Scope& sp) const {
-  return sp.scopeStatements == scopeStatements;
-}
-
 BinOp::BinOp(Token op): leftSide{}, rightSide{}, op{op} {}
 
 BinOp::BinOp(BinOp&& binOp) noexcept: leftSide{std::move(binOp.leftSide)}, rightSide{std::move(binOp.rightSide)}, op{binOp.op} {
   binOp.op.type = TokenType::NOTHING;
 }
 
-bool BinOp::operator==(const BinOp& bo) const {
-  if (!(op == bo.op)) {
-    return false;
-  }
-  // short circuit right side
-  bool r = false;
-  if (rightSide || bo.rightSide) {
-    if (!rightSide || !bo.rightSide) {
-      return false;
-    }
-    r = true;
-  }
-  if (leftSide && bo.leftSide) {
-    if (!(leftSide == bo.leftSide)) {
-      return false;
-    }
-  } else if (leftSide || bo.leftSide) {
-    return false;
-  }
-  if (r) {
-    if (!(rightSide == bo.rightSide)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 UnOp::UnOp(Token op): op{op} {}
 
 UnOp::UnOp(UnOp&& unOp) noexcept : operand{std::move(unOp.operand)} , op{unOp.op} {}
-
-bool UnOp::operator==(const UnOp& uo) const {
-  if (operand && uo.operand) {
-    if (!(operand == uo.operand)) {
-      return false;
-    }
-  } else if (operand || uo.operand) {
-    return false;
-  }
-  return true;
-}
 
 Enum::Enum(): name{0,0,TokenType::NOTHING} {}
 
@@ -396,10 +268,6 @@ FunctionDec::FunctionDec(FunctionDec&& fd):
   returnType{std::move(fd.returnType)}, name{fd.name} {}
 
 FunctionCall::FunctionCall(Token token): name{token} {}
-
-bool FunctionCall::operator==(const FunctionCall& fc) const {
-  return name == fc.name && args == fc.args;
-}
 
 Struct::Struct(Token tok): name{tok} {}
 
@@ -434,149 +302,12 @@ Declaration::Declaration(Enum *ptr): enm{ptr}, decType{DecType::ENUM} {}
 
 Program::Program(Program&& prog) noexcept : name{std::move(prog.name)}, decs{std::move(prog.decs)} {}
 
-bool ArrOrStructLiteral::operator==(const ArrOrStructLiteral & l) const {
-  return list == l.list;
-}
-
-bool FunctionDec::operator==(const FunctionDec& ref) const {
-  return ref.name == name && ref.returnType == returnType && ref.params == params && ref.body == body;
-}
-
-bool Enum::operator==(const Enum& ref) const {
-  return ref.name == name && ref.members == members;
-}
-
-bool Declaration::operator==(const Declaration& ref) const {
-  if (ref.decType != decType) {
-    return false;
-  }
-
-  switch (decType) {
-    case DecType::TEMPLATE:
-      if (ref.temp && temp) {
-        if (!(*ref.temp == *temp)) {
-          return false;
-        }
-      } else if (ref.temp || temp) {
-        return false;
-      }
-      return true;
-    case DecType::ENUM:
-      if (ref.enm && enm) {
-        if (!(*ref.enm == *enm)) {
-          return false;
-        }
-      } else if (ref.enm || enm) {
-        return false;
-      }
-      return true;
-    case DecType::VARIABLE_DEC:
-      if (ref.varDec && varDec) {
-        if (!(*ref.varDec == *varDec)) {
-          return false;
-        }
-      } else if (ref.varDec || varDec) {
-        return false;
-      }
-      return true;
-    case DecType::STRUCT:
-      if (ref.struc && struc) {
-        if (!(*ref.struc == *struc)) {
-          return false;
-        }
-      } else if (ref.struc || struc) {
-        return false;
-      }
-      return true;
-    case DecType::FUNCTION:
-      if (ref.func && func) {
-        if (!(*ref.func == *func)) {
-          return false;
-        }
-      } else if (ref.func || func) {
-        return false;
-      }
-      return true;
-    default:
-      return true;
-  }
-}
-
-bool Struct::operator==(const Struct& ref) const {
-  return (ref.name == name) && (ref.decs == decs);
-}
-
-bool Template::operator==(const Template& ref) const {
-  return ref.templateIdentifiers == templateIdentifiers && ref.dec == dec;
-}
-
-bool Program::operator==(const Program& ref) const {
-  return ref.name == name && ref.decs == decs;
-}
-
-bool KeywordWithBody::operator==(const KeywordWithBody& ref) const {
-  if (!(ref.keyword == keyword)) {
-    return false;
-  }
-  if (ref.body && body) {
-    if (!(ref.body == body)) {
-      return false;
-    }
-  } else if (ref.body || body) {
-    return false;
-  }
-  if (ref.header && header) {
-    if (!(ref.header == header)) {
-      return false;
-    }
-  } else if (ref.header || header) {
-    return false;
-  }
-  return true;
-}
-
 Statement::operator bool() const {
   return type != StatementType::NONE;
 }
 
-bool ForLoopHeader::operator==(const ForLoopHeader& ref) const {
-  return list == ref.list;
-}
-
 TokenList::TokenList(): curr{0,0,TokenType::NOTHING}, next{nullptr} {}
 TokenList::TokenList(Token tk): curr{tk}, next{nullptr} {}
-
-bool TokenList::operator==(const TokenList& ref) const {
-  const TokenList* refCurr = &ref;
-  const TokenList* thisCurr = this;
-  while (refCurr->next && thisCurr->next) {
-    if (!(refCurr->curr == thisCurr->curr)) {
-      return false;
-    }
-    refCurr = refCurr->next;
-    thisCurr = thisCurr->next;
-  }
-  if (refCurr->next || thisCurr->next) {
-    return false;
-  }
-  return true;
-}
-
-bool StatementList::operator==(const StatementList& ref) const {
-  const StatementList* refCurr = &ref;
-  const StatementList* thisCurr = this;
-  while (refCurr->next && thisCurr->next) {
-    if (!(refCurr->curr == thisCurr->curr)) {
-      return false;
-    }
-    refCurr = refCurr->next;
-    thisCurr = thisCurr->next;
-  }
-  if (refCurr->next || thisCurr->next) {
-    return false;
-  }
-  return true;
-}
 
 StatementList::StatementList(): curr{}, next{} {}
 
@@ -605,4 +336,20 @@ StatementList::operator bool() const {
 }
 Scope::operator bool() const {
   return scopeStatements;
+}
+
+bool TokenList::operator==(const TokenList& ref) const {
+  const TokenList* refCurr = &ref;
+  const TokenList* thisCurr = this;
+  while (refCurr->next && thisCurr->next) {
+    if (!(refCurr->curr == thisCurr->curr)) {
+      return false;
+    }
+    refCurr = refCurr->next;
+    thisCurr = thisCurr->next;
+  }
+  if (refCurr->next || thisCurr->next) {
+    return false;
+  }
+  return true;
 }
