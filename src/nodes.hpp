@@ -13,22 +13,18 @@ struct Unexpected {
 
 enum class ExpectedType : uint8_t {
   NOTHING,
-  BAD,
   EXPRESSION,
-  FOR_LOOP_HEADER,
   TOKEN,
-  SCOPE,
 };
 
 struct Expected {
-  uint32_t line;
-  uint32_t column;
-  TokenType tokenType;
+  Token tokenWhereExpected;
+  TokenType expectedTokenType;
   ExpectedType expectedType;
   Expected() = delete;
-  Expected(ExpectedType, uint32_t, uint32_t);
-  Expected(ExpectedType, uint32_t, uint32_t, TokenType);
-  std::string getErrorMessage(const std::string&);
+  Expected(ExpectedType, Token);
+  Expected(ExpectedType, Token, TokenType);
+  std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
 struct TokenList {

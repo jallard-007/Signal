@@ -280,8 +280,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 10);
-    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 10);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
@@ -291,8 +291,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 12);
-    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
@@ -302,7 +302,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -312,7 +312,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 3);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 3);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -322,7 +322,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -332,7 +332,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 17);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 17);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -342,7 +342,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -352,9 +352,9 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 2);
-    CHECK(parser.expected[0].column == 9);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 9);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(parser.expected[1].column == 11);
+    CHECK(parser.expected[1].tokenWhereExpected.linePos == 11);
     CHECK(parser.expected[1].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -364,7 +364,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 6);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 6);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -374,7 +374,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 5);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 5);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -384,8 +384,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 6);
-    CHECK(parser.expected[0].expectedType == ExpectedType::FOR_LOOP_HEADER);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 6);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
   { // missing expression for keyword
@@ -394,7 +394,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 9);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 9);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -404,8 +404,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 10);
-    CHECK(parser.expected[0].expectedType == ExpectedType::SCOPE);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 10);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
   
   { // missing close brace for function
@@ -414,9 +414,9 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 32);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 32);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenType == TokenType::CLOSE_BRACE);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::CLOSE_BRACE);
   }
 
   { // missing close brace for struct
@@ -425,9 +425,9 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 21);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 21);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenType == TokenType::CLOSE_BRACE);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::CLOSE_BRACE);
   }
   
   { // semicolon missing after return value
@@ -436,9 +436,9 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].column == 11);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
   }
 
   { // empty paren in expression
@@ -449,7 +449,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     auto& ex = parser.expected;
     REQUIRE(ex.size() == 1);
     CHECK(ex[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(ex[0].column == 6);
+    CHECK(ex[0].tokenWhereExpected.linePos == 6);
   }
 
   { // missing colon
@@ -459,7 +459,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenType == TokenType::COLON);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::COLON);
   }
 
   { // missing type
@@ -469,7 +469,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
   { // missing type in template
@@ -479,8 +479,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].column == 11);
-    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
   { // trailing comma in template type
@@ -490,8 +490,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].column == 16);
-    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 16);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
   { // leading comma in template type
@@ -501,8 +501,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].column == 12);
-    CHECK(parser.expected[0].tokenType == TokenType::IDENTIFIER);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
   { // missing comma in template type
@@ -512,8 +512,8 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].column == 14);
-    CHECK(parser.expected[0].tokenType == TokenType::COMMA);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 14);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::COMMA);
   }
 
   { // extra commas in function call
@@ -523,10 +523,77 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
     REQUIRE(parser.expected.size() == 2);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(parser.expected[0].column == 16);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 16);
     CHECK(parser.expected[1].expectedType == ExpectedType::EXPRESSION);
-    CHECK(parser.expected[1].column == 26);
+    CHECK(parser.expected[1].tokenWhereExpected.linePos == 26);
   }
+
+  { // missing function name
+    const std::string str = " func (): int { var : int; } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 7);
+  }
+
+  { // missing open paren
+    const std::string str = " func name ): int { var : int; } ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::OPEN_PAREN);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+  }
+
+  { // missing expression
+    const std::string str = " var:int = ; ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+  }
+
+  { // missing expression
+    const std::string str = " var:int = ; }";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+  }
+
+  { // doesn't make sense
+    const std::string str = " var:int = x:int ;";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 2);
+    CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+    CHECK(parser.expected[1].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[1].expectedTokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[1].tokenWhereExpected.linePos == 11);
+  }
+
+  { //  global type not delimited 
+    const std::string str = " var: int ptr ptr ref";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parse();
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].tokenWhereExpected.linePos == 22);
+  }
+
 }
 
 TEST_CASE("Unexpected tokens", "[parser]") {
@@ -548,6 +615,16 @@ TEST_CASE("Unexpected tokens", "[parser]") {
     REQUIRE(parser.unexpected.size() == 1);
     CHECK(parser.unexpected[0].token.linePos == 10);
     CHECK(parser.unexpected[0].token.type == TokenType::INCREMENT_PREFIX);
+  }
+
+  { // semicolon in function call
+    const std::string str = " functionName( thing ; , ); ";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+    Parser parser{tokenizer, memPool};
+    parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+    REQUIRE(parser.unexpected.size() == 1);
+    CHECK(parser.unexpected[0].token.linePos == 22);
+    CHECK(parser.unexpected[0].token.type == TokenType::SEMICOLON);
   }
 }
 
@@ -678,3 +755,14 @@ TEST_CASE("Scope", "[parser]") {
   CHECK(parser.unexpected.empty());
   REQUIRE(s.type == StatementType::SCOPE);
 }
+
+
+// TEST_CASE("For Loop", "[parser]") {
+//   const std::string str = "for (i: uint32_t = tokenStartPos + 1, j: uint32_t = 1; i < position && j < MIN_CHARS_TO_DISAMBIG; ++i, ++j) {chars[j] = content[i];} } ";
+//   Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+//   Parser parser{tokenizer, memPool};
+//   Statement s = parser.parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_BRACE);
+//   CHECK(parser.expected.empty());
+//   CHECK(parser.unexpected.empty());
+//   REQUIRE(s.type == StatementType::SCOPE);
+// }

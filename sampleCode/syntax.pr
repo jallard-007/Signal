@@ -57,3 +57,88 @@ template [T, K] func templateName(var : T): K {
 }
 
 create [int, char] templateName as actualType;
+
+
+
+################### more formal grammar ###################
+
+binOpOperator:= defined in token.hpp
+unaryOpOperator:= defined in token.hpp
+postFixUnaryOpOperator:= defined in token.hpp
+
+  NOTE: unaryOp * and - can be distinguished from binaryOp * and - based on the previous token
+  if there is a binOpOperator or unaryOpOperator before it, it is unary. if there is an expression, binary
+
+
+identifier:= not a keyword, can start with a letter or underscore, can have letters underscores and numbers following
+keywords:= defined in token.hpp
+
+binOp:= expression binOpOperator expression
+unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
+
+functionCall:= identifier(expressionList)
+
+arrayOrStructLiteral:= [ expressionList ]
+
+expression:= identifier | number | stringLiteral | charLiteral | binOp | unaryOp | functionCall | arrayAccess
+
+expressionList:= expression expressionTail
+expressionTail:= , expression expressionTail | nothing
+
+typeQualifier:= mut | const | nothing
+typeList: typeQualifier identifier indirectionTypeList
+
+indirectionTypeList:= nothing
+                    | typeQualifier ptr indirectionTypeList
+                    | typeQualifier [number | nothing] indirectionTypeList
+                    | typeQualifier ref
+
+simpleVarDec:= identifier : typeList
+varDecWInitialize:= varDec = expression
+                            | arrayOrStructLiteral
+varDec:= simpleVarDec | varDecWInitialize
+
+scope:= { statementList }
+
+forLoop:= for (expression | varDec ; expression; expression) scope
+whileLoop:= while (expression) scope
+
+
+conditionalStatement:= ifStatement
+                      | ifStatement elifStatementList
+                      | ifStatement elifStatementList elseStatement
+
+ifStatement:= if (expression) scope
+elifStatement:= elif (expression) scope
+elifStatementList:= elifStatement elifStatementList | nothing
+elseStatement:= else scope
+returnStatement:= return expression;
+switchStatement:=  switch (identifier) switchScope
+
+controlFlowStatement:= forLoop | whileLoop | conditionalStatement | returnStatement | switchStatement
+
+statementList:= expression ; statementList | controlFlowStatement statementList | scope statementList | varDec statementList | nothing
+
+functionDec:= func identifier (varDecList): typeList scope
+
+varDecList:= varDec varDecTail
+varDecTail:= , varDec varDecTail | nothing
+
+structDec:= struct identifier { structDecList }
+
+structDecList:= varDec ; decList | functionDec decList | nothing
+
+enumDec:= enum identifier { identifierList }
+identifierList:= identifier identifierTail
+                | nothing
+identifierTail:= , identifier identifierTail
+
+templateDec:= template [ identifierList ] structDec
+                                         | functionDec
+
+templateCreation:= create identifier [ identifierList ] as identifier ;
+
+program:= globalDecList
+
+globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
+globalDecList:= globalDec globalDecList | nothing

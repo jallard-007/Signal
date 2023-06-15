@@ -7,11 +7,11 @@ bool hasData(StatementType type) {
 
 Unexpected::Unexpected(Token token): token{token} {}
 
-Expected::Expected(ExpectedType type, uint32_t line, uint32_t column):
-  line{line}, column{column}, tokenType{TokenType::NOTHING}, expectedType{type} {}
+Expected::Expected(ExpectedType type, Token where):
+  tokenWhereExpected{where}, expectedTokenType{TokenType::NOTHING}, expectedType{type} {}
 
-Expected::Expected(ExpectedType type, uint32_t line, uint32_t column, TokenType tokenType):
-  line{line}, column{column}, tokenType{tokenType}, expectedType{type} {}
+Expected::Expected(ExpectedType type, Token where, TokenType tokenType):
+  tokenWhereExpected{where}, expectedTokenType{tokenType}, expectedType{type} {}
 
 VariableDec::VariableDec(Token token): type{}, name{token}, initialAssignment{nullptr} {}
 
@@ -138,7 +138,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       }
       // bin op, un op, value, funcCall, array access, wrapped
       if (!hasData(st.type)) {
-        return ExpectedType::BAD;
+        return ExpectedType::EXPRESSION;
       }
       unOp->operand = std::move(st);
       return ExpectedType::NOTHING;
@@ -149,7 +149,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       }
       // bin op, un op, value, funcCall, array access, wrapped
       if (!hasData(st.type)) {
-        return ExpectedType::BAD;
+        return ExpectedType::EXPRESSION;
       }
       binOp->rightSide = std::move(st);
       return ExpectedType::NOTHING;
@@ -159,7 +159,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
         if (keyWBody->keyword.type == TokenType::RETURN) {
           return ExpectedType::TOKEN;
         }
-        return ExpectedType::BAD;
+        return ExpectedType::EXPRESSION;
       }
       ExpectedType exType;
       if (!keyWBody->header && keyWBody->keyword.type != TokenType::ELSE) {
@@ -168,7 +168,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
             keyWBody->header = std::move(st);
             return ExpectedType::NOTHING;
           } else {
-            exType = ExpectedType::FOR_LOOP_HEADER;
+            exType = ExpectedType::TOKEN;
           }
         }
         else if (hasData(st.type)) {
@@ -199,7 +199,7 @@ ExpectedType Statement::addStatementToNode(Statement&& st) {
       if (exType != ExpectedType::NOTHING) {
         return exType;
       }
-      return ExpectedType::SCOPE;
+      return ExpectedType::TOKEN;
 
     default:
       return ExpectedType::TOKEN;
@@ -219,20 +219,20 @@ ExpectedType Statement::isValid() const {
       }
       break;
     case StatementType::KEY_W_BODY: {
-      if (keyWBody->body.scopeStatements.curr.type != StatementType::NONE) {
+      if (keyWBody->body.scopeStatements.curr.type != StatementType::NONE || keyWBody->keyword.type == TokenType::RETURN) {
         return ExpectedType::NOTHING;
       }
       
       if (!keyWBody->header && keyWBody->keyword.type != TokenType::ELSE) {
         if (keyWBody->keyword.type == TokenType::FOR) {
-          return ExpectedType::FOR_LOOP_HEADER;
+          return ExpectedType::TOKEN;
         }
         return ExpectedType::EXPRESSION;
       }
       if (keyWBody->keyword.type == TokenType::RETURN) {
          return ExpectedType::EXPRESSION;
       }
-      return ExpectedType::SCOPE;
+      return ExpectedType::TOKEN;
     }
 
     default:
@@ -311,24 +311,28 @@ TokenList::TokenList(Token tk): curr{tk}, next{nullptr} {}
 
 StatementList::StatementList(): curr{}, next{} {}
 
-std::string Expected::getErrorMessage(const std::string& file) {
-  std::string message = file + ':' + std::to_string(line) + ':' + std::to_string(column) + '\n';
+std::string Expected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  std::string message = file + ':' + std::to_string(tokenWhereExpected.lineNum) + ':' + std::to_string(tokenWhereExpected.linePos);
+  std::string extractedTokenWhere;
+  if (tokenWhereExpected.type == TokenType::END_OF_FILE) {
+    extractedTokenWhere = "end of file";
+  } else {
+    extractedTokenWhere = tk.extractToken(tokenWhereExpected);
+  }
   if (expectedType == ExpectedType::TOKEN) {
-    if (tokenType == TokenType::IDENTIFIER) {
-      return message + "\nExpected Identifier\n";
+    if (tokenWhereExpected.type == TokenType::IDENTIFIER) {
+      return message + "\nExpected identifier before " +  + "\n\n";
     }
-    return message + "\nExpected Token: " + typeToString.at(tokenType) + '\n';
+    return message + "\nExpected token '" + typeToString.at(tokenWhereExpected.type) + "' before " + tk.extractToken(tokenWhereExpected) + "\n\n";
   } else if (expectedType == ExpectedType::EXPRESSION) {
-    return message + "\nExpected Expression\n";
-  } else if (expectedType == ExpectedType::SCOPE) {
-    return message + "\nExpected Scope\n";
+    return message + "\nExpected expression before " + tk.extractToken(tokenWhereExpected) + "\n\n";
   }
   return message;
 }
 
 std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
   return file + ":" + std::to_string(token.lineNum) + ":" + std::to_string(token.linePos) +
-  "\nUnexpected token: " + tk.extractToken(token) + '\n';
+  "\nUnexpected token: " + tk.extractToken(token) + "\n\n";
 }
 
 StatementList::operator bool() const {

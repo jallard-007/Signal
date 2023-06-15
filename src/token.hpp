@@ -58,9 +58,9 @@ enum class TokenType : uint8_t {
   // BINARY
   // general
   TERNARY,
+  COMMA,
   DOT,
   PTR_MEMBER_ACCESS,
-  COMMA,
 
   // arithmetic
   ADDITION,
@@ -361,6 +361,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::DECREMENT_PREFIX, "--"},
   {TokenType::DECREMENT_POSTFIX, "--"},
   {TokenType::ADDITION, " + "},
+  {TokenType::ADDITION_ASSIGNMENT, " += "},
   {TokenType::INCREMENT_PREFIX, "++"},
   {TokenType::INCREMENT_POSTFIX, "++"},
   {TokenType::ASSIGNMENT, " = "},
@@ -369,7 +370,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::CLOSE_BRACE, "}\n"},
   {TokenType::BITWISE_OR, "|"},
   {TokenType::BITWISE_OR_ASSIGNMENT, "|="},
-  {TokenType::LOGICAL_OR, "||"},
+  {TokenType::LOGICAL_OR, " || "},
   {TokenType::OPEN_BRACKET, "["},
   {TokenType::CLOSE_BRACKET, "]"},
   {TokenType::BACK_SLASH, "\\"},

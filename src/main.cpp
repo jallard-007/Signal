@@ -31,14 +31,15 @@ int main(int argc, char **argv) {
   }
   if (!p.expected.empty()) {
     for (auto enx : p.expected) {
-      std::cout << enx.getErrorMessage(argv[1]);
+      std::cout << enx.getErrorMessage(tk, argv[1]);
     }
-    exit(1);
   }
   if (!p.unexpected.empty()) {
     for (auto enx : p.unexpected) {
       std::cout << enx.getErrorMessage(tk, argv[1]);
     }
+  }
+  if (!p.unexpected.empty() || !p.expected.empty()) {
     exit(1);
   }
   std::string pretty;

@@ -112,10 +112,12 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   if (scopeStatements.curr.type != StatementType::NONE && scopeStatements.curr.type != StatementType::SET) {
     indentation += indentationSize;
     for (StatementList * iter = &scopeStatements; iter; iter = iter->next) {
-      str += std::string(indentation, ' ');
-      iter->curr.prettyPrint(tk, str, indentation);
-      if (iter->curr.type != StatementType::SCOPE && !(iter->curr.type == StatementType::KEY_W_BODY && iter->curr.keyWBody->keyword.type != TokenType::RETURN)) {
-        str += ";\n";
+      if (iter->curr.type != StatementType::NONE) {
+        str += std::string(indentation, ' ');
+        iter->curr.prettyPrint(tk, str, indentation);
+        if (iter->curr.type != StatementType::SCOPE && !(iter->curr.type == StatementType::KEY_W_BODY && iter->curr.keyWBody->keyword.type != TokenType::RETURN)) {
+          str += ";\n";
+        }
       }
     }
     indentation -= indentationSize;
@@ -126,7 +128,6 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
 
 void ForLoopHeader::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += '(';
-  if (list.curr.type != StatementType::NONE) {
     StatementList * iter = &list;
     for (; iter->next; iter = iter->next) {
       iter->curr.prettyPrint(tk, str, indentation);
@@ -136,8 +137,9 @@ void ForLoopHeader::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indent
         str += ";";
       }
     }
-    iter->curr.prettyPrint(tk, str, indentation);
-  }
+    if (iter->next) {
+      iter->curr.prettyPrint(tk, str, indentation);
+    }
   str += ')';
 }
 
