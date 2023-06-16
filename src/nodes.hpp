@@ -1,13 +1,11 @@
 #pragma once
 
 #include "tokenizer/tokenizer.hpp"
-#include <vector>
-#include <memory>
 
 struct Unexpected {
   Token token;
   Unexpected() = delete;
-  Unexpected(Token);
+  Unexpected(const Token&);
   std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
@@ -22,259 +20,435 @@ struct Expected {
   TokenType expectedTokenType;
   ExpectedType expectedType;
   Expected() = delete;
-  Expected(ExpectedType, Token);
-  Expected(ExpectedType, Token, TokenType);
+  Expected(ExpectedType, const Token&);
+  Expected(ExpectedType, const Token&, TokenType);
   std::string getErrorMessage(Tokenizer&, const std::string&);
-};
-
-struct TokenList {
-  Token curr;
-  TokenList *next;
-  TokenList();
-  TokenList(Token);
-  TokenList(TokenList&&) = default;
-  ~TokenList() = default;
-  bool operator==(const TokenList&) const;
-};
-
-struct Type {
-  TokenList tokens;
-  Type() = default;
-  Type(Type&&) = default;
-  void prettyPrint(Tokenizer&, std::string&);
 };
 
 typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
-typedef struct Scope Scope;
-typedef struct ForLoopHeader ForLoopHeader;
-typedef struct ArrOrStructLiteral ArrOrStructLiteral;
-typedef struct KeywordWithBody KeywordWithBody;
-typedef struct Declaration Declaration;
-typedef struct VariableDec VariableDec;
 
-enum class StatementType: uint8_t {
+enum class ExpressionType {
   NONE,
-  SET,
   BINARY_OP,
   UNARY_OP,
   VALUE,
   FUNCTION_CALL,
   ARRAY_ACCESS,
-  WRAPPED_VALUE,
-  VARIABLE_DEC,
-  ARRAY_OR_STRUCT_LITERAL,
-  FOR_LOOP_HEADER,
-  SCOPE,
-  KEYWORD,
-  KEY_W_BODY,
+  WRAPPED,
 };
 
-struct Statement {
+struct Expression {
   union {
-    UnOp *unOp;
     BinOp *binOp;
-    Declaration *dec;
+    UnOp *unOp;
+    Token *value;
     FunctionCall *funcCall;
     ArrayAccess *arrAccess;
-    Statement *wrapped;
-    Scope *scope;
-    ArrOrStructLiteral *arrOrStructLiteral;
-    ForLoopHeader *list;
-    KeywordWithBody *keyWBody;
-    Token *var;
-    TokenType key;
+    Expression *wrapped;
   };
-  StatementType type = StatementType::NONE;
+  ExpressionType type;
+  Expression();
+  Expression(const Expression&);
+  Expression(Expression&&);
+  void operator=(Expression&&);
+  void swap(Expression&);
+  void prettyPrint(Tokenizer&, std::string&);
+};
 
+struct ExpressionList {
+  Expression curr;
+  ExpressionList *next;
+  ExpressionList();
+  ExpressionList(const ExpressionList&) = default;
+  void prettyPrint(Tokenizer&, std::string&);
+};
+
+typedef struct ControlFlowStatement ControlFlowStatement;
+typedef struct Scope Scope;
+typedef struct VariableDec VariableDec;
+
+enum class StatementType {
+  NOTHING,
+  EXPRESSION,
+  CONTROL_FLOW,
+  SCOPE,
+  VARIABLE_DEC
+};
+
+// statement:=  expression; | controlFlowStatement | scope | varDec | nothing
+struct Statement {
+  union {
+    Expression *expression;
+    ControlFlowStatement *controlFlow;
+    Scope *scope;
+    VariableDec *varDec;
+  };
+  StatementType type;
   Statement();
-  explicit Statement(StatementType);
-  Statement(const Statement&) = delete;
-  Statement(Statement&&) noexcept ;
-  explicit Statement(UnOp *);
-  explicit Statement(BinOp *);
-  explicit Statement(Declaration *);
-  explicit Statement(FunctionCall *);
-  explicit Statement(ArrayAccess *);
-  explicit Statement(Statement *);
+  explicit Statement(Expression *);
+  explicit Statement(ControlFlowStatement *);
   explicit Statement(Scope *);
-  explicit Statement(ForLoopHeader *);
-  explicit Statement(KeywordWithBody *);
-  explicit Statement(ArrOrStructLiteral *);
-  explicit Statement(Token *);
-  void operator=(Statement&&) noexcept;
-  void operator=(const Statement&) = delete;
-  explicit operator bool() const;
-
-  ExpectedType addStatementToNode(Statement&&);
-  Statement *getChild();
-  ExpectedType isValid() const;
+  explicit Statement(VariableDec *);
+  Statement(const Statement&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+// typeList: typeQualifier identifier indirectionTypeList
+// indirectionTypeList:= nothing
+//                     | typeQualifier ptr indirectionTypeList
+//                     // | typeQualifier [number | nothing] indirectionTypeList ignore arrays for now
+//                     | typeQualifier ref
+struct TokenList {
+  Token token;
+  TokenList *next;
+  TokenList();
+  TokenList(const Token&);
+  TokenList(const TokenList&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// varDec:= simpleVarDec initialization
+//                     | nothing
+struct VariableDec {
+  Token name;
+  TokenList type;
+  Expression *initialAssignment;
+  VariableDec() = delete;
+  explicit VariableDec(const Token&);
+  VariableDec(const VariableDec&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// statementList:= statement statementList | nothing
 struct StatementList {
   Statement curr;
   StatementList *next;
-  StatementList();
-  StatementList(StatementList&&) = default;
-  ~StatementList() = default;
-  operator bool() const;
-};
-
-bool hasData(StatementType);
-
-struct VariableDec {
-  Type type;
-  Token name;
-  Statement *initialAssignment;
-  VariableDec() = delete;
-  explicit VariableDec(Token);
-  VariableDec(VariableDec&&) = default;
+  StatementList() = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct ArrOrStructLiteral {
-  StatementList list;
-  ArrOrStructLiteral() = default;
-  ArrOrStructLiteral(ArrOrStructLiteral&&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-};
-
-struct ForLoopHeader {
-  StatementList list;
-  ForLoopHeader() = default;
-  ForLoopHeader(ForLoopHeader&&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-};
-
+// scope:= { statementList }
 struct Scope {
   StatementList scopeStatements;
   Scope() = default;
-  operator bool() const;
+  Scope(const Scope &) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct KeywordWithBody {
-  Scope body;
-  Statement header;
-  Token keyword;
-  bool isValid;
-  KeywordWithBody() = delete;
-  KeywordWithBody(Token);
-  KeywordWithBody(KeywordWithBody&&);
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-};
+// EXPRESSIONS
 
+// arrayAccess:= identifier [ expression ]
 struct ArrayAccess {
-  Statement offset;
   Token array;
-
+  Expression offset;
   ArrayAccess() = delete;
-  explicit ArrayAccess(Token);
+  explicit ArrayAccess(const Token&);
+  ArrayAccess(const ArrayAccess&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+// binOp:= expression binOpOperator expression
 struct BinOp {
-  Statement leftSide;
-  Statement rightSide;
   Token op;
-  explicit BinOp(Token);
-  BinOp(const BinOp&) = delete;
-  BinOp(BinOp&&) noexcept;
+  Expression leftSide;
+  Expression rightSide;
+  explicit BinOp(const Token&);
+  BinOp(const BinOp&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+// unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
 struct UnOp {
-  Statement operand;
   Token op;
-  explicit UnOp(Token);
-  UnOp(const UnOp&) = delete;
-  UnOp(UnOp&&) noexcept;
+  Expression operand;
+  explicit UnOp(const Token&);
+  UnOp(const UnOp&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+// functionCall:= identifier(expressionList)
 struct FunctionCall {
-  StatementList args;
   Token name;
+  ExpressionList args;
   FunctionCall() = delete;
-  explicit FunctionCall(Token);
+  explicit FunctionCall(const Token &);
+  FunctionCall(const FunctionCall&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct Enum {
-  // we can assign specific values to tokens, has to be statements >:(
-  std::vector<Token> members;
-  Token name;
-  Enum();
+// arrayOrStructLiteral:= [ expressionList ]
+struct ArrayOrStructLiteral {
+  ExpressionList values;
+  ArrayOrStructLiteral() = default;
+  ArrayOrStructLiteral(const ArrayOrStructLiteral&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct FunctionDec {
-  StatementList params;
+// CONDITIONAL STATEMENTS
+
+// ifStatement:= if (expression) scope
+struct IfStatement {
+  Token token;
+  Expression condition;
   Scope body;
-  Type returnType;
-  Token name;
-  FunctionDec() = delete;
-  explicit FunctionDec(Token);
-  FunctionDec(FunctionDec&&);
+  IfStatement() = delete;
+  explicit IfStatement(const Token&);
+  IfStatement(const IfStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-typedef struct Template Template;
-typedef struct Struct Struct;
-
-enum class DecType: uint8_t {
-  NONE,
-  FUNCTION,
-  VARIABLE_DEC,
-  TEMPLATE,
-  STRUCT,
-  ENUM
+// elifStatementList:= elifStatement elifStatementList | nothing
+struct ElifStatementList {
+  IfStatement elif;
+  ElifStatementList *next;
+  ElifStatementList() = delete;
+  ElifStatementList(const Token&);
+  ElifStatementList(const ElifStatementList&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct Declaration {
-  union{
-    FunctionDec *func;
-    VariableDec *varDec;
-    Template *temp;
-    Struct *struc;
-    Enum *enm;
+// conditionalStatement:= ifStatement
+//                       | ifStatement elifStatementList
+//                       | ifStatement elifStatementList elseStatement
+struct ConditionalStatement {
+  IfStatement ifStatement;
+  ElifStatementList *elifStatement;
+  Scope *elseStatement;
+  ConditionalStatement(const Token&);
+  ConditionalStatement(const ConditionalStatement&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// returnStatement:= return expression;
+struct ReturnStatement {
+  Token token;
+  Expression returnValue;
+  ReturnStatement() = delete;
+  explicit ReturnStatement(const Token&);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+struct SwitchScope {
+  int i;
+};
+
+// switchStatement:=  switch (identifier) switchScope
+struct SwitchStatement {
+  Token token;
+  Token switched;
+  Scope body;
+  SwitchStatement() = delete;
+  explicit SwitchStatement(const Token&);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// LOOPS
+
+// whileLoop:= while (expression) scope
+struct WhileLoop {
+  Token token;
+  Expression condition;
+  Scope body;
+  WhileLoop() = delete;
+  explicit WhileLoop(const Token&);
+  WhileLoop(const WhileLoop&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
+struct ForLoop {
+  Token token;
+  bool isVarDec;
+  union {
+    Expression initialize;
+    VariableDec varDec;
   };
-  DecType decType;
-  bool isValid;
-  Declaration();
-  Declaration(Declaration&&) noexcept;
-  explicit Declaration(FunctionDec *);
-  explicit Declaration(VariableDec *);
-  explicit Declaration(Template *);
-  explicit Declaration(Struct *);
-  explicit Declaration(Enum *);
+  Expression condition;
+  Expression iteration;
+  Scope body;
+  ForLoop() = delete;
+  explicit ForLoop(const Token&);
+  ForLoop(ForLoop &&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct Struct {
-  std::vector<Declaration> decs;
+
+enum class ControlFlowStatementType {
+  NONE,
+  FOR_LOOP,
+  WHILE_LOOP,
+  CONDITIONAL_STATEMENT,
+  RETURN_STATEMENT,
+  SWITCH_STATEMENT,
+};
+
+// forLoop | whileLoop | conditionalStatement | returnStatement | switchStatement
+struct ControlFlowStatement {
+  union {
+    ForLoop forLoop;
+    WhileLoop whileLoop;
+    ConditionalStatement conditional;
+    ReturnStatement returnStatement;
+    SwitchStatement switchStatement;
+  };
+  ControlFlowStatementType type;
+  ControlFlowStatement();
+  ControlFlowStatement(ForLoop&& val);
+  ControlFlowStatement(const WhileLoop& val);
+  ControlFlowStatement(const ConditionalStatement& val);
+  ControlFlowStatement(const ReturnStatement& val);
+  ControlFlowStatement(const SwitchStatement& val);
+
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// STATEMENTS
+
+// DECLARATIONS
+
+// functionDec:= func identifier (varDecList): typeList scope
+struct FunctionDec {
   Token name;
-  Struct(Token);
-  Struct(Struct&&) = default;
+  StatementList params;
+  TokenList returnType;
+  Scope body;
+  FunctionDec() = delete;
+  explicit FunctionDec(const Token&);
+  FunctionDec(const FunctionDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-struct Template {
-  TokenList templateIdentifiers;
-  Declaration dec;
-  Template() = default;
-  Template(const Template&) = delete;
-  Template(Template&&) = default;
+// initialization:=  = expression
+//                   | arrayOrStructLiteral
+struct Initialization {
+  union {
+    Expression expression;
+    ArrayOrStructLiteral arrOrStruct;
+  };
+  bool isExpression;
+  Initialization();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
+// varDecList:= varDec varDecTail
+// varDecTail:= , varDec varDecTail | nothing
+struct VarDecList {
+  VariableDec curr;
+  VarDecList * next;
+  VarDecList() = delete;
+  VarDecList(const Token&);
+  VarDecList(const VarDecList&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// structDec:= struct identifier { structDecList }
+struct StructDec {
+  Token token;
+  StructDecList decs;
+  StructDec() = delete;
+  explicit StructDec(const Token&);
+  StructDec(const StructDec&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// structDecList:= varDec ; decList | functionDec decList | nothing
+struct StructDecList {
+  union {
+    VariableDec varDec;
+    FunctionDec funcDec;
+  };
+  
+  StructDecList *next;
+  bool isVarDec;
+  StructDecList();
+  StructDecList(const StructDecList&);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// enumDec:= enum identifier { identifierList }
+struct EnumDec {
+  Token token;
+  TokenList members;
+  EnumDec() = delete;
+  explicit EnumDec(const Token&);
+  EnumDec(const EnumDec&) = default;
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// identifierList:= identifier identifierTail
+//                 | nothing
+// identifierTail:= , identifier identifierTail
+struct IdentifierList {
+  Token token;
+  IdentifierList *next;
+  IdentifierList();
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// templateDec:= template [ identifierList ] structDec
+//                                          | functionDec
+struct TemplateDec {
+  Token token;
+  IdentifierList templateTypes;
+  union {
+    StructDec structDec;
+    FunctionDec funcDec;
+  };
+  bool isStruct;
+  TemplateDec();
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+//templateCreation:= create identifier [ identifierList ] as identifier ;
+struct TemplateCreation {
+  Token token;
+  TemplateDec * templateDec;
+  IdentifierList templateTypes;
+  Token identifier;
+  TemplateCreation() = delete;
+  TemplateCreation(const Token &);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+enum class GlobalDecType {
+  STRUCT,
+  VARIABLE,
+  FUNCTION,
+  ENUM,
+  TEMPLATE,
+  TEMPLATE_CREATE,
+};
+
+// globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
+struct GlobalDec {
+  union {
+    StructDec structDec;
+    VariableDec varDec;
+    FunctionDec funcDec;
+    EnumDec enumDec;
+    TemplateDec tempDec;
+    TemplateCreation tempCreate;
+  };
+  GlobalDecType type;
+  GlobalDec();
+  GlobalDec();
+  GlobalDec();
+  GlobalDec();
+  GlobalDec();
+};
+
+// globalDecList:= globalDec globalDecList | nothing
+struct GlobalDecList {
+  GlobalDec curr;
+  GlobalDecList *next;
+  GlobalDecList();
+};
+
+// program:= globalDecList
 struct Program {
-  std::string name;
-  std::vector<Declaration> decs;
+  GlobalDecList decs;
   Program() = default;
-  Program(Program&&) noexcept;
-  void prettyPrint(Tokenizer&, std::string&);
 };

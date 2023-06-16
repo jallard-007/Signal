@@ -73,36 +73,41 @@ postFixUnaryOpOperator:= defined in token.hpp
 identifier:= not a keyword, can start with a letter or underscore, can have letters underscores and numbers following
 keywords:= defined in token.hpp
 
+expression:= identifier | number | stringLiteral | charLiteral | binOp | unaryOp | functionCall | arrayAccess | (expression) | memberAccess
+expressionList:= expression expressionTail
+expressionTail:= , expression expressionTail | nothing
+
+memberAccess:= identifier . identifier
+                            | functionCall
+                            | arrayAccess
+
+arrayAccess:= identifier [ expression ]
+
 binOp:= expression binOpOperator expression
 unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
 
-functionCall:= identifier(expressionList)
+functionCall:= identifier (expressionList)
 
 arrayOrStructLiteral:= [ expressionList ]
-
-expression:= identifier | number | stringLiteral | charLiteral | binOp | unaryOp | functionCall | arrayAccess
-
-expressionList:= expression expressionTail
-expressionTail:= , expression expressionTail | nothing
 
 typeQualifier:= mut | const | nothing
 typeList: typeQualifier identifier indirectionTypeList
 
 indirectionTypeList:= nothing
                     | typeQualifier ptr indirectionTypeList
-                    | typeQualifier [number | nothing] indirectionTypeList
+                    // | typeQualifier [number | nothing] indirectionTypeList ignore arrays for now
                     | typeQualifier ref
 
 simpleVarDec:= identifier : typeList
-varDecWInitialize:= varDec = expression
-                            | arrayOrStructLiteral
-varDec:= simpleVarDec | varDecWInitialize
+initialization:=  = expression
+                  | arrayOrStructLiteral
+varDec:= simpleVarDec initialization
+                    | nothing
 
 scope:= { statementList }
 
-forLoop:= for (expression | varDec ; expression; expression) scope
+forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 whileLoop:= while (expression) scope
-
 
 conditionalStatement:= ifStatement
                       | ifStatement elifStatementList
@@ -117,7 +122,8 @@ switchStatement:=  switch (identifier) switchScope
 
 controlFlowStatement:= forLoop | whileLoop | conditionalStatement | returnStatement | switchStatement
 
-statementList:= expression ; statementList | controlFlowStatement statementList | scope statementList | varDec statementList | nothing
+statement:= expression; | controlFlowStatement | scope | varDec 
+statementList:= statement statementList | nothing
 
 functionDec:= func identifier (varDecList): typeList scope
 
@@ -129,6 +135,7 @@ structDec:= struct identifier { structDecList }
 structDecList:= varDec ; decList | functionDec decList | nothing
 
 enumDec:= enum identifier { identifierList }
+
 identifierList:= identifier identifierTail
                 | nothing
 identifierTail:= , identifier identifierTail

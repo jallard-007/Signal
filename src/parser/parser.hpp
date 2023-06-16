@@ -13,12 +13,15 @@ struct Parser {
   ~Parser();
   explicit Parser(Tokenizer&, NodeMemPool&);
   bool parse();
-  bool functionDec(Declaration&);
-  bool structDec(Declaration&);
-  bool templateDec(Declaration&);
+  bool functionDec(FunctionDec&);
+  bool structDec(StructDec&);
+  bool templateDec(TemplateDec&);
   Statement parseStatement(TokenType, TokenType);
-  bool getStatements(StatementList&, TokenType, TokenType);
-  Token getType(Type&);
+  bool parseExpression(Expression&);
+  bool getExpressions(ExpressionList&, TokenType, TokenType);
+
+
+  Token getType(TokenList&);
 };
 
 const std::unordered_map<TokenType, uint8_t> operatorPrecedence {

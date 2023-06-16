@@ -76,6 +76,18 @@ struct MemPool {
     return curr;
   }
 
+  T *get(const T& t) {
+    if (!freeObj->next) {
+      addList();
+      freeObj->next = mem[n];
+    }
+
+    T *curr = &freeObj->val;
+    freeObj = freeObj->next;
+    new (curr) T{t};
+    return curr;
+  }
+
   T *get() {
     if (!freeObj->next) {
       addList();

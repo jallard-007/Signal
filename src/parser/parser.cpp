@@ -9,6 +9,7 @@ Parser::~Parser() {
 }
 
 bool Parser::parse() {
+  GlobalDecList * list = &program.decs;
   Token token = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
     switch (token.type) {
@@ -19,31 +20,34 @@ bool Parser::parse() {
 
       case TokenType::FUNC: {
         tokenizer.consumePeek();
-        auto& funcDec = program.decs.emplace_back();
-        if (!functionDec(funcDec)) {
-          program.decs.pop_back();
+        list->curr.type = GlobalDecType::FUNCTION;
+        if (!functionDec(list->curr.funcDec)) {
           return false;
         }
+        list->next = memPool.getGlobalDec();
+        list = list->next;
         break;
       }
 
       case TokenType::STRUCT: {
         tokenizer.consumePeek();
-        auto& sDec = program.decs.emplace_back();
-        if (!structDec(sDec)) {
-          program.decs.pop_back();
+        list->curr.type == GlobalDecType::STRUCT;
+        if (!structDec(list->curr.structDec)) {
           return false;
         }
+        list->next = memPool.getGlobalDec();
+        list = list->next;
         break;
       }
 
       case TokenType::TEMPLATE: {
         tokenizer.consumePeek();
-        auto& tempDec = program.decs.emplace_back();
-        if (!templateDec(tempDec)) {
-          program.decs.pop_back();
+        list->curr.type == GlobalDecType::TEMPLATE;
+        if (!templateDec(list->curr.tempDec)) {
           return false;
         }
+        list->next = memPool.getGlobalDec();
+        list = list->next;
         break;
       }
 
@@ -55,34 +59,7 @@ bool Parser::parse() {
 
       case TokenType::ENUM: {
         tokenizer.consumePeek();
-
-        auto& r = program.decs.emplace_back(memPool.get(Enum{}));
-        if (tokenizer.peekNext().type == TokenType::IDENTIFIER) {
-          r.enm->name = tokenizer.peeked;
-          tokenizer.consumePeek();
-        }
-
-        if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACE);
-        }
-        tokenizer.consumePeek();
-        token = tokenizer.peekNext();
-        while (tokenizer.peeked.type != TokenType::CLOSE_BRACE) {
-          if (token.type != TokenType::IDENTIFIER) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACE);
-          }
-          if (token.type == TokenType::IDENTIFIER) {
-            r.enm->members.emplace_back(token);
-            tokenizer.consumePeek();
-          } else {
-            unexpected.emplace_back(token);
-            program.decs.pop_back();
-            return false;
-          }
-          if (tokenizer.peekNext().type == TokenType::COMMA) {
-            tokenizer.consumePeek();
-          }
-        }
+        // enum
         break;
       }
 
@@ -140,7 +117,7 @@ bool Parser::parse() {
   return true;
 }
 
-bool Parser::functionDec(Declaration& dec) {
+bool Parser::functionDec(FunctionDec& dec) {
   const Token token = tokenizer.tokenizeNext();
   if (token.type != TokenType::IDENTIFIER) {
     // expected identifier
@@ -747,86 +724,171 @@ Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiter
       expected.emplace_back(exType, lookAhead, delimiterA);
     }
   } else {
-    if (rootStatement.type != StatementType::NONE) {
+    if (rootStatement.type != StatementType::NOTHING) {
       exit(1);
     }
     lookAhead.type = TokenType::NOTHING;
-    rootStatement.var = memPool.get(Token{lookAhead});
+    rootStatement.expression = memPool.get(Token{lookAhead});
   }
   return rootStatement;
 }
 
 /**
- * Extracts delimiterMinor delimited statements until it reaches the delimiterMajor delimiter
+ * Extracts delimiterMinor delimited expressions until it reaches the delimiterMajor
  * Returns true on a successful parse (when it reaches the delimiterMajor),
- *  false otherwise (EOF, or when the delimiterMajor was expected by the parser)
+ *  false otherwise (invalid expression, end of file, etc.)
  * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimiterMajor on true)
 */
-bool Parser::getStatements(StatementList& statements, const TokenType delimiterMinor, const TokenType delimiterMajor) {
-  Token token{0, 0, TokenType::NOTHING};
-  StatementList *prev = nullptr;
-  StatementList *ptr = &statements;
-  size_t prevExpectedSize = expected.size();
-  while (true) {
-    ptr->curr = parseStatement(delimiterMinor, delimiterMajor);
+bool Parser::getExpressions(ExpressionList& expressions, TokenType delimiterMinor, TokenType delimiterMajor) {
+  ExpressionList *prev = nullptr;
+  ExpressionList *ptr = &expressions;
+  Token token = tokenizer.peekNext();
+  if (token.type == delimiterMajor) {
+    return true;
+  }
+  while (token.type != TokenType::END_OF_FILE) {
+    if (!parseExpression(ptr->curr)) {
+      // invalid expression
+      return false;
+    }
     token = tokenizer.peekNext();
-    if (ptr->curr.type == StatementType::NONE) {
-      if (delimiterMinor == TokenType::COMMA && (prev || token.type != delimiterMajor)) {
-        expected.emplace_back(ExpectedType::EXPRESSION, token);
-        prevExpectedSize = expected.size();
-      }
-    }
-    ptr->next = memPool.getStatementList();
-    prev = ptr;
-    ptr = ptr->next;
-    if (expected.size() > prevExpectedSize) {
-      if (expected.back().expectedTokenType == delimiterMajor) {
-        break;
-      }
-      prevExpectedSize = expected.size();
-    }
     if (token.type == delimiterMajor) {
-      if (ptr) {
-        if (delimiterMinor == TokenType::SEMICOLON && delimiterMajor == TokenType::CLOSE_BRACE && ptr->curr.type != StatementType::NONE) {
-          expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON);
-        }
-        if (ptr->next) {
-          memPool.release(ptr->next);
-          ptr->next = nullptr;
-        }
-        if (prev && ptr->curr.type == StatementType::NONE) {
-          prev->next = nullptr;
-          memPool.release(ptr);
-        }
-      }
       return true;
-    }
-    else if (token.type == TokenType::END_OF_FILE) {
+    } else if (token.type != delimiterMinor) {
+      expected.emplace_back(ExpectedType::TOKEN, token, delimiterMajor);
       break;
     }
+    ptr->next = memPool.getExpressionList();
+    prev = ptr;
+    ptr = ptr->next;
     tokenizer.consumePeek();
+
   }
   if (ptr) {
+    if (delimiterMinor == TokenType::SEMICOLON && delimiterMajor == TokenType::CLOSE_BRACE && ptr->curr.type != StatementType::NONE) {
+      expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON);
+    }
     if (ptr->next) {
-      memPool.release(ptr->next);
+      memPool.releaseExpressionList(ptr->next);
       ptr->next = nullptr;
     }
-    if (ptr->curr.type == StatementType::NONE) {
+    if (ptr->curr.type == ExpressionType::NONE) {
       prev->next = nullptr;
-      memPool.release(ptr);
+      memPool.releaseExpressionList(ptr);
     }
   }
-
   return false;
+}
+
+bool Parser::parseExpression(Expression& rootExpression) {
+  Expression *bottom = nullptr;
+  Token tk = tokenizer.peekNext();
+  while (1){
+
+    bool binary = isBinaryOp(tk.type);
+    if (binary || isUnaryOp(tk.type)) {
+      Expression expression;
+      if (binary) {
+        expression.type = ExpressionType::BINARY_OP;
+        expression.binOp = memPool.getBinOp(BinOp{tk});
+        if (!bottom) {
+          // expected expression
+          expected.emplace_back(ExpectedType::EXPRESSION, tk);
+          rootExpression = std::move(expression);
+          bottom = &rootExpression;
+          continue;
+        }
+      } else {
+        expression.type = ExpressionType::UNARY_OP;
+        expression.unOp = memPool.getUnOp(UnOp{tk});
+        if (!bottom) {
+          if (tk.type == TokenType::DECREMENT_POSTFIX || tk.type == TokenType::INCREMENT_POSTFIX) {
+            // expected expression
+            expected.emplace_back(ExpectedType::EXPRESSION, tk);
+          }
+          rootExpression = std::move(expression);
+          bottom = &rootExpression;
+          continue;
+        }
+      }
+      if (rootExpression.type != ExpressionType::BINARY_OP && rootExpression.type != ExpressionType::UNARY_OP) {
+        if (binary) {
+          expression.binOp->leftSide = std::move(rootExpression);
+        } else {
+          expression.unOp->operand = std::move(rootExpression);
+        }
+        rootExpression = std::move(expression);
+      }
+      else {
+        Expression* prev = nullptr;
+        Expression* listIter;
+        Expression* next = &rootExpression;
+        while (next) {
+          listIter = next;
+          TokenType op;
+          if (listIter->type == ExpressionType::BINARY_OP) {
+            op = listIter->binOp->op.type;
+            next = &listIter->binOp->rightSide;
+          } else if (listIter->type == ExpressionType::UNARY_OP) {
+            op = listIter->unOp->op.type;
+            next = &listIter->unOp->operand;
+          } else {
+            break;
+          }
+          if (operatorPrecedence.at(tk.type) <= operatorPrecedence.at(op)) {
+            break;
+          }
+          prev = listIter;
+        }
+
+        if (prev) {
+          if (binary) {
+            expression.binOp->leftSide = std::move(*listIter);
+          } else {
+            expression.unOp->operand = std::move(*listIter);
+          }
+          if (prev->type == ExpressionType::BINARY_OP) {
+            prev->binOp->rightSide = std::move(expression);
+          } else {
+            prev->unOp->operand = std::move(expression);
+          }
+        }
+        else {
+          if (binary) {
+            expression.binOp->leftSide = std::move(rootExpression);
+          } else {
+            expression.unOp->operand = std::move(rootExpression);
+          }
+          // move the statement to the root
+          rootExpression = std::move(expression);
+          bottom = &rootExpression;
+        }
+      }
+    }
+
+
+    switch(tk.type) {
+      case TokenType::BINARY_NUMBER:
+      case TokenType::HEX_NUMBER:
+      case TokenType::DECIMAL_NUMBER: 
+      case TokenType::IDENTIFIER: 
+        break;
+
+      default:
+        break;
+
+
+    }
+  }
 }
 
 /**
  * Returns the next token after the type list, adding tokens to type as it goes. tokens are in reverse order
  * Does NOT consume the final token
 */
-Token Parser::getType(Type& type) {
+Token Parser::getType(TokenList& type) {
   Token tp = tokenizer.peekNext();
-  TokenList *curr = memPool.getTokenList();
+  TokenList *curr = &type;
   bool typeFound = false;
   while (tp.type != TokenType::END_OF_FILE) {
     if (isConcreteType(tp.type)) {
@@ -838,7 +900,7 @@ Token Parser::getType(Type& type) {
       break;
     }
     tokenizer.consumePeek();
-    curr->curr = tp;
+    curr->token = tp;
     TokenList *prev = curr;
     curr = memPool.getTokenList();
     curr->next = prev;
@@ -847,8 +909,8 @@ Token Parser::getType(Type& type) {
   if (!curr->next) {
     memPool.release(curr);
   } else {
-    type.tokens.curr = curr->next->curr;
-    type.tokens.next = curr->next->next;
+    type.token = curr->next->token;
+    type.next = curr->next->next;
     memPool.release(curr);
   }
   return tp;
