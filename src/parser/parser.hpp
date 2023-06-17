@@ -14,7 +14,15 @@ enum class ParseStatementErrorType: uint8_t {
   NONE,
   REPORTED,
   NOT_STATEMENT,
+  EXPRESSION_AFTER_EXPRESSION,
+  NOT_EXPRESSION,
 };
+
+enum class ParseTypeErrorType: uint8_t {
+  NONE,
+  REPORTED,
+};
+
 
 struct Parser {
   Program program;
@@ -22,7 +30,7 @@ struct Parser {
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
   NodeMemPool& memPool;
-  Token expressionErrorToken;
+  Token errorToken;
   Parser() = delete;
   ~Parser();
   explicit Parser(Tokenizer&, NodeMemPool&);
@@ -31,12 +39,12 @@ struct Parser {
   bool structDec(StructDec&);
   bool templateDec(TemplateDec&);
   ParseStatementErrorType parseStatement(Statement&);
-  ParseStatementErrorType getStatements(StatementList&);
+  ParseStatementErrorType parseScope(StatementList&);
+  ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
+  ParseStatementErrorType parseIdentifierStatement(Statement&, Token&);
   ParseExpressionErrorType parseExpression(Expression&, Expression* bottom = nullptr);
   ParseExpressionErrorType getExpressions(ExpressionList&);
-
-
-  Token getType(TokenList&);
+  ParseTypeErrorType getType(TokenList&);
 };
 
 const std::unordered_map<TokenType, uint8_t> operatorPrecedence {

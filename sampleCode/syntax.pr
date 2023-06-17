@@ -109,8 +109,7 @@ scope:= { statementList }
 forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 whileLoop:= while (expression) scope
 
-conditionalStatement:= ifStatement
-                      | ifStatement elifStatementList
+conditionalStatement:= ifStatement elifStatementList
                       | ifStatement elifStatementList elseStatement
 
 ifStatement:= if (expression) scope

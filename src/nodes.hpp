@@ -138,7 +138,7 @@ struct VariableDec {
 struct StatementList {
   Statement curr;
   StatementList *next;
-  StatementList() = default;
+  StatementList();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -203,11 +203,9 @@ struct ArrayOrStructLiteral {
 
 // ifStatement:= if (expression) scope
 struct IfStatement {
-  Token token;
   Expression condition;
   Scope body;
-  IfStatement() = delete;
-  explicit IfStatement(const Token&);
+  IfStatement() = default;
   IfStatement(const IfStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
@@ -216,8 +214,7 @@ struct IfStatement {
 struct ElifStatementList {
   IfStatement elif;
   ElifStatementList *next;
-  ElifStatementList() = delete;
-  ElifStatementList(const Token&);
+  ElifStatementList() = default;
   ElifStatementList(const ElifStatementList&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
@@ -261,23 +258,15 @@ struct SwitchStatement {
 
 // whileLoop:= while (expression) scope
 struct WhileLoop {
-  Token token;
-  Expression condition;
-  Scope body;
-  WhileLoop() = delete;
-  explicit WhileLoop(const Token&);
+  IfStatement statement;
+  WhileLoop() = default;
   WhileLoop(const WhileLoop&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 struct ForLoop {
-  Token token;
-  bool isVarDec;
-  union {
-    Expression initialize;
-    VariableDec varDec;
-  };
+  Statement initialize;
   Expression condition;
   Expression iteration;
   Scope body;

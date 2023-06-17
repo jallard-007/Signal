@@ -27,9 +27,9 @@ enum class TokenType : uint8_t {
   CONTINUE,
   CREATE, //
   DEFAULT, //
-  IF,
   ELIF,
   ELSE,
+  IF,
   FOR,
   SWITCH, //
   RETURN,
@@ -116,6 +116,10 @@ enum class TokenType : uint8_t {
   POINTER,
   REFERENCE,
   VOID,
+
+  // extra types used by parse to report errors
+  TYPE,
+  OPERATOR
 };
 
 struct Token {
@@ -261,14 +265,11 @@ const TokenType numToType [128] {
   TokenType::BAD_VALUE  // 127 DEL
 };
 
-bool isLiteral(TokenType);
-bool isLogicalOp(TokenType);
-bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
 bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
-bool isKeywordWithBody(TokenType);
+bool isControlFlow(TokenType);
 
 const std::unordered_map<std::string, TokenType> stringToType {
   {"as", TokenType::AS},

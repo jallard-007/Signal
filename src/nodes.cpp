@@ -59,6 +59,8 @@ TokenList::TokenList(const TokenList& ref): token{ref.token}, next{ref.next} {}
 
 VariableDec::VariableDec(const Token& tk): name{tk}, type{}, initialAssignment{nullptr} {}
 
+StatementList::StatementList(): curr{}, next{nullptr} {}
+
 ArrayAccess::ArrayAccess(const Token& tk): array{tk}, offset{} {}
 
 BinOp::BinOp(const Token& token): op{token}, leftSide{}, rightSide{} {}
@@ -67,11 +69,7 @@ UnOp::UnOp(const Token& token): op{token}, operand{} {};
 
 FunctionCall::FunctionCall(const Token& tk): name{tk}, args{} {}
 
-IfStatement::IfStatement(const Token& token):token{token}, condition{}, body{} {}
-
-ElifStatementList::ElifStatementList(const Token& tk): elif{tk}, next{nullptr} {}
-
-ConditionalStatement::ConditionalStatement(const Token& token): ifStatement{token}, elifStatement{nullptr}, elseStatement{nullptr} {}
+ConditionalStatement::ConditionalStatement(const Token& token): ifStatement{}, elifStatement{nullptr}, elseStatement{nullptr} {}
 
 ReturnStatement::ReturnStatement(const Token& tk): token{tk}, returnValue{} {}
 

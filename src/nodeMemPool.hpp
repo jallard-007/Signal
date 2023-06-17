@@ -7,6 +7,7 @@ class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
   MemPool<ControlFlowStatement> controlFlows;
+  MemPool<ElifStatementList> elifs;
   MemPool<GlobalDecList> decs;
   MemPool<Token> tokens;
   MemPool<TokenList> tokenLists;
@@ -50,7 +51,8 @@ public:
   GlobalDecList* getGlobalDec() {return decs.get();}
   VariableDec* getVariableDec(VariableDec&& ref) {return varDecs.get(std::move(ref));}
   FunctionCall* getFunctionCall(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
-  ControlFlowStatement* getControlFlowStatement(ControlFlowStatement&& ref) {return controlFlows.get(std::move(ref));}
+  ElifStatementList* getElifStatementList() {return elifs.get();}
+  ControlFlowStatement* getControlFlowStatement() {return controlFlows.get();}
   ArrayAccess* getArrayAccess(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
   Token* getToken(const Token& ref) {return tokens.get(ref);}
   TokenList* getTokenList() {return tokenLists.get();}
@@ -58,7 +60,7 @@ public:
   Expression* getExpression(Expression&& ref) {return expressions.get(std::move(ref));}
   ExpressionList* getExpressionList() {return expressionLists.get();}
   Statement* getStatement(Statement&& ref) {return statements.get(std::move(ref));}
-  Scope* getScope(Scope&& ref) {return scopes.get(std::move(ref));}
+  Scope* getScope() {return scopes.get();}
   ArrayOrStructLiteral* getArrayOrStructLiteral(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
   StatementList* getStatementList() {return statementList.get();}
   FunctionDec* getFunctionDec(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
