@@ -6,6 +6,7 @@
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
+  MemPool<ControlFlowStatement> controlFlows;
   MemPool<GlobalDecList> decs;
   MemPool<Token> tokens;
   MemPool<TokenList> tokenLists;
@@ -47,21 +48,23 @@ public:
   UnOp* getUnOp(UnOp&& ref) {return unOps.get(std::move(ref));}
   BinOp* getBinOp(BinOp&& ref) {return binOps.get(std::move(ref));}
   GlobalDecList* getGlobalDec() {return decs.get();}
-  VariableDec* get(VariableDec&& ref) {return varDecs.get(std::move(ref));}
+  VariableDec* getVariableDec(VariableDec&& ref) {return varDecs.get(std::move(ref));}
   FunctionCall* getFunctionCall(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
-  ArrayAccess* get(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
+  ControlFlowStatement* getControlFlowStatement(ControlFlowStatement&& ref) {return controlFlows.get(std::move(ref));}
+  ArrayAccess* getArrayAccess(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
   Token* getToken(const Token& ref) {return tokens.get(ref);}
   TokenList* getTokenList() {return tokenLists.get();}
-  Expression* getExpression() {return expressions.get();}
+  Expression* getDefaultedExpression() {return expressions.get();}
+  Expression* getExpression(Expression&& ref) {return expressions.get(std::move(ref));}
   ExpressionList* getExpressionList() {return expressionLists.get();}
-  Statement* get(Statement&& ref) {return statements.get(std::move(ref));}
-  Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
-  ArrayOrStructLiteral* get(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
+  Statement* getStatement(Statement&& ref) {return statements.get(std::move(ref));}
+  Scope* getScope(Scope&& ref) {return scopes.get(std::move(ref));}
+  ArrayOrStructLiteral* getArrayOrStructLiteral(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
   StatementList* getStatementList() {return statementList.get();}
-  FunctionDec* get(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
-  EnumDec* get(EnumDec&& ref) {return enums.get(std::move(ref));}
-  StructDec* get(StructDec&& ref) {return structs.get(std::move(ref));}
-  TemplateDec* get(TemplateDec&& ref) {return templates.get(std::move(ref));}
+  FunctionDec* getFunctionDec(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
+  EnumDec* getEnumDec(EnumDec&& ref) {return enums.get(std::move(ref));}
+  StructDec* getStructDec(StructDec&& ref) {return structs.get(std::move(ref));}
+  TemplateDec* getTemplateDec(TemplateDec&& ref) {return templates.get(std::move(ref));}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}

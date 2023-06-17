@@ -1,5 +1,17 @@
 #include "nodes.hpp"
 
+bool notFirstOfExpression(TokenType type) {
+  return type != TokenType::IDENTIFIER &&
+    !isBinaryOp(type) && !isUnaryOp(type) &&
+    type != TokenType::DECIMAL_NUMBER &&
+    type != TokenType::OPEN_PAREN &&
+    type != TokenType::STRING_LITERAL &&
+    type != TokenType::CHAR_LITERAL &&
+    type != TokenType::BINARY_NUMBER &&
+    type != TokenType::HEX_NUMBER;
+}
+
+
 Unexpected::Unexpected(const Token& tk): token{tk} {};
 std::string Unexpected::getErrorMessage(Tokenizer&, const std::string&) {
   return "";

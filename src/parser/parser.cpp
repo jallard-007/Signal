@@ -290,521 +290,146 @@ bool Parser::templateDec(Declaration& dec) {
   return true;
 }
 
-/**
- * Extracts tokens until it reaches the specified delimiter, forming a Statement.
- * Two delimiters can be specified to accommodate enclosed lists, leave one as NOTHING if only one is needed
- * Does NOT consume the delimiter, you must do this after 
-*/
-Statement Parser::parseStatement(TokenType delimiterA, const TokenType delimiterB) {
-  if (delimiterA == TokenType::NOTHING) {
-    delimiterA = delimiterB;
-  }
-  Statement rootStatement;
+ParseStatementErrorType Parser::parseStatement(Statement &statement) {
   Token token = tokenizer.peekNext();
-  if (token.type == delimiterA || token.type == delimiterB) {
-    token.type = TokenType::NOTHING;
-    rootStatement.var = memPool.get(Token{token});
-    return rootStatement;
-  }
 
-  Statement *bottom = nullptr;
-  tokenizer.consumePeek();
-  Token lookAhead = tokenizer.peekNext();
-  while (token.type != TokenType::END_OF_FILE) {
-
-    if (isBinaryOp(token.type) || isUnaryOp(token.type)) {
-      Statement statement;
-      if (isBinaryOp(token.type)) {
-        statement.type = StatementType::BINARY_OP;
-        statement.binOp = memPool.get(BinOp{token});
-        if (!bottom) {
-          expected.emplace_back(ExpectedType::EXPRESSION, token);
-        }
-      } else {
-        statement.type = StatementType::UNARY_OP;
-        statement.unOp = memPool.get(UnOp{token});
-      }
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      }
-      
-      else {
-        const StatementType sType = rootStatement.type;
-        if (sType == StatementType::NONE) {
-          // never will be a node of this type in the list
-          exit(1);
-        }
-        
-        else if (sType == StatementType::UNARY_OP || sType == StatementType::BINARY_OP) {
-          Statement* prev = nullptr;
-          Statement* list_iter = &rootStatement;
-          do {
-            Statement* next;
-            TokenType op;
-            if (list_iter->type == StatementType::BINARY_OP) {
-              op = list_iter->binOp->op.type;
-              next = &list_iter->binOp->rightSide;
-            } else if (list_iter->type == StatementType::UNARY_OP) {
-              op = list_iter->unOp->op.type;
-              next = &list_iter->unOp->operand;
-            } else {
-              if (prev != bottom) {
-                std::cerr << "Only \'other\' nodes should be at the bottom\n";
-                std::cerr << "Statement Type: " << (int)list_iter->type << '\n';
-                std::cerr << "Bottom Statement Type: " << (int)bottom->type << '\n';
-                exit(1);
-              }
-              // cant insert the node
-              list_iter = nullptr;
-              break;
-            }
-            
-            if (operatorPrecedence.at(token.type) <= operatorPrecedence.at(op)) {
-              // place it between prev and current
-              if (prev) {
-                Statement* childOfPrev = prev->getChild();
-                // if there is a previous, it means there is a child, right? no need to check for nullptr
-                ExpectedType exType = childOfPrev->isValid();
-                if (exType != ExpectedType::NOTHING) {
-                  expected.emplace_back(exType, token, token.type);
-                }
-                if (statement.type == StatementType::BINARY_OP) {
-                  statement.binOp->leftSide = std::move(*childOfPrev);
-                } else {
-                  statement.unOp->operand = std::move(*childOfPrev);
-                }
-
-                if (prev->addStatementToNode(std::move(statement)) != ExpectedType::NOTHING) {
-                  std::cerr << "theres a problem\n";
-                  exit(1);
-                }
-                prev = nullptr;
-              }
-              
-              // root node
-              else {
-                ExpectedType exType = rootStatement.isValid();
-                if (exType != ExpectedType::NOTHING) {
-                  expected.emplace_back(exType, token, token.type);
-                }
-                if (statement.type == StatementType::BINARY_OP) {
-                  statement.binOp->leftSide = std::move(rootStatement);
-                } else {
-                  statement.unOp->operand = std::move(rootStatement);
-                }
-                // move the statement to the root
-                rootStatement = std::move(statement);
-                bottom = &rootStatement;
-              }
-              
-              // exit the list loop, we inserted the node
-              break;
-            }
-            
-            prev = list_iter;
-            list_iter = next;
-          } while (list_iter);
-
-          // we went through the whole list, so add it to the bottom
-          if (prev) {
-            Statement *childOfPrev = prev->getChild();
-            
-            // DUP CODE: moving child node
-            if (!childOfPrev ) {
-              // expected token between operators
-              if (statement.type == StatementType::BINARY_OP) {
-                expected.emplace_back(ExpectedType::EXPRESSION, token);
-              }
-            } else {
-              if (statement.type == StatementType::BINARY_OP) {
-                statement.binOp->leftSide = std::move(*childOfPrev);
-              } else {
-                statement.unOp->operand = std::move(*childOfPrev);
-              }
-            }
-            // END DUP CODE
-            ExpectedType exType = prev->addStatementToNode(std::move(statement));
-            if (exType != ExpectedType::NOTHING) {
-              expected.emplace_back(exType, token, delimiterA);
-              break;
-            } else {
-              if (prev->type == StatementType::BINARY_OP) {
-                bottom = &prev->binOp->rightSide;
-              } else {
-                bottom = &prev->unOp->operand;
-              }
-            }
-          }
-        }
-        
-        else if (hasData(sType)) {
-          // first "value" token in statement: take it
-          // this is the only node in the list (list.size == 1)
-          if (statement.type == StatementType::BINARY_OP) {
-            statement.binOp->leftSide = std::move(rootStatement);
-          } else {
-            statement.unOp->operand = std::move(rootStatement);
-          }
-          // move the statement to the tree root
-          rootStatement = std::move(statement);
-        }
-
-        else {
-          unexpected.emplace_back(token);
-        }
-      }
-    }
-
-    else if (token.type == TokenType::IDENTIFIER) {
-      Statement statement;
-
-      // function call: identifier (
-      if (lookAhead.type == TokenType::OPEN_PAREN) {
-        statement.funcCall = memPool.get(FunctionCall{token});
-        statement.type = StatementType::FUNCTION_CALL;
-        // consume the open paren
-        tokenizer.consumePeek();
-        if (!getStatements(statement.funcCall->args, TokenType::COMMA, TokenType::CLOSE_PAREN)) {
-          if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_PAREN);
-          }
-        } else {
-          // consume close_paren
-          tokenizer.consumePeek();
-        }
-        lookAhead = tokenizer.peekNext();
-      }
-
-      // pointer access with offset: identifier [
-      else if (lookAhead.type == TokenType::OPEN_BRACKET) {
-        statement.arrAccess = memPool.get(ArrayAccess{token});
-        statement.type = StatementType::ARRAY_ACCESS;
-        tokenizer.tokenizeNext();
-        statement.arrAccess->offset = parseStatement(TokenType::NOTHING, TokenType::CLOSE_BRACKET);
-        lookAhead = tokenizer.peekNext();
-        if (lookAhead.type == TokenType::CLOSE_BRACKET) {
-          tokenizer.consumePeek();
-        }
-        lookAhead = tokenizer.peekNext();
-      }
-
-      // variable declaration: identifier :
-      else if (lookAhead.type == TokenType::COLON && delimiterA != TokenType::COLON) {
-        statement.dec = memPool.get(Declaration{memPool.get(VariableDec{token})});
-        statement.type = StatementType::VARIABLE_DEC;
-        // consume the colon
-        tokenizer.consumePeek();
-        lookAhead = getType(statement.dec->varDec->type);
-        if (lookAhead.type == TokenType::END_OF_FILE) {
-          // never reached a type delimiter
-          expected.emplace_back(ExpectedType::TOKEN, lookAhead, delimiterB);
-          break;
-        }
-        if (lookAhead.type == TokenType::ASSIGNMENT) {
-          tokenizer.consumePeek();
-          Token tkBefore = lookAhead;
-          tkBefore.linePos += 1;
-          statement.dec->varDec->initialAssignment = memPool.get(parseStatement(delimiterA, delimiterB));
-          if (statement.dec->varDec->initialAssignment->type == StatementType::NONE) {
-            expected.emplace_back(ExpectedType::EXPRESSION, tkBefore);
-          } else if (!hasData(statement.dec->varDec->initialAssignment->type) && statement.dec->varDec->initialAssignment->type != StatementType::ARRAY_OR_STRUCT_LITERAL) {
-            expected.emplace_back(ExpectedType::EXPRESSION, tkBefore);
-            expected.emplace_back(ExpectedType::TOKEN, tkBefore, delimiterA);
-          }
-          lookAhead = tokenizer.peekNext();
-        }
-        if (lookAhead.type != TokenType::SEMICOLON && delimiterA == TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, lookAhead, delimiterA);
-          break;
-        }
-        // cant be keyword, unary op,
-        // can be binary op, delimiter
-        else if (lookAhead.type != delimiterA && lookAhead.type != delimiterB && !isBinaryOp(lookAhead.type)) {
-          unexpected.emplace_back(lookAhead);
-          break;
-        }
-      }
-
-      // we are using the identifier's actual value
-      else {
-        statement.type = StatementType::VALUE;
-        statement.var = memPool.get(Token{token});
-      }
-
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-    }
-
-    else if (isLiteral(token.type)) {
-      Statement statement{memPool.get(Token{token})};
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-    }
-
-    else if (isKeyword(token.type)) {
-      Statement statement;
-      if (isKeywordWithBody(token.type)) {
-        statement.keyWBody = memPool.get(KeywordWithBody{token});
-        statement.type = StatementType::KEY_W_BODY;
-      }
-      else if (token.type == TokenType::BREAK || token.type == TokenType::CONTINUE) {
-        statement.type = StatementType::KEYWORD;
-        statement.key = token.type;
-        if (lookAhead.type != TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, lookAhead, TokenType::SEMICOLON);
-          break;
-        }
-      }
-      else {
-        // unexpected
-        unexpected.emplace_back(token);
-        break;
-      }
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-    }
-
-    else if (token.type == TokenType::OPEN_PAREN) {
-      Statement statement;
-      if (rootStatement.type == StatementType::KEY_W_BODY && rootStatement.keyWBody->keyword.type == TokenType::FOR) {
-        statement.type = StatementType::FOR_LOOP_HEADER;
-        statement.list = memPool.get(ForLoopHeader{});
-        if (!getStatements(statement.list->list, TokenType::SEMICOLON, TokenType::CLOSE_PAREN)) {
-          if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_PAREN);
-          }
-        } else {
-          lookAhead = tokenizer.peekNext();
-        }
-      }
-      else {
-        statement.type = StatementType::WRAPPED_VALUE;
-        statement.wrapped = memPool.get(parseStatement(TokenType::SEMICOLON, TokenType::CLOSE_PAREN));
-        lookAhead = tokenizer.peekNext();
-        if (statement.wrapped->type == StatementType::NONE) {
-          expected.emplace_back(ExpectedType::EXPRESSION, lookAhead);
-        }
-      }
-
-      if (lookAhead.type != TokenType::CLOSE_PAREN) {
-        // expected close paren
-        expected.emplace_back(ExpectedType::TOKEN, lookAhead, TokenType::CLOSE_PAREN);
-        break;
-      } else {
-        // consume the close paren
-        tokenizer.consumePeek();
-      }
-
-      lookAhead = tokenizer.peekNext();
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-    }
-
-    // scope
-    else if (token.type == TokenType::OPEN_BRACE) {
-      if (delimiterB != TokenType::CLOSE_BRACE) {
-        // naughty naughty naughty
-        unexpected.emplace_back(token);
-        break;
-      }
-      Statement statement{memPool.get(Scope{})};
-      if (!getStatements(statement.scope->scopeStatements, TokenType::SEMICOLON, TokenType::CLOSE_BRACE)) {
-        if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACE);
-        }
-      } else {
-        // consume the close_brace
-        tokenizer.consumePeek();
-      }
-
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-      if ((rootStatement.type == StatementType::KEY_W_BODY || rootStatement.type == StatementType::SCOPE) && delimiterA == TokenType::SEMICOLON) {
-        --tokenizer.position;
-        tokenizer.peeked.type = TokenType::SEMICOLON;
-        tokenizer.peeked.length = 1;
-      }
-      lookAhead = tokenizer.peekNext();
-    }
-
-    // array literals, structs
-    else if (token.type == TokenType::OPEN_BRACKET) {
-      Statement statement{memPool.get(ArrOrStructLiteral{})};
-      statement.type = StatementType::ARRAY_OR_STRUCT_LITERAL;
-      if (!getStatements(statement.arrOrStructLiteral->list, TokenType::COMMA, TokenType::CLOSE_BRACKET)) {
-        if (tokenizer.peeked.type == TokenType::END_OF_FILE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACKET);
-        }
-      } else {
-        // consume the close_bracket
-        tokenizer.consumePeek();
-      }
-      lookAhead = tokenizer.peekNext();
-      // DUP CODE: adding leaf node to the tree by move
-      if (!bottom) {
-        rootStatement = std::move(statement);
-        bottom = &rootStatement;
-      } else {
-        ExpectedType exType = bottom->addStatementToNode(std::move(statement));
-        if (exType != ExpectedType::NOTHING) {
-          expected.emplace_back(exType, token, delimiterA);
-          break;
-        }
-      }
-      // END DUP CODE
-    }
-
-    else {
-      // unexpected, i guess...
-      unexpected.emplace_back(token);
-    }
-
-    if (lookAhead.type == delimiterA || lookAhead.type == delimiterB) {
-      break;
-    }
-    
-    token = tokenizer.tokenizeNext();
-    lookAhead = tokenizer.peekNext();
-  }
-
-  if (bottom) {
-    ExpectedType exType = bottom->isValid();
-    if (exType != ExpectedType::NOTHING) {
-      expected.emplace_back(exType, lookAhead, delimiterA);
-    }
-  } else {
-    if (rootStatement.type != StatementType::NOTHING) {
-      exit(1);
-    }
-    lookAhead.type = TokenType::NOTHING;
-    rootStatement.expression = memPool.get(Token{lookAhead});
-  }
-  return rootStatement;
-}
-
-/**
- * Extracts delimiterMinor delimited expressions until it reaches the delimiterMajor
- * Returns true on a successful parse (when it reaches the delimiterMajor),
- *  false otherwise (invalid expression, end of file, etc.)
- * Does NOT consume the final delimiter, just peeks at it (tokenizer.peeked.type == delimiterMajor on true)
-*/
-bool Parser::getExpressions(ExpressionList& expressions, TokenType delimiterMinor, TokenType delimiterMajor) {
-  ExpressionList *prev = nullptr;
-  ExpressionList *ptr = &expressions;
-  Token token = tokenizer.peekNext();
-  if (token.type == delimiterMajor) {
-    return true;
-  }
-  while (token.type != TokenType::END_OF_FILE) {
-    if (!parseExpression(ptr->curr)) {
-      // invalid expression
-      return false;
-    }
-    token = tokenizer.peekNext();
-    if (token.type == delimiterMajor) {
-      return true;
-    } else if (token.type != delimiterMinor) {
-      expected.emplace_back(ExpectedType::TOKEN, token, delimiterMajor);
-      break;
-    }
-    ptr->next = memPool.getExpressionList();
-    prev = ptr;
-    ptr = ptr->next;
+  // varDec or expression
+  if (token.type == TokenType::IDENTIFIER) {
     tokenizer.consumePeek();
+    Token next = tokenizer.peekNext();
+    if (next.type == TokenType::COLON) {
+      // var dec
+    } else {
+      // expression
+      statement.type = StatementType::EXPRESSION;
+      statement.expression = memPool.getDefaultedExpression();
+      Expression &expression = *statement.expression;
+      // DUP CODE. parsing identifier in expression
+      if (next.type == TokenType::OPEN_PAREN) {
+        expression.type = ExpressionType::FUNCTION_CALL;
+        expression.funcCall = memPool.getFunctionCall(FunctionCall{token});
+        ParseExpressionErrorType errorType = getExpressions(expression.funcCall->args);
+        if (errorType != ParseExpressionErrorType::NONE) {
+          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+            expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_PAREN_OR_COMMA, expressionErrorToken);
+          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+            expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+          }
+          return ParseStatementErrorType::REPORTED;
+        }
+        if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_PAREN);
+        }
+        tokenizer.consumePeek();
+      }
+      else if (next.type == TokenType::OPEN_BRACKET) {
+        expression.type = ExpressionType::ARRAY_ACCESS;
+        expression.arrAccess = memPool.getArrayAccess(ArrayAccess{token});
+        ParseExpressionErrorType errorType = parseExpression(expression.arrAccess->offset);
+        if (errorType != ParseExpressionErrorType::NONE) {
+          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+            expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_BRACKET, expressionErrorToken);
+          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+            expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+          }
+          return ParseStatementErrorType::REPORTED;
+        }
+        if (tokenizer.peekNext().type != TokenType::CLOSE_BRACKET) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACKET);
+          return ParseStatementErrorType::REPORTED;
+        }
+        tokenizer.consumePeek();
+      }
+      // END DUP
+      else {
+        expression.type = ExpressionType::VALUE;
+        expression.value = memPool.getToken(token);
+        ParseExpressionErrorType errorType = parseExpression(expression, &expression);
+        if (errorType != ParseExpressionErrorType::NONE) {
+          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+            expected.emplace_back(ExpectedType::OPERATOR_OR_SEMICOLON, expressionErrorToken);
+          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+            expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+          }
+          return ParseStatementErrorType::REPORTED;
+        }
+      }
+    }
+    if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::SEMICOLON);
+      return ParseStatementErrorType::REPORTED;
+    }
+    tokenizer.consumePeek();
+  }
+
+  // control flow
+  else if (token.type == TokenType::IF) {
 
   }
-  if (ptr) {
-    if (delimiterMinor == TokenType::SEMICOLON && delimiterMajor == TokenType::CLOSE_BRACE && ptr->curr.type != StatementType::NONE) {
-      expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON);
-    }
-    if (ptr->next) {
-      memPool.releaseExpressionList(ptr->next);
-      ptr->next = nullptr;
-    }
-    if (ptr->curr.type == ExpressionType::NONE) {
-      prev->next = nullptr;
-      memPool.releaseExpressionList(ptr);
-    }
+
+  // scope
+  else if (token.type == TokenType::OPEN_BRACE) {
+
   }
-  return false;
+
+  // unexpected token
+  else if (notFirstOfExpression(token.type)) {
+    
+  }
+
+  // expression
+  else {
+
+  }
+
+  return ParseStatementErrorType::NONE;
 }
 
-bool Parser::parseExpression(Expression& rootExpression) {
-  Expression *bottom = nullptr;
-  Token tk = tokenizer.peekNext();
-  while (1){
+/**
+ * Extracts comma delimited expressions until it reaches something else, or an expression parse fails
+*/
+ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions) {
+  if (notFirstOfExpression(tokenizer.peekNext().type)) {
+    return ParseExpressionErrorType::NONE;
+  }
+  ExpressionList *list = &expressions;
+  while (1) {
+    ParseExpressionErrorType errorType = parseExpression(list->curr);
+    if (errorType != ParseExpressionErrorType::NONE) {
+      return errorType;
+    }
+    if (tokenizer.peekNext().type != TokenType::COMMA) {
+      return ParseExpressionErrorType::NONE;
+    }
+    tokenizer.consumePeek();
+    list->next = memPool.getExpressionList();
+    list = list->next;
+  }
+}
 
-    bool binary = isBinaryOp(tk.type);
-    if (binary || isUnaryOp(tk.type)) {
+ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Expression *bottom) {
+  Token token = tokenizer.peekNext();
+  while (1){
+    bool binary = isBinaryOp(token.type);
+    if (binary || isUnaryOp(token.type)) {
       Expression expression;
       if (binary) {
         expression.type = ExpressionType::BINARY_OP;
-        expression.binOp = memPool.getBinOp(BinOp{tk});
+        expression.binOp = memPool.getBinOp(BinOp{token});
         if (!bottom) {
           // expected expression
-          expected.emplace_back(ExpectedType::EXPRESSION, tk);
+          expected.emplace_back(ExpectedType::EXPRESSION, token);
           rootExpression = std::move(expression);
           bottom = &rootExpression;
           continue;
         }
       } else {
         expression.type = ExpressionType::UNARY_OP;
-        expression.unOp = memPool.getUnOp(UnOp{tk});
+        expression.unOp = memPool.getUnOp(UnOp{token});
         if (!bottom) {
-          if (tk.type == TokenType::DECREMENT_POSTFIX || tk.type == TokenType::INCREMENT_POSTFIX) {
+          if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
             // expected expression
-            expected.emplace_back(ExpectedType::EXPRESSION, tk);
+            expected.emplace_back(ExpectedType::EXPRESSION, token);
           }
           rootExpression = std::move(expression);
           bottom = &rootExpression;
@@ -835,7 +460,7 @@ bool Parser::parseExpression(Expression& rootExpression) {
           } else {
             break;
           }
-          if (operatorPrecedence.at(tk.type) <= operatorPrecedence.at(op)) {
+          if (operatorPrecedence.at(token.type) <= operatorPrecedence.at(op)) {
             break;
           }
           prev = listIter;
@@ -864,20 +489,106 @@ bool Parser::parseExpression(Expression& rootExpression) {
           bottom = &rootExpression;
         }
       }
-    }
+    } else {
+      Expression expression;
+      switch(token.type) {
+        case TokenType::CHAR_LITERAL:
+        case TokenType::STRING_LITERAL:
+        case TokenType::BINARY_NUMBER:
+        case TokenType::HEX_NUMBER:
+        case TokenType::DECIMAL_NUMBER:
+          expression.type = ExpressionType::VALUE;
+          expression.value = memPool.getToken(token);
+          break;
 
+        case TokenType::OPEN_PAREN: {
+          expression.type = ExpressionType::WRAPPED;
+          expression.wrapped = memPool.getDefaultedExpression();
+          ParseExpressionErrorType errorType = parseExpression(*expression.wrapped);
+          if (errorType != ParseExpressionErrorType::NONE) {
+            if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+              expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_PAREN, expressionErrorToken);
+            } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+              expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+            }
+            return ParseExpressionErrorType::REPORTED;
+          }
+          break;
+        }
 
-    switch(tk.type) {
-      case TokenType::BINARY_NUMBER:
-      case TokenType::HEX_NUMBER:
-      case TokenType::DECIMAL_NUMBER: 
-      case TokenType::IDENTIFIER: 
-        break;
+        case TokenType::IDENTIFIER: {
+          Token next = tokenizer.peekNext();
+          // DUP CODE. parsing identifier in expression
+          if (next.type == TokenType::OPEN_PAREN) {
+            expression.type = ExpressionType::FUNCTION_CALL;
+            expression.funcCall = memPool.getFunctionCall(FunctionCall{token});
+            ParseExpressionErrorType errorType = getExpressions(expression.funcCall->args);
+            if (errorType != ParseExpressionErrorType::NONE) {
+              if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+                expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_PAREN_OR_COMMA, expressionErrorToken);
+              } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+                expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+              }
+              return ParseExpressionErrorType::REPORTED;
+            }
+            if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
+              expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_PAREN);
+            }
+            tokenizer.consumePeek();
+          }
+          else if (next.type == TokenType::OPEN_BRACKET) {
+            expression.type = ExpressionType::ARRAY_ACCESS;
+            expression.arrAccess = memPool.getArrayAccess(ArrayAccess{token});
+            ParseExpressionErrorType errorType = parseExpression(expression.arrAccess->offset);
+            if (errorType != ParseExpressionErrorType::NONE) {
+              if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+                expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_BRACKET, expressionErrorToken);
+              } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+                expected.emplace_back(ExpectedType::EXPRESSION, expressionErrorToken);
+              }
+              return ParseExpressionErrorType::REPORTED;
+            }
+            if (tokenizer.peekNext().type != TokenType::CLOSE_BRACKET) {
+              expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACKET);
+              return ParseExpressionErrorType::REPORTED;
+            }
+            tokenizer.consumePeek();
+          }
+          // END DUP
+          else {
+            expression.type = ExpressionType::VALUE;
+            expression.value = memPool.getToken(token);
+          }
+          break;
+        }
 
-      default:
-        break;
-
-
+        default:
+          expressionErrorToken = token;
+          return ParseExpressionErrorType::NOT_EXPRESSION;
+      }
+      if (bottom) {
+        if (bottom->type == ExpressionType::BINARY_OP) {
+          if (bottom->binOp->rightSide.type != ExpressionType::NONE) {
+            expressionErrorToken = token;
+            return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
+          }
+          bottom->binOp->rightSide = std::move(expression);
+          bottom = &bottom->binOp->rightSide;
+        } else if (bottom->type == ExpressionType::UNARY_OP) {
+          if (bottom->unOp->operand.type != ExpressionType::NONE) {
+            expressionErrorToken = token;
+            return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
+          }
+          bottom->unOp->operand = std::move(expression);
+          bottom = &bottom->unOp->operand;
+        } else {
+          expressionErrorToken = token;
+          return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
+        }
+      } else {
+        rootExpression = std::move(expression);
+        bottom = &rootExpression;
+      }
     }
   }
 }

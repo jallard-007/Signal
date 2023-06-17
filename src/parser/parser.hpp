@@ -3,12 +3,26 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../nodeMemPool.hpp"
 
+enum class ParseExpressionErrorType: uint8_t {
+  NONE,
+  REPORTED,
+  EXPRESSION_AFTER_EXPRESSION,
+  NOT_EXPRESSION,
+};
+
+enum class ParseStatementErrorType: uint8_t {
+  NONE,
+  REPORTED,
+  NOT_STATEMENT,
+};
+
 struct Parser {
   Program program;
   std::vector<Unexpected> unexpected;
   std::vector<Expected> expected;
   Tokenizer& tokenizer;
   NodeMemPool& memPool;
+  Token expressionErrorToken;
   Parser() = delete;
   ~Parser();
   explicit Parser(Tokenizer&, NodeMemPool&);
@@ -16,9 +30,10 @@ struct Parser {
   bool functionDec(FunctionDec&);
   bool structDec(StructDec&);
   bool templateDec(TemplateDec&);
-  Statement parseStatement(TokenType, TokenType);
-  bool parseExpression(Expression&);
-  bool getExpressions(ExpressionList&, TokenType, TokenType);
+  ParseStatementErrorType parseStatement(Statement&);
+  ParseStatementErrorType getStatements(StatementList&);
+  ParseExpressionErrorType parseExpression(Expression&, Expression* bottom = nullptr);
+  ParseExpressionErrorType getExpressions(ExpressionList&);
 
 
   Token getType(TokenList&);

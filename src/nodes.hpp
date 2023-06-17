@@ -2,6 +2,8 @@
 
 #include "tokenizer/tokenizer.hpp"
 
+bool notFirstOfExpression(TokenType);
+
 struct Unexpected {
   Token token;
   Unexpected() = delete;
@@ -13,6 +15,10 @@ enum class ExpectedType : uint8_t {
   NOTHING,
   EXPRESSION,
   TOKEN,
+  OPERATOR_OR_CLOSE_BRACKET,
+  OPERATOR_OR_CLOSE_PAREN,
+  OPERATOR_OR_CLOSE_PAREN_OR_COMMA,
+  OPERATOR_OR_SEMICOLON,
 };
 
 struct Expected {
@@ -51,6 +57,12 @@ struct Expression {
   };
   ExpressionType type;
   Expression();
+  Expression(BinOp *);
+  Expression(UnOp *);
+  Expression(Token *);
+  Expression(FunctionCall *);
+  Expression(ArrayAccess *);
+  Expression(Expression *);
   Expression(const Expression&);
   Expression(Expression&&);
   void operator=(Expression&&);
