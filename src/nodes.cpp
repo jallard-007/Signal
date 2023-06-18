@@ -25,23 +25,10 @@ std::string Expected::getErrorMessage(Tokenizer&, const std::string&) {
 
 Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
 Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
-Expression::Expression(Expression&& ref): binOp{ref.binOp}, type{ref.type} {
-  ref.type = ExpressionType::NONE;
-  ref.binOp = nullptr;
-}
-void Expression::operator=(Expression&& ref) {
+Expression::Expression(Token *tk): value{tk}, type{ExpressionType::VALUE} {}
+void Expression::operator=(const Expression&ref) {
   binOp = ref.binOp;
   type = ref.type;
-  ref.binOp = nullptr;
-  ref.type = ExpressionType::NONE;
-}
-void Expression::swap(Expression &ref) {
-  BinOp * temp = ref.binOp;
-  ref.binOp = binOp;
-  binOp = temp;
-  ExpressionType temp2 = ref.type;
-  ref.type = type;
-  type = temp2;
 }
 
 ExpressionList::ExpressionList(): curr{}, next{nullptr} {}
@@ -52,14 +39,33 @@ Statement::Statement(ControlFlowStatement *val): controlFlow{val}, type{Statemen
 Statement::Statement(Scope *val): scope{val}, type{StatementType::SCOPE} {}
 Statement::Statement(VariableDec *val): varDec{val}, type{StatementType::VARIABLE_DEC} {}
 Statement::Statement(const Statement& ref): expression{ref.expression}, type{ref.type} {}
+void Statement::operator=(const Statement& ref) {
+  expression = ref.expression;
+  type = ref.type;
+}
 
-TokenList::TokenList(): token{0,0,TokenType::NOTHING}, next{nullptr} {}
 TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
-TokenList::TokenList(const TokenList& ref): token{ref.token}, next{ref.next} {}
+void TokenList::operator=(const TokenList& ref) {
+  token = ref.token;
+  next = ref.next;
+}
 
 VariableDec::VariableDec(const Token& tk): name{tk}, type{}, initialAssignment{nullptr} {}
+VariableDec::VariableDec(const VariableDec& ref): name{ref.name}, type{ref.type}, initialAssignment{ref.initialAssignment} {}
+void VariableDec::operator=(const VariableDec& ref) {
+  name = ref.name;
+  type = ref.type;
+  initialAssignment = ref.initialAssignment;
+}
 
-StatementList::StatementList(): curr{}, next{nullptr} {}
+void StatementList::operator=(const StatementList &ref) {
+  curr = ref.curr;
+  next = ref.next;
+}
+
+void Scope::operator=(const Scope &ref) {
+  scopeStatements = ref.scopeStatements;
+}
 
 ArrayAccess::ArrayAccess(const Token& tk): array{tk}, offset{} {}
 
@@ -69,36 +75,26 @@ UnOp::UnOp(const Token& token): op{token}, operand{} {};
 
 FunctionCall::FunctionCall(const Token& tk): name{tk}, args{} {}
 
-ConditionalStatement::ConditionalStatement(const Token& token): ifStatement{}, elifStatement{nullptr}, elseStatement{nullptr} {}
-
 ReturnStatement::ReturnStatement(const Token& tk): token{tk}, returnValue{} {}
 
 SwitchStatement::SwitchStatement(const Token& token): token{token}, switched{0,0,TokenType::NOTHING}, body{} {}
 
-WhileLoop::WhileLoop(const Token& token): token{token}, condition{}, body{} {}
+ForLoop::ForLoop(const ForLoop &ref): initialize{ref.initialize}, condition{ref.condition}, iteration{ref.iteration}, body{ref.body} {}
 
-ForLoop::ForLoop(const Token& token): token{token}, initialize{}, condition{}, iteration{}, body{}, isVarDec{false} {}
-
-ForLoop::ForLoop(ForLoop&& ref): token{ref.token}, isVarDec{ref.isVarDec}, condition{std::move(ref.condition)}, iteration{std::move(ref.iteration)}, body{std::move(ref.body)} {
-  if (isVarDec) {
-    varDec = std::move(ref.varDec);
-  } else {
-    initialize = std::move(ref.initialize);
-  }
-}
-
-ControlFlowStatement::ControlFlowStatement(): forLoop{Token{0,0,TokenType::NOTHING}}, type{ControlFlowStatementType::NONE} {}
-ControlFlowStatement::ControlFlowStatement(ForLoop&& val): forLoop{std::move(val)}, type{ControlFlowStatementType::FOR_LOOP} {}
+ControlFlowStatement::ControlFlowStatement(): forLoop{}, type{ControlFlowStatementType::NONE} {}
+ControlFlowStatement::ControlFlowStatement(const ForLoop& val): forLoop{val}, type{ControlFlowStatementType::FOR_LOOP} {}
 ControlFlowStatement::ControlFlowStatement(const WhileLoop& val): whileLoop{val}, type{ControlFlowStatementType::WHILE_LOOP} {}
 ControlFlowStatement::ControlFlowStatement(const ConditionalStatement& val): conditional{val}, type{ControlFlowStatementType::CONDITIONAL_STATEMENT} {}
 ControlFlowStatement::ControlFlowStatement(const ReturnStatement& val): returnStatement{val}, type{ControlFlowStatementType::RETURN_STATEMENT} {}
 ControlFlowStatement::ControlFlowStatement(const SwitchStatement& val): switchStatement{val}, type{ControlFlowStatementType::SWITCH_STATEMENT} {}
 
 FunctionDec::FunctionDec(const Token& token): name{token}, params{}, returnType{}, body{} {};
-
-Initialization::Initialization(): arrOrStruct{}, isExpression{false} {};
-
-VarDecList::VarDecList(const Token& tk): curr{tk}, next{nullptr} {}
+void FunctionDec::operator=(const FunctionDec &ref) {
+  name = ref.name;
+  params = ref.params;
+  returnType = ref.returnType;
+  body = ref.body;
+}
 
 StructDec::StructDec(const Token& token): token{token}, decs{} {}
 
@@ -113,12 +109,10 @@ StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, isVarDec{
 
 EnumDec::EnumDec(const Token&tk): token{tk}, members{} {};
 
-IdentifierList::IdentifierList(): token{0,0,TokenType::NOTHING}, next{nullptr} {};
-
-TemplateDec::TemplateDec(): token{0,0,TokenType::NOTHING}, templateTypes{}, structDec{Token{0,0,TokenType::NOTHING}} {};
+TemplateDec::TemplateDec(): token{0,0,TokenType::NOTHING}, templateTypes{}, structDec{Token{0,0,TokenType::NOTHING}}, isStruct{false} {};
 
 TemplateCreation::TemplateCreation(const Token& tk): token{tk}, templateDec{nullptr}, templateTypes{}, identifier{0,0,TokenType::NOTHING} {}
 
-GlobalDec::GlobalDec(): structDec{Token{0,0,TokenType::NOTHING}} {}
+GlobalDec::GlobalDec(): funcDec{Token{0,0,TokenType::NOTHING}}, type{GlobalDecType::NOTHING} {}
 
 GlobalDecList::GlobalDecList(): curr{}, next{nullptr} {}

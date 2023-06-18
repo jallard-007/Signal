@@ -4,24 +4,24 @@
 #include "memPool.hpp"
 
 class NodeMemPool {
-  MemPool<UnOp> unOps;
-  MemPool<BinOp> binOps;
-  MemPool<ControlFlowStatement> controlFlows;
-  MemPool<ElifStatementList> elifs;
-  MemPool<GlobalDecList> decs;
+  MemPool<VariableDec> varDecs;
   MemPool<Token> tokens;
   MemPool<TokenList> tokenLists;
-  MemPool<VariableDec> varDecs;
+  MemPool<ArrayOrStructLiteral> arrOrStructs;
+  MemPool<ArrayAccess> arrayAccesses;
+  MemPool<UnOp> unOps;
+  MemPool<BinOp> binOps;
   MemPool<Expression> expressions;
   MemPool<ExpressionList> expressionLists;
-  MemPool<FunctionCall> funcCalls;
-  MemPool<ArrayAccess> arrayAccesses;
-  MemPool<Statement> statements;
-  MemPool<Scope> scopes;
-  MemPool<ArrayOrStructLiteral> arrOrStructs;
+  MemPool<ControlFlowStatement> controlFlows;
+  MemPool<ElifStatementList> elifs;
   MemPool<WhileLoop> whileLoops;
   MemPool<ForLoop> forLoops;
-  MemPool<StatementList> statementList;
+  MemPool<FunctionCall> funcCalls;
+  MemPool<Statement> statements;
+  MemPool<StatementList> statementLists;
+  MemPool<Scope> scopes;
+  MemPool<GlobalDecList> decs;
   MemPool<FunctionDec> functionDecs;
   MemPool<EnumDec> enums;
   MemPool<StructDec> structs;
@@ -39,7 +39,7 @@ public:
     statements.reset();
     scopes.reset();
     arrOrStructs.reset();
-    statementList.reset();
+    statementLists.reset();
     functionDecs.reset();
     enums.reset();
     structs.reset();
@@ -62,7 +62,7 @@ public:
   Statement* makeStatement(Statement&& ref) {return statements.get(std::move(ref));}
   Scope* makeScope() {return scopes.get();}
   ArrayOrStructLiteral* makeArrayOrStructLiteral(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
-  StatementList* makeStatementList() {return statementList.get();}
+  StatementList* makeStatementList() {return statementLists.get();}
   FunctionDec* makeFunctionDec(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
   EnumDec* makeEnumDec(EnumDec&& ref) {return enums.get(std::move(ref));}
   StructDec* makeStructDec(StructDec&& ref) {return structs.get(std::move(ref));}
@@ -81,7 +81,7 @@ public:
   void release(Statement* ptr) { statements.release(ptr);}
   void release(Scope* ptr) { scopes.release(ptr);}
   void release(ArrayOrStructLiteral* ptr) { arrOrStructs.release(ptr);}
-  void release(StatementList* ptr) { statementList.release(ptr);}
+  void release(StatementList* ptr) { statementLists.release(ptr);}
   void release(FunctionDec* ptr) { functionDecs.release(ptr);}
   void release(EnumDec* ptr) { enums.release(ptr);}
   void release(StructDec* ptr) { structs.release(ptr);}

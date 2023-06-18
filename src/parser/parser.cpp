@@ -10,7 +10,8 @@ Parser::~Parser() {
 }
 
 bool Parser::parse() {
-  GlobalDecList * list = &program.decs;
+  GlobalDecList *prev = nullptr;
+  GlobalDecList *list = &program.decs;
   Token token = tokenizer.peekNext();
   while (token.type != TokenType::END_OF_FILE) {
     if (token.type == TokenType::FUNC) {
@@ -59,9 +60,12 @@ bool Parser::parse() {
       unexpected.emplace_back(token);
       return false;
     }
+    prev = list;
     list->next = memPool.makeGlobalDec();
     list = list->next;
+    token = tokenizer.peekNext();
   }
+  prev->next = nullptr;
   return true;
 }
 
@@ -81,9 +85,9 @@ bool Parser::parseFunction(FunctionDec& dec) {
   // consume open paren
   tokenizer.consumePeek();
   StatementList *list = &dec.params;
-  if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
-    while (1) {
-      Token nextToken = tokenizer.peeked;
+  Token nextToken = tokenizer.peekNext();
+  if (nextToken.type != TokenType::CLOSE_PAREN) {
+    while (true) {
       if (nextToken.type != TokenType::IDENTIFIER) {
         expected.emplace_back(ExpectedType::TOKEN, nextToken, TokenType::IDENTIFIER);
         return false;
@@ -96,13 +100,13 @@ bool Parser::parseFunction(FunctionDec& dec) {
       }
       // consume colon
       tokenizer.consumePeek();
+      list->curr.type = StatementType::VARIABLE_DEC;
       list->curr.varDec = memPool.makeVariableDec(VariableDec{nextToken});
       ParseStatementErrorType errorType = parseVariableDec(*list->curr.varDec);
       if (errorType != ParseStatementErrorType::NONE) {
         if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
           expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::COMMA);
-        }
-        else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
+        } else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
           expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
         }
         return false;
@@ -117,10 +121,23 @@ bool Parser::parseFunction(FunctionDec& dec) {
         return false;
       }
     }
-  } else {
-    // consume close paren
-    tokenizer.consumePeek();
   }
+  // consume close paren
+  tokenizer.consumePeek();
+  // get return type
+  if (tokenizer.peekNext().type != TokenType::COLON) {
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::COLON);
+    return false;
+  }
+  tokenizer.consumePeek();
+  if (getType(dec.returnType) != ParseTypeErrorType::NONE) {
+    return false;
+  }
+  if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACE);
+    return false;
+  }
+  tokenizer.consumePeek();
   ParseStatementErrorType errorType = parseScope(dec.body.scopeStatements);
   if (errorType != ParseStatementErrorType::NONE) {
     return false;
@@ -129,20 +146,109 @@ bool Parser::parseFunction(FunctionDec& dec) {
 }
 
 bool Parser::parseStruct(StructDec& dec) {
-
+  Token token = tokenizer.peekNext();
+  if (token.type != TokenType::IDENTIFIER) {
+    expected.emplace_back(ExpectedType::TOKEN, token, TokenType::IDENTIFIER);
+    return false;
+  }
+  dec.token = token;
+  StructDecList *list = &dec.decs;
+  while (true) {
+    if (token.type == TokenType::IDENTIFIER) {
+      tokenizer.consumePeek();
+      if (tokenizer.peekNext().type == TokenType::COLON) {
+        tokenizer.consumePeek();
+        list->isVarDec = true;
+        list->varDec.name = token;
+        ParseStatementErrorType errorType = parseVariableDec(list->varDec);
+        if (errorType != ParseStatementErrorType::NONE) {
+          if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
+            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
+          } else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
+            expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
+          }
+          return false;
+        }
+        if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::SEMICOLON);
+          return false;
+        }
+        tokenizer.consumePeek();
+      }
+      else {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::COLON);
+        return false;
+      }
+    }
+    else if (token.type == TokenType::FUNC) {
+      tokenizer.consumePeek();
+      list->isVarDec = false;
+      if (!parseFunction(list->funcDec)) {
+        return false;
+      }
+    }
+    else if (token.type == TokenType::CLOSE_BRACE) {
+      tokenizer.consumePeek();
+      return true;
+    } else {
+      unexpected.emplace_back(token);
+      return false;
+    }
+    token = tokenizer.peekNext();
+  }
 }
 
 bool Parser::parseTemplate(TemplateDec& dec) {
-  
+  Token token = tokenizer.peekNext();
+  if (token.type != TokenType::OPEN_BRACKET) {
+    expected.emplace_back(ExpectedType::TOKEN, token, TokenType::OPEN_BRACKET);
+    return false;
+  }
+  tokenizer.consumePeek();
+  TokenList *list = &dec.templateTypes;
+  token = tokenizer.peekNext();
+  while (true) {
+    if (token.type != TokenType::IDENTIFIER) {
+      expected.emplace_back(ExpectedType::TOKEN, token, TokenType::IDENTIFIER);
+      return false;
+    }
+    tokenizer.consumePeek();
+    dec.templateTypes.token = token;
+    if (tokenizer.peekNext().type == TokenType::CLOSE_BRACKET) {
+      tokenizer.consumePeek();
+      break;
+    }
+    if (tokenizer.peeked.type != TokenType::COMMA) {
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::SEMICOLON);
+      return false;
+    }
+    tokenizer.consumePeek();
+    token = tokenizer.peekNext();
+    list->next = memPool.makeTokenList();
+    list = list->next;
+  }
+  token = tokenizer.peekNext();
+  if (token.type == TokenType::STRUCT) {
+    tokenizer.consumePeek();
+    dec.isStruct = true;
+    return parseStruct(dec.structDec);
+  } else if (token.type == TokenType::FUNC) {
+    tokenizer.consumePeek();
+    dec.isStruct = false;
+    return parseFunction(dec.funcDec);
+  } else {
+    expected.emplace_back(ExpectedType::FUNCTION_OR_STRUCT_DEC, token);
+    return false;
+  }
 }
 
 /**
- * parses a scope
+ * parses a scope. the first open brace should be consumed before calling this function
  * consumes the final close brace, unless there was an error
 */
 ParseStatementErrorType Parser::parseScope(StatementList& statementList) {
   StatementList* list = &statementList;
-  Token token = tokenizer.tokenizeNext();
+  Token token = tokenizer.peekNext();
   while (token.type != TokenType::CLOSE_BRACE) {
     if (token.type == TokenType::END_OF_FILE) {
       expected.emplace_back(ExpectedType::TOKEN, token, TokenType::CLOSE_BRACE);
@@ -333,7 +439,9 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
   return ParseStatementErrorType::NONE;
 }
 
-
+/**
+ * consume the colon after the variable name before calling this function
+*/
 ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
   ParseTypeErrorType typeErrorType = getType(varDec.type);
   if (typeErrorType != ParseTypeErrorType::NONE) {
@@ -438,7 +546,7 @@ ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions) {
     return ParseExpressionErrorType::NONE;
   }
   ExpressionList *list = &expressions;
-  while (1) {
+  while (true) {
     ParseExpressionErrorType errorType = parseExpression(list->curr);
     if (errorType != ParseExpressionErrorType::NONE) {
       return errorType;
@@ -458,7 +566,7 @@ ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions) {
 */
 ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Expression *bottom) {
   Token token = tokenizer.peekNext();
-  while (1) {
+  while (true) {
     bool binary = isBinaryOp(token.type);
     if (binary || isUnaryOp(token.type)) {
       tokenizer.consumePeek();
@@ -469,7 +577,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Exp
         if (!bottom) {
           // expected expression
           expected.emplace_back(ExpectedType::EXPRESSION, token);
-          rootExpression = std::move(expression);
+          rootExpression = expression;
           bottom = &rootExpression;
           continue;
         }
