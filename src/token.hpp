@@ -270,6 +270,7 @@ bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
 bool isControlFlow(TokenType);
+bool isLiteral(TokenType);
 
 const std::unordered_map<std::string, TokenType> stringToType {
   {"as", TokenType::AS},

@@ -24,6 +24,10 @@ bool isControlFlow(TokenType type) {
   return type >= TokenType::IF && type <= TokenType::WHILE;
 }
 
+bool isLiteral(TokenType type) {
+  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_PTR;
+}
+
 bool Token::operator==(const Token& tk) const {
   return position == tk.position && length == tk.length && type == tk.type;
 }

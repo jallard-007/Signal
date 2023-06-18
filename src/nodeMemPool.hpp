@@ -46,27 +46,27 @@ public:
     templates.reset();
   }
 
-  UnOp* getUnOp(UnOp&& ref) {return unOps.get(std::move(ref));}
-  BinOp* getBinOp(BinOp&& ref) {return binOps.get(std::move(ref));}
-  GlobalDecList* getGlobalDec() {return decs.get();}
-  VariableDec* getVariableDec(VariableDec&& ref) {return varDecs.get(std::move(ref));}
-  FunctionCall* getFunctionCall(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
-  ElifStatementList* getElifStatementList() {return elifs.get();}
-  ControlFlowStatement* getControlFlowStatement() {return controlFlows.get();}
-  ArrayAccess* getArrayAccess(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
-  Token* getToken(const Token& ref) {return tokens.get(ref);}
-  TokenList* getTokenList() {return tokenLists.get();}
-  Expression* getDefaultedExpression() {return expressions.get();}
-  Expression* getExpression(Expression&& ref) {return expressions.get(std::move(ref));}
-  ExpressionList* getExpressionList() {return expressionLists.get();}
-  Statement* getStatement(Statement&& ref) {return statements.get(std::move(ref));}
-  Scope* getScope() {return scopes.get();}
-  ArrayOrStructLiteral* getArrayOrStructLiteral(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
-  StatementList* getStatementList() {return statementList.get();}
-  FunctionDec* getFunctionDec(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
-  EnumDec* getEnumDec(EnumDec&& ref) {return enums.get(std::move(ref));}
-  StructDec* getStructDec(StructDec&& ref) {return structs.get(std::move(ref));}
-  TemplateDec* getTemplateDec(TemplateDec&& ref) {return templates.get(std::move(ref));}
+  UnOp* makeUnOp(UnOp&& ref) {return unOps.get(std::move(ref));}
+  BinOp* makeBinOp(BinOp&& ref) {return binOps.get(std::move(ref));}
+  GlobalDecList* makeGlobalDec() {return decs.get();}
+  VariableDec* makeVariableDec(VariableDec&& ref) {return varDecs.get(std::move(ref));}
+  FunctionCall* makeFunctionCall(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
+  ElifStatementList* makeElifStatementList() {return elifs.get();}
+  ControlFlowStatement* makeControlFlowStatement() {return controlFlows.get();}
+  ArrayAccess* makeArrayAccess(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
+  Token* makeToken(const Token& ref) {return tokens.get(ref);}
+  TokenList* makeTokenList() {return tokenLists.get();}
+  Expression* makeDefaultedExpression() {return expressions.get();}
+  Expression* makeExpression(Expression&& ref) {return expressions.get(std::move(ref));}
+  ExpressionList* makeExpressionList() {return expressionLists.get();}
+  Statement* makeStatement(Statement&& ref) {return statements.get(std::move(ref));}
+  Scope* makeScope() {return scopes.get();}
+  ArrayOrStructLiteral* makeArrayOrStructLiteral(ArrayOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
+  StatementList* makeStatementList() {return statementList.get();}
+  FunctionDec* makeFunctionDec(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
+  EnumDec* makeEnumDec(EnumDec&& ref) {return enums.get(std::move(ref));}
+  StructDec* makeStructDec(StructDec&& ref) {return structs.get(std::move(ref));}
+  TemplateDec* makeTemplateDec() {return templates.get();}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}

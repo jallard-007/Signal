@@ -345,16 +345,6 @@ struct VarDecList {
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-// structDec:= struct identifier { structDecList }
-struct StructDec {
-  Token token;
-  StructDecList decs;
-  StructDec() = delete;
-  explicit StructDec(const Token&);
-  StructDec(const StructDec&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-};
-
 // structDecList:= varDec ; decList | functionDec decList | nothing
 struct StructDecList {
   union {
@@ -366,6 +356,16 @@ struct StructDecList {
   bool isVarDec;
   StructDecList();
   StructDecList(const StructDecList&);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+// structDec:= struct identifier { structDecList }
+struct StructDec {
+  Token token;
+  StructDecList decs;
+  StructDec() = delete;
+  explicit StructDec(const Token&);
+  StructDec(const StructDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -434,10 +434,6 @@ struct GlobalDec {
     TemplateCreation tempCreate;
   };
   GlobalDecType type;
-  GlobalDec();
-  GlobalDec();
-  GlobalDec();
-  GlobalDec();
   GlobalDec();
 };
 

@@ -35,13 +35,14 @@ struct Parser {
   ~Parser();
   explicit Parser(Tokenizer&, NodeMemPool&);
   bool parse();
-  bool functionDec(FunctionDec&);
-  bool structDec(StructDec&);
-  bool templateDec(TemplateDec&);
+  bool parseFunction(FunctionDec&);
+  bool parseStruct(StructDec&);
+  bool parseTemplate(TemplateDec&);
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token&);
+  ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&, Expression* bottom = nullptr);
   ParseExpressionErrorType getExpressions(ExpressionList&);
   ParseTypeErrorType getType(TokenList&);

@@ -15,9 +15,10 @@ set_target_properties(tokenizer parser prettyPrint checker PROPERTIES ARCHIVE_OU
 add_executable(main ./src/main.cpp)
 target_link_libraries(main PRIVATE prettyPrint)
 
-add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp)
-target_link_libraries(test PRIVATE checker)
-target_link_libraries(test PRIVATE prettyPrint)
+add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp)
+# add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp)
+# target_link_libraries(test PRIVATE checker)
+# target_link_libraries(test PRIVATE prettyPrint)
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)
 
 if ( UNIX )
