@@ -38,7 +38,7 @@ typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
 typedef struct ArrayOrStructLiteral ArrayOrStructLiteral;
 
-enum class ExpressionType {
+enum class ExpressionType: uint8_t {
   NONE,
   BINARY_OP,
   UNARY_OP,
@@ -79,7 +79,7 @@ typedef struct ControlFlowStatement ControlFlowStatement;
 typedef struct Scope Scope;
 typedef struct VariableDec VariableDec;
 
-enum class StatementType {
+enum class StatementType: uint8_t {
   NOTHING,
   EXPRESSION,
   CONTROL_FLOW,
@@ -117,6 +117,7 @@ struct TokenList {
   TokenList(const TokenList&) = default;
   void operator=(const TokenList&);
   void prettyPrint(Tokenizer&, std::string&);
+  bool operator==(const TokenList&) const;
 };
 
 // varDec:= simpleVarDec initialization
@@ -156,7 +157,7 @@ struct Scope {
 // arrayAccess:= identifier [ expression ]
 struct ArrayAccess {
   Token array;
-  Expression offset;
+  Expression offset{};
   ArrayAccess() = delete;
   explicit ArrayAccess(const Token&);
   ArrayAccess(const ArrayAccess&) = default;
@@ -277,7 +278,7 @@ struct ForLoop {
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-enum class ControlFlowStatementType {
+enum class ControlFlowStatementType: uint8_t {
   NONE,
   FOR_LOOP,
   WHILE_LOOP,
@@ -335,17 +336,18 @@ struct StructDecList {
     VariableDec varDec;
     FunctionDec funcDec;
   };
-  StructDecList *next;
-  StructDecType type;
+  StructDecList *next{nullptr};
+  StructDecType type{StructDecType::NONE};
+  bool isValid{false};
   StructDecList();
   StructDecList(const StructDecList&);
 };
 
 // structDec:= struct identifier { structDecList }
 struct StructDec {
-  Token token;
-  StructDecList decs;
-  StructDec() = delete;
+  StructDecList decs{};
+  Token name{0,0,TokenType::NOTHING};
+  StructDec() = default;
   explicit StructDec(const Token&);
   StructDec(const StructDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -353,8 +355,8 @@ struct StructDec {
 
 // enumDec:= enum identifier { identifierList }
 struct EnumDec {
-  Token token;
-  TokenList members;
+  TokenList members{};
+  Token name;
   EnumDec() = delete;
   explicit EnumDec(const Token&);
   EnumDec(const EnumDec&) = default;
@@ -369,8 +371,8 @@ struct TemplateDec {
     FunctionDec funcDec;
   };
   TokenList templateTypes{};
-  Token token;
-  bool isStruct;
+  Token token{0,0,TokenType::NOTHING};
+  bool isStruct{false};
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
@@ -385,7 +387,7 @@ struct TemplateCreation {
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
-enum class GlobalDecType {
+enum class GeneralDecType: uint8_t {
   NOTHING,
   STRUCT,
   VARIABLE,
@@ -396,31 +398,32 @@ enum class GlobalDecType {
 };
 
 // globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
-struct GlobalDec {
+struct GeneralDec {
   union {
-    StructDec structDec;
-    VariableDec varDec;
-    FunctionDec funcDec;
-    EnumDec enumDec;
-    TemplateDec tempDec;
-    TemplateCreation tempCreate;
+    StructDec *structDec;
+    VariableDec *varDec;
+    FunctionDec *funcDec;
+    EnumDec *enumDec;
+    TemplateDec *tempDec;
+    TemplateCreation *tempCreate;
   };
-  GlobalDecType type{GlobalDecType::NOTHING};
-  GlobalDec();
+  GeneralDecType type{GeneralDecType::NOTHING};
+  bool isValid{false};
+  GeneralDec();
   void prettyPrint(Tokenizer&, std::string&);
 };
 
 // globalDecList:= globalDec globalDecList | nothing
-struct GlobalDecList {
-  GlobalDec curr{};
-  GlobalDecList *next{nullptr};
-  GlobalDecList() = default;
+struct GeneralDecList {
+  GeneralDec curr{};
+  GeneralDecList *next{nullptr};
+  GeneralDecList() = default;
   void prettyPrint(Tokenizer&, std::string&);
 };
 
 // program:= globalDecList
 struct Program {
-  GlobalDecList decs{};
+  GeneralDecList decs{};
   Program() = default;
   void prettyPrint(Tokenizer&, std::string&);
 };

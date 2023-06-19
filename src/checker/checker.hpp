@@ -4,7 +4,7 @@
 #include "../nodeMemPool.hpp"
 #include <map>
 
-enum class CheckerErrorType {
+enum class CheckerErrorType: uint8_t {
   NONE,
 
   // general
@@ -52,16 +52,16 @@ enum class CheckerErrorType {
 struct CheckerError {
   Token *token;
   CheckerErrorType type;
-  Declaration *dec;
+  GeneralDec *dec;
   CheckerError() = delete;
   CheckerError(CheckerErrorType, Token *);
-  CheckerError(CheckerErrorType, Statement *, Declaration*);
-  CheckerError(CheckerErrorType, Token *, Declaration*);
+  CheckerError(CheckerErrorType, Token *, GeneralDec*);
+  CheckerError(CheckerErrorType, Expression *, GeneralDec*);
 };
 
 struct Checker {
-  std::map<std::string, std::map<std::string, Declaration *>> structsLookUp;
-  std::map<std::string, Declaration *> lookUp;
+  std::map<std::string, std::map<std::string, StructDecList *>> structsLookUp;
+  std::map<std::string, GeneralDec *> lookUp;
   std::vector<CheckerError> errors;
   Program& program;
   Tokenizer& tokenizer;
@@ -72,6 +72,7 @@ struct Checker {
   TokenList stringValue {Token{0,0,TokenType::STRING_LITERAL}};
   TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
   TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
+  TokenList voidValue {Token{0,0,TokenType::VOID}};
 
   Checker(Program&, Tokenizer&, NodeMemPool &);
   
@@ -81,13 +82,12 @@ struct Checker {
   bool checkFunction(FunctionDec&);
   bool validateFunctionHeader(FunctionDec&);
   
-  bool checkScope(Scope&, std::vector<std::string>&, Type&, bool, bool, bool);
+  bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
 
-  TokenList *checkStatement(Statement&);
+  bool checkStatement(Statement&);
+  TokenList *checkExpression(Expression& expression);
 
-  bool checkType(Type&);
+  bool checkType(TokenList&);
 };
 
-// first do top level scan and place every dec in the map
-// this includes structs and their members (variables, function headers)
-// then start at the beginning and do a full search;
+bool canBeConvertedToBool(TokenList&);

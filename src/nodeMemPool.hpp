@@ -6,7 +6,8 @@
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
-  MemPool<GlobalDecList> decs;
+  MemPool<GeneralDec> decs;
+  MemPool<GeneralDecList> decLists;
   MemPool<VariableDec> varDecs;
   MemPool<FunctionCall> funcCalls;
   MemPool<ElifStatementList> elifs;
@@ -20,12 +21,16 @@ class NodeMemPool {
   MemPool<StatementList> statementLists;
   MemPool<StructDecList> structDecLists;
   MemPool<ArrayOrStructLiteral> arraysOrStructs;
+  MemPool<FunctionDec> functionDecs;
+  MemPool<StructDec> structDecs;
+  MemPool<TemplateDec> templateDecs;
 
 public:
   void reset() {
     unOps.reset();
     binOps.reset();
     decs.reset();
+    decLists.reset();
     varDecs.reset();
     funcCalls.reset();
     elifs.reset();
@@ -39,28 +44,36 @@ public:
     statementLists.reset();
     structDecLists.reset();
     arraysOrStructs.reset();
+    functionDecs.reset();
+    structDecs.reset();
+    templateDecs.reset();
   }
 
-  UnOp* makeUnOp(UnOp&& ref) {return unOps.get(std::move(ref));}
-  BinOp* makeBinOp(BinOp&& ref) {return binOps.get(std::move(ref));}
-  GlobalDecList* makeGlobalDec() {return decs.get();}
-  VariableDec* makeVariableDec(VariableDec&& ref) {return varDecs.get(std::move(ref));}
-  FunctionCall* makeFunctionCall(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
+  UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
+  BinOp* makeBinOp(const BinOp& ref) {return binOps.get(ref);}
+  GeneralDec* makeGlobalDec() {return decs.get();}
+  GeneralDecList* makeGlobalDecList() {return decLists.get();}
+  VariableDec* makeVariableDec(const VariableDec& ref) {return varDecs.get(ref);}
+  FunctionCall* makeFunctionCall(const FunctionCall& ref) {return funcCalls.get(ref);}
   ElifStatementList* makeElifStatementList() {return elifs.get();}
   ControlFlowStatement* makeControlFlowStatement() {return controlFlows.get();}
-  ArrayAccess* makeArrayAccess(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
+  ArrayAccess* makeArrayAccess(const ArrayAccess& ref) {return arrayAccesses.get(ref);}
   Token* makeToken(const Token& ref) {return tokens.get(ref);}
   TokenList* makeTokenList() {return tokenLists.get();}
-  Expression* makeDefaultedExpression() {return expressions.get();}
+  Expression* makeExpression() {return expressions.get();}
   ExpressionList* makeExpressionList() {return expressionLists.get();}
   Scope* makeScope() {return scopes.get();}
   StatementList* makeStatementList() {return statementLists.get();}
   StructDecList* makeStructDecList() {return structDecLists.get();}
   ArrayOrStructLiteral* makeArrayOrStruct() {return arraysOrStructs.get();}
+  FunctionDec* makeFunctionDec() {return functionDecs.get();}
+  StructDec* makeStructDec() {return structDecs.get();}
+  TemplateDec* makeTemplateDec() {return templateDecs.get();}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
-  void release(GlobalDecList* ptr) { decs.release(ptr);}
+  void release(GeneralDec* ptr) { decs.release(ptr);}
+  void release(GeneralDecList* ptr) { decLists.release(ptr);}
   void release(VariableDec* ptr) { varDecs.release(ptr);}
   void release(FunctionCall* ptr) { funcCalls.release(ptr);}
   void release(ElifStatementList* ptr) { elifs.release(ptr);}
@@ -74,4 +87,7 @@ public:
   void release(StatementList* ptr) { statementLists.release(ptr);}
   void release(StructDecList* ptr) { structDecLists.release(ptr);}
   void release(ArrayOrStructLiteral* ptr) { arraysOrStructs.release(ptr);}
+  void release(FunctionDec* ptr) { functionDecs.release(ptr);}
+  void release(StructDec* ptr) { structDecs.release(ptr);}
+  void release(TemplateDec* ptr) { templateDecs.release(ptr);}
 };

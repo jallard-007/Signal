@@ -118,7 +118,7 @@ void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
 }
 
 void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  str += typeToString.at(TokenType::ENUM) + tk.extractToken(token) + "{\n";
+  str += typeToString.at(TokenType::ENUM) + tk.extractToken(name) + "{\n";
   indentation += indentationSize;
   for (TokenList *iter = &members; iter; iter = iter->next) {
     str += std::string(indentation, ' ') + tk.extractToken(iter->token) + ",\n";
@@ -127,27 +127,27 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
   str += std::string(indentation, ' ') + "}\n";
 }
 
-void GlobalDec::prettyPrint(Tokenizer& tk, std::string& str) {
-  if (type == GlobalDecType::NOTHING) {
+void GeneralDec::prettyPrint(Tokenizer& tk, std::string& str) {
+  if (type == GeneralDecType::NOTHING) {
     return;
   }
   switch (type) {
-    case GlobalDecType::FUNCTION:
-      funcDec.prettyPrint(tk, str, 0); break;
-    case GlobalDecType::VARIABLE:
-      varDec.prettyPrint(tk, str); break;
-    case GlobalDecType::TEMPLATE:
-      tempDec.prettyPrint(tk, str, 0); break;
-    case GlobalDecType::STRUCT:
-      structDec.prettyPrint(tk, str, 0); break;
-    case GlobalDecType::ENUM:
-      enumDec.prettyPrint(tk, str, 0); break;
+    case GeneralDecType::FUNCTION:
+      funcDec->prettyPrint(tk, str, 0); break;
+    case GeneralDecType::VARIABLE:
+      varDec->prettyPrint(tk, str); break;
+    case GeneralDecType::TEMPLATE:
+      tempDec->prettyPrint(tk, str, 0); break;
+    case GeneralDecType::STRUCT:
+      structDec->prettyPrint(tk, str, 0); break;
+    case GeneralDecType::ENUM:
+      enumDec->prettyPrint(tk, str, 0); break;
     default: break;
   }
 }
 
-void GlobalDecList::prettyPrint(Tokenizer& tk, std::string& str) {
-  GlobalDecList*list = this;
+void GeneralDecList::prettyPrint(Tokenizer& tk, std::string& str) {
+  GeneralDecList*list = this;
   for (; list->next; list = list->next) {
     list->curr.prettyPrint(tk, str);
     str += '\n';
@@ -156,7 +156,7 @@ void GlobalDecList::prettyPrint(Tokenizer& tk, std::string& str) {
 }
 
 void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  str += typeToString.at(TokenType::STRUCT) + tk.extractToken(token) + " {\n";
+  str += typeToString.at(TokenType::STRUCT) + tk.extractToken(name) + " {\n";
   indentation += indentationSize;
   for (StructDecList* list = &decs; list; list = list->next) {
     str += std::string(indentation, ' ');

@@ -1,36 +1,7 @@
 #include "checker.hpp"
 
 CheckerError::CheckerError(CheckerErrorType type, Token *token): token{token}, type{type}, dec{} {}
-CheckerError::CheckerError(CheckerErrorType type, Token *token, Declaration *decPtr): token{token}, type{type}, dec{decPtr} {}
-CheckerError::CheckerError(CheckerErrorType type, Statement *st, Declaration *decPtr): token{nullptr}, type{type}, dec{decPtr} {
-  switch(st->type) {
-    case StatementType::BINARY_OP:
-      token = &st->binOp->op; break;
-    case StatementType::UNARY_OP:
-      token = &st->unOp->op; break;
-    case StatementType::VALUE:
-      token = st->var; break;
-    case StatementType::VARIABLE_DEC:
-      token = &st->dec->varDec->name; break;
-    case StatementType::FUNCTION_CALL:
-      token = &st->funcCall->name; break;
-    case StatementType::ARRAY_ACCESS:
-      token = &st->arrAccess->array; break;
-    case StatementType::KEYWORD:
-      token = st->var; break;
-    case StatementType::KEY_W_BODY:
-      token = &st->keyWBody->keyword; break;
-
-    case StatementType::WRAPPED_VALUE:
-    case StatementType::ARRAY_OR_STRUCT_LITERAL:
-    case StatementType::FOR_LOOP_HEADER:
-    case StatementType::SCOPE:
-      token = nullptr; break;
-
-    default:
-      token = nullptr; break;
-  }
-}
+CheckerError::CheckerError(CheckerErrorType type, Token *token, GeneralDec *decPtr): token{token}, type{type}, dec{decPtr} {}
 
 Checker::Checker(Program& prog, Tokenizer& tk, NodeMemPool& mem):
 structsLookUp{}, lookUp{}, errors{}, program{prog}, tokenizer{tk}, memPool{mem} {}
@@ -40,50 +11,50 @@ structsLookUp{}, lookUp{}, errors{}, program{prog}, tokenizer{tk}, memPool{mem} 
  * Also registers struct members in the struct's table
 */
 void Checker::firstTopLevelScan() {
-  for (auto& dec : program.decs) {
-    switch (dec.decType) {
-      case DecType::FUNCTION: {
-        Declaration* &decPtr = lookUp[tokenizer.extractToken(dec.func->name)];
+  for (GeneralDecList *list = &program.decs; list; list = list->next) {
+    switch (list->curr.type) {
+      case GeneralDecType::FUNCTION: {
+        GeneralDec* &decPtr = lookUp[tokenizer.extractToken(list->curr.funcDec->name)];
         if (decPtr) {
-          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &dec.func->name, decPtr);
+          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &list->curr.funcDec->name, decPtr);
         } else {
-          decPtr = &dec;
+          decPtr = &list->curr;
         }
         break;
       }
-      case DecType::VARIABLE_DEC: {
-        Declaration* &decPtr = lookUp[tokenizer.extractToken(dec.varDec->name)];
+      case GeneralDecType::VARIABLE: {
+        GeneralDec* &decPtr = lookUp[tokenizer.extractToken(list->curr.varDec->name)];
         if (decPtr) {
-          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &dec.varDec->name, decPtr);
+          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &list->curr.varDec->name, decPtr);
         } else {
-          decPtr = &dec;
+          decPtr = &list->curr;
         }
         break;
       }
-      case DecType::STRUCT: {
-        const std::string structName = tokenizer.extractToken(dec.struc->name);
-        Declaration* &decPtr = lookUp[structName];
+      case GeneralDecType::STRUCT: {
+        const std::string structName = tokenizer.extractToken(list->curr.structDec->name);
+        GeneralDec* &decPtr = lookUp[structName];
         if (decPtr) {
-          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &dec.struc->name, decPtr);
+          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &list->curr.structDec->name, decPtr);
         } else {
-          decPtr = &dec;
+          decPtr = &list->curr;
           auto& structDecLookUp = structsLookUp[structName];
-          for (auto& inner : dec.struc->decs) {
-            if (inner.decType == DecType::VARIABLE_DEC) {
-              Declaration* &innerStructDecPtr = structDecLookUp[tokenizer.extractToken(inner.varDec->name)];
+          for (StructDecList* inner = &list->curr.structDec->decs; inner; inner = inner->next) {
+            if (inner->type == StructDecType::VAR) {
+              StructDecList* &innerStructDecPtr = structDecLookUp[tokenizer.extractToken(inner->varDec.name)];
               if (innerStructDecPtr) {
-                errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &dec.varDec->name, innerStructDecPtr);
+                errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &inner->varDec.name, innerStructDecPtr);
               } else {
-                innerStructDecPtr = &inner;
+                innerStructDecPtr = inner;
               }
             }
-            // inner.decType == DecType::FUNCTION
+            // inner->type == StructDecType::FUNC
             else {
-              Declaration* &innerStructDecPtr = structDecLookUp[tokenizer.extractToken(inner.func->name)];
+              StructDecList* &innerStructDecPtr = structDecLookUp[tokenizer.extractToken(inner->funcDec.name)];
               if (innerStructDecPtr) {
-                errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &dec.func->name, innerStructDecPtr);
+                errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &inner->funcDec.name, innerStructDecPtr);
               } else {
-                innerStructDecPtr = &inner;
+                innerStructDecPtr = inner;
               }
             }
           }
@@ -91,23 +62,23 @@ void Checker::firstTopLevelScan() {
 
         break;
       }
-      case DecType::TEMPLATE: {
-        Token * tk = nullptr;
-        if (dec.temp->dec.decType == DecType::STRUCT) {
-         tk = &dec.temp->dec.struc->name;
+      case GeneralDecType::TEMPLATE: {
+        Token *tk = nullptr;
+        if (list->curr.tempDec->isStruct) {
+         tk = &list->curr.tempDec->structDec.name;
         } 
         // dec.temp->dec.decType == DecType::FUNCTION
         else {
-         tk = &dec.temp->dec.func->name;
+         tk = &list->curr.tempDec->funcDec.name;
         }
-        Declaration*& decPtr = lookUp[tokenizer.extractToken(*tk)];
+        GeneralDec* &decPtr = lookUp[tokenizer.extractToken(*tk)];
         if (decPtr) {
           errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, tk, decPtr);
         } else {
-          decPtr = &dec;
+          decPtr = &list->curr;
         }
       }
-      case DecType::ENUM: {
+      case GeneralDecType::ENUM: {
         break;
       }
       default: {
@@ -127,10 +98,10 @@ bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
     }
   }
   // check parameters
-  if (funcDec.params.curr.type != StatementType::NONE) {
+  if (funcDec.params.curr.type != StatementType::NOTHING) {
     StatementList* params = &funcDec.params;
     do {
-      if (!checkType(params->curr.dec->varDec->type)) {
+      if (!checkType(params->curr.varDec->type)) {
         valid = false;
       }
       params = params->next;
@@ -143,59 +114,67 @@ bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
  * Validates function types, global variable types, struct member variable types, struct member function types
 */
 void Checker::secondTopLevelScan() {
-  for (auto& dec : program.decs) {
-    switch (dec.decType) {
-      case DecType::FUNCTION: {
-        dec.isValid = validateFunctionHeader(*dec.func);
+  for (GeneralDecList* list = &program.decs; list; list = list->next) {
+    switch (list->curr.type) {
+      case GeneralDecType::FUNCTION: {
+        list->curr.isValid = validateFunctionHeader(*list->curr.funcDec);
         break;
       }
-      case DecType::VARIABLE_DEC: {
-        dec.isValid = checkType(dec.varDec->type);
+      case GeneralDecType::VARIABLE: {
+        list->curr.isValid = checkType(list->curr.varDec->type);
         break;
       }
-      case DecType::STRUCT: {
-        for (auto& inner : dec.struc->decs) {
-          if (inner.decType == DecType::VARIABLE_DEC) {
-            inner.isValid = checkType(inner.varDec->type);
+      case GeneralDecType::STRUCT: {
+        for (StructDecList *inner = &list->curr.structDec->decs; inner; inner = inner->next) {
+          if (inner->type == StructDecType::VAR) {
+            inner->isValid = checkType(inner->varDec.type);
           }
-          // inner.decType == DecType::FUNCTION
+          // inner.decType == DecType::FUNC
           else {
-            inner.isValid = validateFunctionHeader(*inner.func);
+            inner->isValid = validateFunctionHeader(inner->funcDec);
           }
         }
         break;
       }
-      case DecType::TEMPLATE: {
+      case GeneralDecType::TEMPLATE: {
         // parser validates that there is at least one type
         std::vector<std::string> templateTypes;
-        TokenList *templateIdentifiers = &dec.temp->templateIdentifiers;
+        TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
         do {
-          templateTypes.push_back(tokenizer.extractToken(templateIdentifiers->curr));
-          Declaration *&tempTypeDec = lookUp[templateTypes.back()];
+          templateTypes.push_back(tokenizer.extractToken(templateIdentifiers->token));
+          GeneralDec *&tempTypeDec = lookUp[templateTypes.back()];
           if (tempTypeDec) {
-            errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &templateIdentifiers->curr, tempTypeDec);
+            errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &templateIdentifiers->token, tempTypeDec);
           } else {
-            tempTypeDec = memPool.get(Declaration{});
-            tempTypeDec->decType = DecType::STRUCT;
+            tempTypeDec = memPool.makeGlobalDec();
+            tempTypeDec->type = GeneralDecType::STRUCT;
           }
           templateIdentifiers = templateIdentifiers->next;
         } while (templateIdentifiers);
 
-        if (dec.temp->dec.decType == DecType::STRUCT) {
-          for (auto& inner : dec.temp->dec.struc->decs) {
-            if (inner.decType == DecType::VARIABLE_DEC) {
-              inner.isValid = checkType(inner.varDec->type);
+        if (list->curr.tempDec->isStruct) {
+          bool isValid = true;
+          for (StructDecList *inner = &list->curr.tempDec->structDec.decs; list; list = list->next) {
+            if (inner->type == StructDecType::VAR) {
+              inner->isValid = checkType(inner->varDec.type);
+              if (!inner->isValid) {
+                isValid = false;
+              }
             }
-            // inner.decType == DecType::FUNCTION
+            // inner->type == StructDecType::FUNC
             else {
-              inner.isValid = validateFunctionHeader(*inner.func);
+              inner->isValid= validateFunctionHeader(inner->funcDec);
+              if (!inner->isValid) {
+                isValid = false;
+              }
             }
           }
+          list->curr.isValid = isValid;
         }
-        // dec.temp->dec.decType == DecType::FUNCTION
         else {
-          dec.temp->dec.isValid = validateFunctionHeader(*dec.temp->dec.func);
+          list->curr.isValid = validateFunctionHeader(list->curr.tempDec->funcDec);
         }
+
         while (!templateTypes.empty()) {
           auto tempType = lookUp.find(templateTypes.back());
           memPool.release(tempType->second);
@@ -204,7 +183,7 @@ void Checker::secondTopLevelScan() {
         }
         break;
       }
-      case DecType::ENUM: {
+      case GeneralDecType::ENUM: {
         break;
       }
       default: {
@@ -229,19 +208,21 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
   // parser needs to check that they are just variable declarations, nothing else;
   // validate parameter types and name
   std::vector<std::string> locals;
-  if (funcDec.params.curr.type != StatementType::NONE) {
+  if (funcDec.params.curr.type != StatementType::NOTHING) {
     StatementList *list = &funcDec.params;
     while (list) {
-      locals.emplace_back(tokenizer.extractToken(list->curr.dec->varDec->name));
-      Declaration* &paramDec = lookUp[locals.back()];
+      locals.emplace_back(tokenizer.extractToken(list->curr.varDec->name));
+      GeneralDec* &paramDec = lookUp[locals.back()];
       if (paramDec) {
-        errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &list->curr.dec->varDec->name, paramDec);
+        errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, &list->curr.varDec->name, paramDec);
       } else {
         // name is available, check type
-        if (!checkType(list->curr.dec->varDec->type)) {
+        if (!checkType(list->curr.varDec->type)) {
           wasThereAnError = true;
         }
-        paramDec = list->curr.dec;
+        paramDec = memPool.makeGlobalDec();
+        paramDec->varDec = list->curr.varDec;
+        paramDec->type = GeneralDecType::VARIABLE;
       }
       list = list->next;
     }
@@ -265,37 +246,27 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
  * \param isReturnRequired set to true if a return is required within this scope
  * \returns true if the scope is valid, false otherwise. (error type appended to errors)
 */
-bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, Type& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
+bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
   const uint32_t marker = locals.size();
   StatementList* list = &scope.scopeStatements;
   do {
     switch (list->curr.type) {
-      case StatementType::BINARY_OP: {
-        auto&binOp = *list->curr.binOp;
-        if (hasData(binOp.leftSide.type)) {
-
-        }
-        break;
+      case StatementType::CONTROL_FLOW: {
       }
-      case StatementType::UNARY_OP: {
-        break;
-      }
-      case StatementType::FUNCTION_CALL: {
-        break;
-      }
-      case StatementType::KEY_W_BODY: {
+      case StatementType::EXPRESSION: {
+        checkExpression(*list->curr.expression);
         break;
       }
       case StatementType::KEYWORD: {
-        if (list->curr.keyWBody->keyword.type == TokenType::CONTINUE) {
+        if (list->curr.keyword->type == TokenType::CONTINUE) {
           if (!isLoop) {
-            errors.emplace_back(CheckerErrorType::CANNOT_HAVE_CONTINUE_HERE, &list->curr.keyWBody->keyword);
+            errors.emplace_back(CheckerErrorType::CANNOT_HAVE_CONTINUE_HERE, list->curr.keyword);
           }
           break;
         }
-        else if (list->curr.keyWBody->keyword.type == TokenType::BREAK) {
+        else if (list->curr.keyword->type == TokenType::BREAK) {
           if (!isLoop && !isSwitch) {
-            errors.emplace_back(CheckerErrorType::CANNOT_HAVE_BREAK_HERE, &list->curr.keyWBody->keyword);
+            errors.emplace_back(CheckerErrorType::CANNOT_HAVE_BREAK_HERE, list->curr.keyword);
           }
           break;
         } else {
@@ -312,11 +283,11 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, Type& r
         break;
       }
 
+
       case StatementType::VARIABLE_DEC: {
         break;
       }
       default: {
-        // statement does nothing;
         break;
       }
     }
@@ -330,6 +301,116 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, Type& r
   return isReturnRequired;
 }
 
+TokenList *Checker::checkExpression(Expression& expression) {
+  switch(expression.type) {
+    case ExpressionType::BINARY_OP: {
+        // logical
+      // EQUAL,
+      // NOT_EQUAL,
+      // LOGICAL_AND,
+      // LOGICAL_OR,
+      // LESS_THAN,
+      // LESS_THAN_EQUAL,
+      // GREATER_THAN,
+      // GREATER_THAN_EQUAL,
+
+
+
+      TokenList *leftSide = checkExpression(expression.binOp->leftSide);
+      TokenList *rightSide = checkExpression(expression.binOp->rightSide);
+      break;
+    }
+    case ExpressionType::UNARY_OP: {
+      // NOT,
+      // ADDRESS_OF,
+      // DEREFERENCE,
+      // INCREMENT_POSTFIX,
+      // INCREMENT_PREFIX,
+      // DECREMENT_POSTFIX,
+      // DECREMENT_PREFIX,
+      // NEGATIVE,
+      TokenList *sd;
+      break;
+    }
+    case ExpressionType::VALUE: {
+      if (expression.value->type == TokenType::IDENTIFIER) {
+        GeneralDec *&decPtr = lookUp[tokenizer.extractToken(*expression.value)];
+        if (!decPtr) {
+          errors.emplace_back(CheckerErrorType::NO_SUCH_VARIABLE, expression.value);
+          break;
+        }
+        if (decPtr->type != GeneralDecType::VARIABLE) {
+          errors.emplace_back(CheckerErrorType::NOT_A_VARIABLE, expression.value, decPtr);
+          break;
+        }
+        return &decPtr->varDec->type;
+      } else if (expression.value->type == TokenType::DECIMAL_NUMBER) {
+        // need to get the actual number and see if it fits in a 32bit int, if not, unsigned, if not, 64bit
+        // for now, just dump all numbers as ints
+        return &intValue;
+      } else if (expression.value->type == TokenType::NULL_PTR) {
+        return &nullptrValue;
+      } else if (expression.value->type == TokenType::FALSE || expression.value->type == TokenType::TRUE) {
+        return &boolValue;
+      } else if (expression.value->type == TokenType::STRING_LITERAL) {
+        return &stringValue;
+      } else if (expression.value->type == TokenType::CHAR_LITERAL) {
+        return &charValue;
+      }
+      break;
+    }
+    case ExpressionType::FUNCTION_CALL: {
+      GeneralDec* &dec = lookUp[tokenizer.extractToken(expression.funcCall->name)];
+      if (!dec) {
+        // dec does not exist
+        errors.emplace_back(CheckerErrorType::NO_SUCH_FUNCTION, &expression.funcCall->name);
+      } else if (dec->type != GeneralDecType::FUNCTION) {
+        // not a function
+        errors.emplace_back(CheckerErrorType::NOT_A_FUNCTION, &expression.funcCall->name, dec);
+      }
+      // valid function, now check parameters
+      // parameters are already validated on second top level scan. so assume the statements are all varDecs and valid
+      StatementList* paramList = &dec->funcDec->params;
+      ExpressionList* argList = &expression.funcCall->args;
+      // have to get type of each argument since they are statements themselves
+      do {
+        TokenList *resultingType = checkExpression(argList->curr);
+        if (!resultingType) {
+          // there was an error in the parameter, return
+          return nullptr;
+        }
+        if (!(paramList->curr.varDec->type == *resultingType)) {
+          // types dont match
+          errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, &argList->curr, dec);
+          return nullptr;
+        }
+        // types match. yay
+        paramList = paramList->next;
+        argList = argList->next;
+      } while (argList && paramList);
+      if (argList || paramList) {
+        errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, &expression.funcCall->name, dec);
+        return nullptr;
+      }
+      // valid parameters. return returnType: assume this was also checked and valid
+      return &dec->funcDec->returnType;
+    }
+    case ExpressionType::ARRAY_ACCESS: {
+      break;
+    }
+    case ExpressionType::WRAPPED: {
+      return checkExpression(*expression.wrapped);
+    }
+    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
+      break;
+    }
+    default: {
+      return &voidValue;
+    }
+  }
+  return &voidValue;
+}
+
 /**
  * Validates a type
  * \param type the type to check
@@ -337,7 +418,7 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, Type& r
  * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
  *  check if the emplaced error is 'void' and remove it if called for a function return type
 */
-bool Checker::checkType(Type& type) {
+bool Checker::checkType(TokenList& type) {
   /**
    * Used to track the type info. 0 means we can have a ref, 0-2 means pointer, and 3 means an actual type was found
    * Can go forward, but cant go back. 
@@ -362,14 +443,10 @@ bool Checker::checkType(Type& type) {
   uint8_t typeType = 0;
 
   CheckerErrorType errorType = CheckerErrorType::NONE;
-  TokenList *list = &type.tokens;
-  if (list->curr.type == TokenType::NOTHING) {
-    errors.emplace_back(CheckerErrorType::MISSING_TYPE, &list->curr);
-    return false;
-  }
+  TokenList *list = &type;
   do {
-    if (isBuiltInType(list->curr.type)) {
-      const TokenType tokenType = list->curr.type;
+    if (isBuiltInType(list->token.type)) {
+      const TokenType tokenType = list->token.type;
       if (tokenType == TokenType::POINTER) {
         if (typeType == 3) {
           errorType = CheckerErrorType::UNEXPECTED_TYPE;
@@ -402,13 +479,13 @@ bool Checker::checkType(Type& type) {
         errorType = CheckerErrorType::CANNOT_HAVE_MULTI_TYPE;
         break;
       }
-      Declaration* &typeDec = lookUp[tokenizer.extractToken(list->curr)];
+      GeneralDec* &typeDec = lookUp[tokenizer.extractToken(list->token)];
       if (!typeDec) {
         errorType = CheckerErrorType::NO_SUCH_TYPE;
         break;
       }
-      if (typeDec->decType != DecType::STRUCT) {
-        errors.emplace_back(CheckerErrorType::EXPECTING_TYPE, &list->curr, typeDec);
+      if (typeDec->type != GeneralDecType::STRUCT) {
+        errors.emplace_back(CheckerErrorType::EXPECTING_TYPE, &list->token, typeDec);
         return false;
       }
       typeType = 3;
@@ -418,99 +495,39 @@ bool Checker::checkType(Type& type) {
   if (errorType == CheckerErrorType::NONE) {
     return true;
   }
-  errors.emplace_back(errorType, &list->curr);
+  errors.emplace_back(errorType, &list->token);
   return false;
 }
 
-TokenList *Checker::checkStatement(Statement& statement) {
+bool Checker::checkStatement(Statement& statement) {
   switch (statement.type) {
-    case StatementType::UNARY_OP: {
-    }
-
-    case StatementType::BINARY_OP: {
-      //TokenList *leftSide = checkStatement(statement.binOp->leftSide);
-      //TokenList *rightSide = checkStatement(statement.binOp->rightSide);
-      // do conversions
-      break;
-    }
-
     case StatementType::VARIABLE_DEC: {
-    }
-
-    case StatementType::FUNCTION_CALL: {
-      Declaration*& dec = lookUp[tokenizer.extractToken(statement.funcCall->name)];
-      if (!dec) {
-        // dec does not exist
-        errors.emplace_back(CheckerErrorType::NO_SUCH_FUNCTION, &statement.funcCall->name);
-      } else if (dec->decType != DecType::FUNCTION) {
-        // not a function
-        errors.emplace_back(CheckerErrorType::NOT_A_FUNCTION, &statement.funcCall->name, dec);
-      }
-      // valid function, now check parameters
-      // parameters are already validated before on second top level scan. so assume the statements are all varDecs and valid
-      StatementList* paramList = &dec->func->params;
-      StatementList* argList = &statement.funcCall->args;
-      // have to get type of each argument since they are statements themselves
-      do {
-        TokenList *resultingType = checkStatement(argList->curr);
-        if (!resultingType) {
-          // there was an error in the parameter, return
-          return nullptr;
-        }
-        if (!(paramList->curr.dec->varDec->type.tokens == *resultingType)) {
-          // types dont match
-          errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, &argList->curr, paramList->curr.dec);
-          return nullptr;
-        }
-        // types match. yay
-        paramList = paramList->next;
-        argList = argList->next;
-      } while (argList && paramList);
-      if (argList || paramList) {
-        errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, &statement.funcCall->name, dec);
-        return nullptr;
-      }
-      // valid parameters. return returnType: assume this was also checked and valid
-      return &dec->func->returnType.tokens;
-    }
-
-    case StatementType::ARRAY_ACCESS: {
-    }
-
-    case StatementType::WRAPPED_VALUE: {
     }
 
     case StatementType::KEYWORD: {
     }
 
-    case StatementType::VALUE: {
-      if (statement.var->type == TokenType::IDENTIFIER) {
-        Declaration *&decPtr = lookUp[tokenizer.extractToken(*statement.var)];
-        if (!decPtr) {
-          errors.emplace_back(CheckerErrorType::NO_SUCH_VARIABLE, statement.var);
-          break;
-        }
-        if (decPtr->decType != DecType::VARIABLE_DEC) {
-          errors.emplace_back(CheckerErrorType::NOT_A_VARIABLE, statement.var, decPtr);
-          break;
-        }
-        return &decPtr->varDec->type.tokens;
-      } else if (statement.var->type == TokenType::DECIMAL_NUMBER) {
-        // need to get the actual number and see if it fits in a 32bit int, if not, unsigned, if not, 64bit
-        // for now, just dump all numbers as ints
-        return &intValue;
-      } else if (statement.var->type == TokenType::NULL_PTR) {
-        return &nullptrValue;
-      } else if (statement.var->type == TokenType::FALSE || statement.var->type == TokenType::TRUE) {
-        return &boolValue;
-      } else if (statement.var->type == TokenType::STRING_LITERAL) {
-        return &stringValue;
-      } else if (statement.var->type == TokenType::CHAR_LITERAL) {
-        return &charValue;
-      }
-      break;
-    }
+
     default: break;
   }
-  return nullptr;
+  return true;
+}
+
+bool canBeConvertedToBool(TokenList& type) {
+  TokenList *actual = &type;
+  if (type.next) {
+    if (type.next->token.type == TokenType::REFERENCE) {
+      // move to next;
+      actual = type.next;
+    }
+  }
+  if (isBuiltInType(actual->token.type)) {
+    const TokenType tokenType = actual->token.type;
+    if (tokenType == TokenType::FLOAT_TYPE || tokenType == TokenType::DOUBLE_TYPE || tokenType == TokenType::VOID) {
+      return false;
+    }
+    return true;
+  }
+  // custom type
+  return true;
 }

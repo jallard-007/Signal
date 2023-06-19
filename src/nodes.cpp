@@ -57,11 +57,11 @@ void Scope::operator=(const Scope &ref) {
   scopeStatements = ref.scopeStatements;
 }
 
-ArrayAccess::ArrayAccess(const Token& tk): array{tk}, offset{} {}
+ArrayAccess::ArrayAccess(const Token& tk): array{tk} {}
 
-BinOp::BinOp(const Token& token): op{token}, leftSide{}, rightSide{} {}
+BinOp::BinOp(const Token& token): op{token} {}
 
-UnOp::UnOp(const Token& token): op{token}, operand{} {};
+UnOp::UnOp(const Token& token): op{token} {};
 
 FunctionCall::FunctionCall(const Token& tk): name{tk}, args{} {}
 
@@ -78,7 +78,7 @@ ControlFlowStatement::ControlFlowStatement(const ConditionalStatement& val): con
 ControlFlowStatement::ControlFlowStatement(const ReturnStatement& val): returnStatement{val}, type{ControlFlowStatementType::RETURN_STATEMENT} {}
 ControlFlowStatement::ControlFlowStatement(const SwitchStatement& val): switchStatement{val}, type{ControlFlowStatementType::SWITCH_STATEMENT} {}
 
-FunctionDec::FunctionDec(const Token& token): name{token}, params{}, returnType{}, body{} {};
+FunctionDec::FunctionDec(const Token& token): name{token} {};
 void FunctionDec::operator=(const FunctionDec &ref) {
   name = ref.name;
   params = ref.params;
@@ -86,10 +86,10 @@ void FunctionDec::operator=(const FunctionDec &ref) {
   body = ref.body;
 }
 
-StructDec::StructDec(const Token& token): token{token}, decs{} {}
+StructDec::StructDec(const Token& token): name{token} {}
 
-StructDecList::StructDecList(): funcDec{}, next{nullptr}, type{StructDecType::NONE} {}
-StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, type{ref.type} {
+StructDecList::StructDecList(): funcDec{} {}
+StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, type{ref.type}, isValid{ref.isValid} {
   if (type == StructDecType::VAR) {
     varDec = ref.varDec;
   } else if (type == StructDecType::FUNC) {
@@ -97,9 +97,24 @@ StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, type{ref.
   }
 }
 
-EnumDec::EnumDec(const Token&tk): token{tk}, members{} {};
+EnumDec::EnumDec(const Token&tk): name{tk} {}
 
-TemplateDec::TemplateDec(): funcDec{}, templateTypes{}, token{0,0,TokenType::NOTHING}, isStruct{false}  {};
+TemplateDec::TemplateDec(): funcDec{} {}
 
-GlobalDec::GlobalDec(): tempDec{} {}
+GeneralDec::GeneralDec(): tempDec{nullptr} {}
 
+bool TokenList::operator==(const TokenList& ref) const {
+  const TokenList* refCurr = &ref;
+  const TokenList* thisCurr = this;
+  while (refCurr->next && thisCurr->next) {
+    if (!(refCurr->token == thisCurr->token)) {
+      return false;
+    }
+    refCurr = refCurr->next;
+    thisCurr = thisCurr->next;
+  }
+  if (refCurr->next || thisCurr->next) {
+    return false;
+  }
+  return true;
+}

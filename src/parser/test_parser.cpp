@@ -41,22 +41,23 @@ TEST_CASE("Function Declaration", "[parser]") {
   CHECK(parser.unexpected.empty());
   CHECK(parser.expected.empty());
   REQUIRE(decs.next == nullptr);
-  REQUIRE(decs.curr.type == GlobalDecType::FUNCTION);
+  REQUIRE(decs.curr.type == GeneralDecType::FUNCTION);
   auto& func = decs.curr.funcDec;
-  CHECK(tokenizer.extractToken(func.name) == "funcName");
+  REQUIRE(func);
+  CHECK(tokenizer.extractToken(func->name) == "funcName");
 
   // check parameters
-  REQUIRE(func.params.curr.type == StatementType::VARIABLE_DEC);
-  REQUIRE(func.params.curr.varDec);
-  CHECK(tokenizer.extractToken(func.params.curr.varDec->name) == "first");
-  CHECK(func.params.curr.varDec->type.token.type == TokenType::POINTER);
-  REQUIRE(func.params.curr.varDec->type.next);
-  CHECK(func.params.curr.varDec->type.next->token.type == TokenType::INT_TYPE);
+  REQUIRE(func->params.curr.type == StatementType::VARIABLE_DEC);
+  REQUIRE(func->params.curr.varDec);
+  CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
+  CHECK(func->params.curr.varDec->type.token.type == TokenType::POINTER);
+  REQUIRE(func->params.curr.varDec->type.next);
+  CHECK(func->params.curr.varDec->type.next->token.type == TokenType::INT_TYPE);
 
   // check return type
-  CHECK(func.returnType.next == nullptr);
-  CHECK(func.returnType.token.type == TokenType::INT_TYPE);
-  CHECK(func.body.scopeStatements.curr.type == StatementType::NOTHING);
+  CHECK(func->returnType.next == nullptr);
+  CHECK(func->returnType.token.type == TokenType::INT_TYPE);
+  CHECK(func->body.scopeStatements.curr.type == StatementType::NOTHING);
 }
 
 TEST_CASE("Function Call - Base", "[parser]") {
@@ -642,9 +643,10 @@ TEST_CASE("Struct Declaration", "[parser]") {
     REQUIRE(parser.expected.empty());
     REQUIRE(parser.unexpected.empty());
     auto& s = parser.program.decs;
-    REQUIRE(s.curr.type == GlobalDecType::STRUCT);
-    CHECK(tokenizer.extractToken(s.curr.structDec.token) == "sName");
-    auto& sd = s.curr.structDec.decs;
+    REQUIRE(s.curr.type == GeneralDecType::STRUCT);
+    REQUIRE(s.curr.structDec);
+    CHECK(tokenizer.extractToken(s.curr.structDec->name) == "sName");
+    auto& sd = s.curr.structDec->decs;
     CHECK(sd.type == StructDecType::FUNC);
     REQUIRE(sd.next);
     CHECK(sd.next->type  == StructDecType::VAR);
@@ -663,15 +665,16 @@ TEST_CASE("Template Declaration", "[parser]") {
   REQUIRE(parser.unexpected.empty());
   REQUIRE(parser.expected.empty());
   auto& t = parser.program.decs.curr;
-  REQUIRE(t.type == GlobalDecType::TEMPLATE);
-  CHECK(tokenizer.extractToken(t.tempDec.templateTypes.token) == "T");
+  REQUIRE(t.type == GeneralDecType::TEMPLATE);
+  REQUIRE(t.tempDec);
+  CHECK(tokenizer.extractToken(t.tempDec->templateTypes.token) == "T");
 
-  CHECK(t.tempDec.templateTypes.next == nullptr);
+  CHECK(t.tempDec->templateTypes.next == nullptr);
   CHECK(parser.program.decs.next == nullptr);
 
-  REQUIRE_FALSE(t.tempDec.isStruct);
-  REQUIRE(t.tempDec.funcDec.body.scopeStatements.next);
-  CHECK(t.tempDec.funcDec.body.scopeStatements.next->next == nullptr);
+  REQUIRE_FALSE(t.tempDec->isStruct);
+  REQUIRE(t.tempDec->funcDec.body.scopeStatements.next);
+  CHECK(t.tempDec->funcDec.body.scopeStatements.next->next == nullptr);
 }
 
 TEST_CASE("Variable Declaration", "[parser]") {
@@ -682,7 +685,7 @@ TEST_CASE("Variable Declaration", "[parser]") {
   REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());
   CHECK(parser.program.decs.next == nullptr);
-  CHECK(parser.program.decs.curr.type == GlobalDecType::VARIABLE);
+  CHECK(parser.program.decs.curr.type == GeneralDecType::VARIABLE);
 }
 
 TEST_CASE("Keywords", "[parser]") {
