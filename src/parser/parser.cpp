@@ -41,11 +41,6 @@ bool Parser::parse() {
         list->curr.varDec.name = token;
         ParseStatementErrorType errorType = parseVariableDec(list->curr.varDec);
         if (errorType != ParseStatementErrorType::NONE) {
-          if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            return false;
-          } else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
-            expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
-          }
           return false;
         }
         if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
@@ -113,6 +108,7 @@ bool Parser::parseFunction(FunctionDec& dec) {
         return false;
       }
       if (tokenizer.peekNext().type == TokenType::COMMA) {
+        tokenizer.consumePeek();
         list->next = memPool.makeStatementList();
         list = list->next;
       } else if (tokenizer.peeked.type == TokenType::CLOSE_PAREN) {
@@ -173,8 +169,6 @@ bool Parser::parseStruct(StructDec& dec) {
         if (errorType != ParseStatementErrorType::NONE) {
           if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
-          } else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
-            expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
           }
           return false;
         }
@@ -203,7 +197,8 @@ bool Parser::parseStruct(StructDec& dec) {
         memPool.release(list);
       }
       return true;
-    } else {
+    }
+    else {
       if (token.type == TokenType::END_OF_FILE) {
         expected.emplace_back(ExpectedType::TOKEN, token, TokenType::CLOSE_BRACE);
       } else {
@@ -351,12 +346,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         if (errorType != ParseStatementErrorType::NONE) {
           return ParseStatementErrorType::REPORTED;
         }
-        if (tokenizer.peekNext().type != TokenType::CLOSE_BRACE) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACE);
-          return ParseStatementErrorType::REPORTED;
-        }
-        // consume close brace
-        tokenizer.consumePeek();
         // END DUP
       }
     }
@@ -386,7 +375,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
           return ParseStatementErrorType::REPORTED;
         }
       }
-      else {
+      else if (tokenizer.peeked.type != TokenType::SEMICOLON) {
         ParseExpressionErrorType errorType = parseExpression(statement.controlFlow->returnStatement.returnValue);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
@@ -396,10 +385,10 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
           }
           return ParseStatementErrorType::REPORTED;
         }
-      }
-      if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
-        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peekNext(), TokenType::SEMICOLON);
-        return ParseStatementErrorType::REPORTED;
+        if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer.peekNext(), TokenType::SEMICOLON);
+          return ParseStatementErrorType::REPORTED;
+        }
       }
       tokenizer.consumePeek();
     }
@@ -513,6 +502,16 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     }
   }
 
+  else if (token.type == TokenType::BREAK || token.type == TokenType::CONTINUE) {
+    tokenizer.consumePeek();
+    statement.type = StatementType::KEYWORD;
+    statement.keyword = memPool.makeToken(token);
+    if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::SEMICOLON);
+      return ParseStatementErrorType::REPORTED;
+    }
+    tokenizer.consumePeek();
+  }
   // unexpected token
   else if (notFirstOfExpression(token.type)) {
     unexpected.emplace_back(token);
@@ -553,6 +552,7 @@ ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
   }
   Token next = tokenizer.peekNext();
   if (next.type == TokenType::ASSIGNMENT) {
+    varDec.initialAssignment = memPool.makeDefaultedExpression();
     tokenizer.consumePeek();
     // initialize
     if (tokenizer.peekNext().type == TokenType::OPEN_BRACKET) {
@@ -641,12 +641,6 @@ ParseStatementErrorType Parser::parseIfStatement(IfStatement& condStatement) {
   if (errorType != ParseStatementErrorType::NONE) {
     return ParseStatementErrorType::REPORTED;
   }
-  if (tokenizer.peekNext().type != TokenType::CLOSE_BRACE) {
-    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACE);
-    return ParseStatementErrorType::REPORTED;
-  }
-  // consume close brace
-  tokenizer.consumePeek();
   // END DUP
   return ParseStatementErrorType::NONE;
 }
@@ -725,10 +719,6 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
   while (true) {
     bool binary = isBinaryOp(token.type);
     if (binary || isUnaryOp(token.type)) {
-      if (bottom && (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP)) {
-        expected.emplace_back(ExpectedType::EXPRESSION, token);
-        return ParseExpressionErrorType::REPORTED;
-      }
       tokenizer.consumePeek();
       Expression expression;
       if (binary) {
@@ -742,6 +732,9 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
           tokenizer.consumePeek();
           token = tokenizer.peekNext();
           continue;
+        } else if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
+          expected.emplace_back(ExpectedType::EXPRESSION, token);
+          return ParseExpressionErrorType::REPORTED;
         }
       } else {
         expression.type = ExpressionType::UNARY_OP;
@@ -756,6 +749,12 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
           tokenizer.consumePeek();
           token = tokenizer.peekNext();
           continue;
+        } else if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
+          if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
+            // expected expression
+            expected.emplace_back(ExpectedType::EXPRESSION, token);
+            return ParseExpressionErrorType::REPORTED;
+          }
         }
       }
       if (rootExpression.type != ExpressionType::BINARY_OP && rootExpression.type != ExpressionType::UNARY_OP) {
@@ -796,8 +795,10 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
           }
           if (prev->type == ExpressionType::BINARY_OP) {
             prev->binOp->rightSide = expression;
+            bottom = &prev->binOp->rightSide;
           } else {
             prev->unOp->operand = expression;
+            bottom = &prev->unOp->operand;
           }
         }
         else {

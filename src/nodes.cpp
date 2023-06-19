@@ -34,10 +34,6 @@ void Expression::operator=(const Expression&ref) {
 ExpressionList::ExpressionList(): curr{}, next{nullptr} {}
 
 Statement::Statement(): expression{}, type{StatementType::NOTHING} {}
-Statement::Statement(Expression *val): expression{val}, type{StatementType::EXPRESSION} {}
-Statement::Statement(ControlFlowStatement *val): controlFlow{val}, type{StatementType::CONTROL_FLOW} {}
-Statement::Statement(Scope *val): scope{val}, type{StatementType::SCOPE} {}
-Statement::Statement(VariableDec *val): varDec{val}, type{StatementType::VARIABLE_DEC} {}
 Statement::Statement(const Statement& ref): expression{ref.expression}, type{ref.type} {}
 void Statement::operator=(const Statement& ref) {
   expression = ref.expression;

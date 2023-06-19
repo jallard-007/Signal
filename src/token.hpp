@@ -113,9 +113,9 @@ enum class TokenType : uint8_t {
   INT_TYPE,
   FLOAT_TYPE,
   DOUBLE_TYPE,
+  VOID,
   POINTER,
   REFERENCE,
-  VOID,
 
   // extra types used by parse to report errors
   TYPE,

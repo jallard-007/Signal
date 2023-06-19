@@ -84,7 +84,8 @@ enum class StatementType {
   EXPRESSION,
   CONTROL_FLOW,
   SCOPE,
-  VARIABLE_DEC
+  VARIABLE_DEC,
+  KEYWORD,
 };
 
 // statement:=  expression; | controlFlowStatement | scope | varDec | nothing
@@ -94,13 +95,10 @@ struct Statement {
     ControlFlowStatement *controlFlow;
     Scope *scope;
     VariableDec *varDec;
+    Token *keyword;
   };
   StatementType type;
   Statement();
-  explicit Statement(Expression *);
-  explicit Statement(ControlFlowStatement *);
-  explicit Statement(Scope *);
-  explicit Statement(VariableDec *);
   Statement(const Statement&);
   void operator=(const Statement&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -118,7 +116,7 @@ struct TokenList {
   TokenList(const Token&);
   TokenList(const TokenList&) = default;
   void operator=(const TokenList&);
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // varDec:= simpleVarDec initialization
@@ -131,7 +129,7 @@ struct VariableDec {
   explicit VariableDec(const Token&);
   VariableDec(const VariableDec&) = default;
   VariableDec& operator=(const VariableDec&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // statementList:= statement statementList | nothing
@@ -162,7 +160,7 @@ struct ArrayAccess {
   ArrayAccess() = delete;
   explicit ArrayAccess(const Token&);
   ArrayAccess(const ArrayAccess&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // binOp:= expression binOpOperator expression
@@ -173,7 +171,7 @@ struct BinOp {
   BinOp() = delete;
   explicit BinOp(const Token&);
   BinOp(const BinOp&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
@@ -183,7 +181,7 @@ struct UnOp {
   UnOp() = delete;
   explicit UnOp(const Token&);
   UnOp(const UnOp&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // functionCall:= identifier(expressionList)
@@ -193,7 +191,7 @@ struct FunctionCall {
   FunctionCall() = delete;
   explicit FunctionCall(const Token &);
   FunctionCall(const FunctionCall&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // arrayOrStructLiteral:= [ expressionList ]
@@ -201,7 +199,7 @@ struct ArrayOrStructLiteral {
   ExpressionList values;
   ArrayOrStructLiteral() = default;
   ArrayOrStructLiteral(const ArrayOrStructLiteral&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // CONDITIONAL STATEMENTS
@@ -241,7 +239,7 @@ struct ReturnStatement {
   Expression returnValue;
   ReturnStatement() = delete;
   explicit ReturnStatement(const Token&);
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 struct SwitchScope {
@@ -273,7 +271,7 @@ struct ForLoop {
   Statement initialize{};
   Expression condition{};
   Expression iteration{};
-  Scope body;
+  Scope body{};
   ForLoop() = default;
   ForLoop(const ForLoop &);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -341,7 +339,6 @@ struct StructDecList {
   StructDecType type;
   StructDecList();
   StructDecList(const StructDecList&);
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 // structDec:= struct identifier { structDecList }
@@ -410,6 +407,7 @@ struct GlobalDec {
   };
   GlobalDecType type{GlobalDecType::NOTHING};
   GlobalDec();
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // globalDecList:= globalDec globalDecList | nothing
@@ -417,10 +415,12 @@ struct GlobalDecList {
   GlobalDec curr{};
   GlobalDecList *next{nullptr};
   GlobalDecList() = default;
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 // program:= globalDecList
 struct Program {
   GlobalDecList decs{};
   Program() = default;
+  void prettyPrint(Tokenizer&, std::string&);
 };

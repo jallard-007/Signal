@@ -13,7 +13,7 @@ bool isUnaryOp(TokenType type) {
 }
 
 bool isConcreteType(TokenType type) {
-  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::DOUBLE_TYPE);
+  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::VOID);
 }
 
 bool isLogicalOp(TokenType type) {

@@ -273,7 +273,7 @@ void Tokenizer::moveToNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
       ++lineNum;
-      lineStart = position + 1;
+      lineStart = ++position;
       return;
     }
   }
