@@ -322,14 +322,14 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       }
 
       // elifs
-      ElifStatementList**curr = &cond.elifStatement;
+      ElifStatementList **curr = &cond.elifStatement;
       while (tokenizer.peekNext().type == TokenType::ELIF) {
         tokenizer.consumePeek();
         *curr = memPool.makeElifStatementList();
         if (parseIfStatement((*curr)->elif) == ParseStatementErrorType::REPORTED) {
           return ParseStatementErrorType::REPORTED;
         }
-        *curr = (*curr)->next;
+        curr = &(*curr)->next;
       }
 
       if (tokenizer.peeked.type == TokenType::ELSE) {

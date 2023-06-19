@@ -39,7 +39,9 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
       scope->prettyPrint(tk, str, indentation); break;
     case StatementType::VARIABLE_DEC:
       varDec->prettyPrint(tk, str); break;
-    default: break;
+    case StatementType::KEYWORD: str += typeToString.at(keyword->type); break;
+    case StatementType::NOTHING: break;
+    default: str += "{not yet implemented in pretty printer}"; break;
   }
 }
 
@@ -259,7 +261,6 @@ void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
     str += ' ';
     returnValue.prettyPrint(tk, str);
   }
-  str += ';';
 }
 
 void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
@@ -269,7 +270,7 @@ void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t inde
 }
 
 void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  str += typeToString.at(TokenType::WHILE) + ' ';
+  str += typeToString.at(TokenType::WHILE);
   statement.prettyPrint(tk ,str, indentation);
 }
 
@@ -280,14 +281,14 @@ void IfStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
 }
 
 void ConditionalStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  str += typeToString.at(TokenType::IF) + ' ';
+  str += typeToString.at(TokenType::IF);
   ifStatement.prettyPrint(tk, str, indentation);
   for (ElifStatementList*list = elifStatement; list; list = list->next) {
-    str += typeToString.at(TokenType::ELIF) + ' ';
+    str += std::string(indentation, ' ') + typeToString.at(TokenType::ELIF);
     list->elif.prettyPrint(tk, str, indentation);
   }
   if (elseStatement) {
-    str += typeToString.at(TokenType::ELSE) + ' ';
+    str += std::string(indentation, ' ') + typeToString.at(TokenType::ELSE);
     elseStatement->prettyPrint(tk, str, indentation);
   }
 }

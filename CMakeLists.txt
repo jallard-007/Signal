@@ -15,15 +15,15 @@ set_target_properties(tokenizer parser prettyPrint checker PROPERTIES ARCHIVE_OU
 add_executable(main ./src/main.cpp)
 target_link_libraries(main PRIVATE prettyPrint)
 
-add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp)
-# add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp)
+add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp)
+# add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp  ./src/checker/test_checker.cpp)
 # target_link_libraries(test PRIVATE checker)
 # target_link_libraries(test PRIVATE prettyPrint)
 target_link_libraries(test PRIVATE prettyPrint)
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)
 
 if ( UNIX )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -Wall -Wextra -Wpedantic -Werror")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -O0 -Wall -Wextra -Wpedantic -Werror")
 endif()
 if ( MSVC )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
