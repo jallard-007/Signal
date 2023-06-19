@@ -43,8 +43,9 @@ struct Parser {
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token&);
   ParseStatementErrorType parseVariableDec(VariableDec&);
-  ParseExpressionErrorType parseExpression(Expression&, Expression* bottom = nullptr);
-  ParseExpressionErrorType getExpressions(ExpressionList&);
+  ParseExpressionErrorType parseExpression(Expression&, Token* start = nullptr);
+  ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
+  ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);
 };
 

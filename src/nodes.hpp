@@ -7,7 +7,7 @@ bool notFirstOfExpression(TokenType);
 struct Unexpected {
   Token token;
   Unexpected() = delete;
-  Unexpected(const Token&);
+  explicit Unexpected(const Token&);
   std::string getErrorMessage(Tokenizer&, const std::string&);
 };
 
@@ -36,6 +36,7 @@ typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
+typedef struct ArrayOrStructLiteral ArrayOrStructLiteral;
 
 enum class ExpressionType {
   NONE,
@@ -45,6 +46,7 @@ enum class ExpressionType {
   FUNCTION_CALL,
   ARRAY_ACCESS,
   WRAPPED,
+  ARRAY_OR_STRUCT_LITERAL
 };
 
 struct Expression {
@@ -55,10 +57,11 @@ struct Expression {
     FunctionCall *funcCall;
     ArrayAccess *arrAccess;
     Expression *wrapped;
+    ArrayOrStructLiteral *arrayOrStruct;
   };
   ExpressionType type;
   Expression();
-  Expression(Token *);
+  explicit Expression(Token *);
   Expression(const Expression&);
   void operator=(const Expression&);
   void prettyPrint(Tokenizer&, std::string&);
@@ -126,8 +129,8 @@ struct VariableDec {
   Expression *initialAssignment;
   VariableDec() = delete;
   explicit VariableDec(const Token&);
-  VariableDec(const VariableDec&);
-  void operator=(const VariableDec&);
+  VariableDec(const VariableDec&) = default;
+  VariableDec& operator=(const VariableDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -311,15 +314,21 @@ struct ControlFlowStatement {
 
 // functionDec:= func identifier (varDecList): typeList scope
 struct FunctionDec {
-  Token name;
+  Token name{0,0,TokenType::NOTHING};
   StatementList params{};
   TokenList returnType{};
   Scope body{};
-  FunctionDec() = delete;
+  FunctionDec() = default;
   explicit FunctionDec(const Token&);
   FunctionDec(const FunctionDec&) = default;
   void operator=(const FunctionDec&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+};
+
+enum class StructDecType: uint8_t {
+  NONE,
+  FUNC,
+  VAR,
 };
 
 // structDecList:= varDec ; decList | functionDec decList | nothing
@@ -328,9 +337,8 @@ struct StructDecList {
     VariableDec varDec;
     FunctionDec funcDec;
   };
-  
   StructDecList *next;
-  bool isVarDec;
+  StructDecType type;
   StructDecList();
   StructDecList(const StructDecList&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -359,12 +367,12 @@ struct EnumDec {
 // templateDec:= template [ identifierList ] structDec
 //                                          | functionDec
 struct TemplateDec {
-  Token token;
-  TokenList templateTypes;
   union {
     StructDec structDec;
     FunctionDec funcDec;
   };
+  TokenList templateTypes{};
+  Token token;
   bool isStruct;
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -373,11 +381,10 @@ struct TemplateDec {
 //templateCreation:= create identifier [ identifierList ] as identifier ;
 struct TemplateCreation {
   Token token;
-  TemplateDec * templateDec;
-  TokenList templateTypes;
+  TemplateDec *templateDec{nullptr};
+  TokenList templateTypes{};
   Token identifier;
   TemplateCreation() = delete;
-  TemplateCreation(const Token &);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
@@ -401,19 +408,19 @@ struct GlobalDec {
     TemplateDec tempDec;
     TemplateCreation tempCreate;
   };
-  GlobalDecType type;
+  GlobalDecType type{GlobalDecType::NOTHING};
   GlobalDec();
 };
 
 // globalDecList:= globalDec globalDecList | nothing
 struct GlobalDecList {
-  GlobalDec curr;
-  GlobalDecList *next;
-  GlobalDecList();
+  GlobalDec curr{};
+  GlobalDecList *next{nullptr};
+  GlobalDecList() = default;
 };
 
 // program:= globalDecList
 struct Program {
-  GlobalDecList decs;
+  GlobalDecList decs{};
   Program() = default;
 };

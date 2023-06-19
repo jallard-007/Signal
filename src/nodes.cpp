@@ -51,12 +51,6 @@ void TokenList::operator=(const TokenList& ref) {
 }
 
 VariableDec::VariableDec(const Token& tk): name{tk}, type{}, initialAssignment{nullptr} {}
-VariableDec::VariableDec(const VariableDec& ref): name{ref.name}, type{ref.type}, initialAssignment{ref.initialAssignment} {}
-void VariableDec::operator=(const VariableDec& ref) {
-  name = ref.name;
-  type = ref.type;
-  initialAssignment = ref.initialAssignment;
-}
 
 void StatementList::operator=(const StatementList &ref) {
   curr = ref.curr;
@@ -98,21 +92,18 @@ void FunctionDec::operator=(const FunctionDec &ref) {
 
 StructDec::StructDec(const Token& token): token{token}, decs{} {}
 
-StructDecList::StructDecList() {}
-StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, isVarDec{ref.isVarDec} {
-  if (isVarDec) {
+StructDecList::StructDecList(): funcDec{}, next{nullptr}, type{StructDecType::NONE} {}
+StructDecList::StructDecList(const StructDecList&ref): next{ref.next}, type{ref.type} {
+  if (type == StructDecType::VAR) {
     varDec = ref.varDec;
-  } else {
+  } else if (type == StructDecType::FUNC) {
     funcDec = ref.funcDec;
   }
 }
 
 EnumDec::EnumDec(const Token&tk): token{tk}, members{} {};
 
-TemplateDec::TemplateDec(): token{0,0,TokenType::NOTHING}, templateTypes{}, structDec{Token{0,0,TokenType::NOTHING}}, isStruct{false} {};
+TemplateDec::TemplateDec(): funcDec{}, templateTypes{}, token{0,0,TokenType::NOTHING}, isStruct{false}  {};
 
-TemplateCreation::TemplateCreation(const Token& tk): token{tk}, templateDec{nullptr}, templateTypes{}, identifier{0,0,TokenType::NOTHING} {}
+GlobalDec::GlobalDec(): tempDec{} {}
 
-GlobalDec::GlobalDec(): funcDec{Token{0,0,TokenType::NOTHING}}, type{GlobalDecType::NOTHING} {}
-
-GlobalDecList::GlobalDecList(): curr{}, next{nullptr} {}
