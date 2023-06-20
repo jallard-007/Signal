@@ -19,6 +19,12 @@ std::vector<Token> Tokenizer::tokenizeAll() {
   return tokens;
 }
 
+#define END_OF_IDENTIFIER(c) TokenType tNext = numToType[(uint8_t)content[++position]]; \
+if (tNext != TokenType::IDENTIFIER && tNext != TokenType::DECIMAL_NUMBER) { \
+  type = c; \
+  break; \
+}
+
 /**
  * Allows peeking to the next token
  * Successive calls to this function will return the same Token.
@@ -49,32 +55,381 @@ Token Tokenizer::tokenizeNext() {
     return temp;
   }
   moveToNextNonWhiteSpaceChar();
-  if (position >= size) {
-    return {position, lineNum, (uint16_t)(position + 1 - lineStart), 0, TokenType::END_OF_FILE};
-  }
-
   const uint32_t tokenStartPos = position;
-  uint16_t length = 0;
   char c = content[position];
   TokenType type = numToType[(uint8_t)c];
   switch (type) {
     case TokenType::IDENTIFIER: {
-      movePastKeywordOrIdentifier();
-      if (length >= MIN_CHARS_TO_DISAMBIG) {
-        type = TokenType::IDENTIFIER;
-      } else {
-        // + 1 for null termination
-        char chars[MIN_CHARS_TO_DISAMBIG + 1]{};
-        chars[0] = c;
-        for (uint32_t i = tokenStartPos + 1, j = 1; i < position && j < MIN_CHARS_TO_DISAMBIG; ++i, ++j) {
-          chars[j] = content[i];
+      switch (c) {
+        case 'a': {
+          // as
+          if (content[++position] == 's') {
+            END_OF_IDENTIFIER(TokenType::AS)
+          }
+          movePastIdentifier();
+          break;
         }
-        if (stringToType.find(chars) != stringToType.end()) {
-          type = stringToType.at(chars);
-        } else {
-          type = TokenType::IDENTIFIER;
+        case 'b': {
+          // break bool
+          if (content[++position] == 'r') {
+            if (content[++position] == 'e') {
+              if (content[++position] == 'a') {
+                if (content[++position] == 'k') {
+                  END_OF_IDENTIFIER(TokenType::BREAK)
+                }
+              }
+            }
+          }
+          else if (content[position] == 'o') {
+            if (content[++position] == 'o') {
+              if (content[++position] == 'l') {
+                END_OF_IDENTIFIER(TokenType::BOOL)
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'c': {
+          // case create continue char
+          if (content[++position] == 'a') {
+            if (content[++position] == 's') {
+              if (content[++position] == 'e') {
+                END_OF_IDENTIFIER(TokenType::CASE)
+              }
+            }
+          }
+          else if (content[position] == 'r') {
+            if (content[++position] == 'e') {
+              if (content[++position] == 'a') {
+                if (content[++position] == 't') {
+                  if (content[++position] == 'e') {
+                    END_OF_IDENTIFIER(TokenType::CREATE)
+                  }
+                }
+              }
+            }
+          }
+          else if (content[position] == 'o') {
+            if (content[++position] == 'n') {
+              if (content[++position] == 't') {
+                if (content[++position] == 'i') {
+                  if (content[++position] == 'n') {
+                    if (content[++position] == 'u') {
+                      if (content[++position] == 'e') {
+                        END_OF_IDENTIFIER(TokenType::CONTINUE)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          else if (content[position] == 'h') {
+            if (content[++position] == 'a') {
+              if (content[++position] == 'r') {
+                END_OF_IDENTIFIER(TokenType::CHAR_TYPE)
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'd': {
+          // default double 
+          if (content[++position] == 'e') {
+            if (content[++position] == 'f') {
+              if (content[++position] == 'a') {
+                if (content[++position] == 'u') {
+                  if (content[++position] == 'l') {
+                    if (content[++position] == 't') {
+                      END_OF_IDENTIFIER(TokenType::DEFAULT)
+                    }
+                  }
+                }
+              }
+            }
+          }
+          else if (content[position] == 'o') {
+            if (content[++position] == 'u') {
+              if (content[++position] == 'b') {
+                if (content[++position] == 'l') {
+                  if (content[++position] == 'e') {
+                    END_OF_IDENTIFIER(TokenType::DOUBLE_TYPE)
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'e': {
+          // elif else enum extern
+          if (content[++position] == 'l') {
+            if (content[++position] == 'i') {
+              if (content[++position] == 'f') {
+                END_OF_IDENTIFIER(TokenType::ELIF)
+              }
+            } else if (content[position] == 's') {
+              if (content[++position] == 'e') {
+                END_OF_IDENTIFIER(TokenType::ELSE)
+              }
+            }
+          }
+          else if (content[position] == 'n') {
+            if (content[++position] == 'u') {
+              if (content[++position] == 'm') {
+                END_OF_IDENTIFIER(TokenType::ENUM)
+              }
+            }
+          }
+          else if (content[position] == 'x') {
+            if (content[++position] == 't') {
+              if (content[++position] == 'e') {
+                if (content[++position] == 'r') {
+                  if (content[++position] == 'n') {
+                    END_OF_IDENTIFIER(TokenType::EXTERN)
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'f': {
+          // false for func float
+          if (content[++position] == 'a') {
+            if (content[++position] == 'l') {
+              if (content[++position] == 's') {
+                if (content[++position] == 'e') {
+                  END_OF_IDENTIFIER(TokenType::FALSE)
+                }
+              }
+            }
+          }
+          else if (content[position] == 'o') {
+            if (content[++position] == 'r') {
+              END_OF_IDENTIFIER(TokenType::FOR)
+            }
+          }
+          else if (content[position] == 'u') {
+            if (content[++position] == 'n') {
+              if (content[++position] == 'c') {
+                END_OF_IDENTIFIER(TokenType::FUNC)
+              }
+            }
+          }
+          else if (content[position] == 'l') {
+            if (content[++position] == 'o') {
+              if (content[++position] == 'a') {
+                if (content[++position] == 't') {
+                  END_OF_IDENTIFIER(TokenType::FLOAT_TYPE)
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'i': {
+          // if include int8 int16 int32 int64
+          if (content[++position] == 'f') {
+            END_OF_IDENTIFIER(TokenType::IF)
+          }
+          else if (content[position] == 'n') {
+            if (content[++position] == 't') {
+              if (content[++position] == '8') {
+                END_OF_IDENTIFIER(TokenType::INT8_TYPE)
+              } else if (content[position] == '1') {
+                if (content[++position] == '6') {
+                  END_OF_IDENTIFIER(TokenType::INT16_TYPE)
+                }
+              } else if (content[position] == '3') {
+                if (content[++position] == '2') {
+                  END_OF_IDENTIFIER(TokenType::INT32_TYPE)
+                }
+              } else if (content[position] == '6') {
+                if (content[++position] == '4') {
+                  END_OF_IDENTIFIER(TokenType::INT64_TYPE)
+                }
+              }
+            } else if (content[position] == 'c') {
+              if (content[++position] == 'l') {
+                if (content[++position] == 'u') {
+                  if (content[++position] == 'd') {
+                    if (content[++position] == 'e') {
+                      END_OF_IDENTIFIER(TokenType::INCLUDE)
+                    }
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'n': {
+          // nullptr 
+          if (content[++position] == 'u') {
+            if (content[++position] == 'l') {
+              if (content[++position] == 'l') {
+                if (content[++position] == 'p') {
+                  if (content[++position] == 't') {
+                    if (content[++position] == 'r') {
+                      END_OF_IDENTIFIER(TokenType::NULL_PTR)
+                    }
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'p': {
+          // ptr 
+          if (content[++position] == 't') {
+            if (content[++position] == 'r') {
+              END_OF_IDENTIFIER(TokenType::POINTER)
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'r': {
+          // ref return
+          if (content[++position] == 'e') {
+            if (content[++position] == 't') {
+              if (content[++position] == 'u') {
+                if (content[++position] == 'r') {
+                  if (content[++position] == 'n') {
+                    END_OF_IDENTIFIER(TokenType::RETURN)
+                  }
+                }
+              }
+            } else if (content[position] == 'f') {
+              END_OF_IDENTIFIER(TokenType::REFERENCE)
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 's': {
+          // switch struct
+          if (content[++position] == 'w') {
+            if (content[++position] == 'i') {
+              if (content[++position] == 't') {
+                if (content[++position] == 'c') {
+                  if (content[++position] == 'h') {
+                    END_OF_IDENTIFIER(TokenType::SWITCH)
+                  }
+                }
+              }
+            }
+          }
+          else if (content[position] == 't') {
+            if (content[++position] == 'r') {
+              if (content[++position] == 'u') {
+                if (content[++position] == 'c') {
+                  if (content[++position] == 't') {
+                    END_OF_IDENTIFIER(TokenType::STRUCT)
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 't': {
+          // true template
+          if (content[++position] == 'r') {
+            if (content[++position] == 'u') {
+              if (content[++position] == 'e') {
+                END_OF_IDENTIFIER(TokenType::TRUE)
+              }
+            }
+          } else if (content[position] == 'e') {
+            if (content[++position] == 'm') {
+              if (content[++position] == 'p') {
+                if (content[++position] == 'l') {
+                  if (content[++position] == 'a') {
+                    if (content[++position] == 't') {
+                      if (content[++position] == 'e') {
+                        END_OF_IDENTIFIER(TokenType::TEMPLATE)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'u': {
+          // uint8 uint16 uint32 uint64
+          if (content[++position] == 'i') {
+            if (content[++position] == 'n') {
+              if (content[++position] == 't') {
+                if (content[++position] == '8') {
+                  END_OF_IDENTIFIER(TokenType::UINT8_TYPE)
+                } else if (content[position] == '1') {
+                  if (content[++position] == '6') {
+                    END_OF_IDENTIFIER(TokenType::UINT16_TYPE)
+                  }
+                } else if (content[position] == '3') {
+                  if (content[++position] == '2') {
+                    END_OF_IDENTIFIER(TokenType::UINT32_TYPE)
+                  }
+                } else if (content[position] == '6') {
+                  if (content[++position] == '4') {
+                    END_OF_IDENTIFIER(TokenType::UINT64_TYPE)
+                  }
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'v': {
+          // void
+          if (content[++position] == 'o') {
+            if (content[++position] == 'i') {
+              if (content[++position] == 'd') {
+                END_OF_IDENTIFIER(TokenType::VOID)
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        case 'w': {
+          // while
+          if (content[++position] == 'h') {
+            if (content[++position] == 'i') {
+              if (content[++position] == 'l') {
+                if (content[++position] == 'e') {
+                  END_OF_IDENTIFIER(TokenType::WHILE)
+                }
+              }
+            }
+          }
+          movePastIdentifier();
+          break;
+        }
+        default: {
+          movePastIdentifier();
+          break;
         }
       }
+      break;
+    }
+
+    case TokenType::END_OF_FILE: {
       break;
     }
 
@@ -98,9 +453,6 @@ Token Tokenizer::tokenizeNext() {
     case TokenType::COMMENT: {
       moveToNewLine();
       Token tk = tokenizeNext();
-      while (tk.type == TokenType::COMMENT) {
-        tk = tokenizeNext();
-      }
       type = tk.type;
       prevType = type;
       return tk;
@@ -141,66 +493,141 @@ Token Tokenizer::tokenizeNext() {
     }
 
     default: {
-      if (++position < size) {
-        const char cNext = content[position++];
-        if (c == '|' && cNext == '|') {
-          type = TokenType::LOGICAL_OR;
-        } else if (c == '&' && cNext == '&') {
-          type = TokenType::LOGICAL_AND;
-        } else if (cNext == '=') {
-          TokenType newType = charWithEqualToType.at(c);
-          if (newType != TokenType::NOTHING) {
-            type = newType;
-          } else {
-            --position;
-          }
-        } else if (c == '<' && cNext == '<') {
-          if (position < size && content[position] == '=') {
-            type = TokenType::SHIFT_LEFT_ASSIGNMENT;
+      const TokenType tNext = numToType[(uint8_t)content[++position]];
+      switch (type) {
+        case TokenType::NOT: {
+          if (tNext == TokenType::ASSIGNMENT) {
             ++position;
-          } else {
-            type = TokenType::SHIFT_LEFT;
+            type = TokenType::NOT_EQUAL;
           }
-        } else if (c == '>' && cNext == '>') {
-          if (position < size && content[position] == '=') {
-            type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
+          break;
+        }
+        case TokenType::BITWISE_XOR: {
+          if (tNext == TokenType::ASSIGNMENT) {
             ++position;
-          } else {
-            type = TokenType::SHIFT_RIGHT;
+            type = TokenType::BITWISE_XOR_ASSIGNMENT;
           }
-        } else if (c == '-') {
-          if (cNext == '>') {
+          break;
+        }
+        case TokenType::MODULO: {
+          if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::MODULO_ASSIGNMENT;
+          }
+          break;
+        }
+        case TokenType::ASSIGNMENT: {
+          if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::EQUAL;
+          }
+          break;
+        }
+        case TokenType::DIVISION: {
+          if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::DIVISION_ASSIGNMENT;
+          }
+          break;
+        }
+        case TokenType::BITWISE_OR: {
+          if (tNext == TokenType::BITWISE_OR) {
+            type = TokenType::LOGICAL_OR;
+            ++position;
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            type = TokenType::BITWISE_OR_ASSIGNMENT;
+            ++position;
+          }
+          break;
+        }
+        case TokenType::BITWISE_AND: {
+          if (tNext == TokenType::BITWISE_AND) {
+            type = TokenType::LOGICAL_AND;
+            ++position;
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            type = TokenType::BITWISE_AND_ASSIGNMENT;
+            ++position;
+          }
+          break;
+        }
+        case TokenType::LESS_THAN: {
+          if (tNext == TokenType::LESS_THAN) {
+            ++position;
+            if (numToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
+              ++position;
+              type = TokenType::SHIFT_LEFT_ASSIGNMENT;
+            } else {
+              type = TokenType::SHIFT_LEFT;
+            }
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            type = TokenType::LESS_THAN_EQUAL;
+            ++position;
+          }
+          break;
+        }
+        case TokenType::GREATER_THAN: {
+          if (tNext == TokenType::GREATER_THAN) {
+            ++position;
+            if (numToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
+              ++position;
+              type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
+            } else {
+              type = TokenType::SHIFT_RIGHT;
+            }
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            type = TokenType::GREATER_THAN_EQUAL;
+            ++position;
+          }
+          break;
+        }
+        case TokenType::SUBTRACTION: {
+          if (tNext == TokenType::GREATER_THAN) {
+            ++position;
             type = TokenType::PTR_MEMBER_ACCESS;
-          }
-          else if (cNext == '-') {
+          } else if (tNext == TokenType::SUBTRACTION) {
+            ++position;
             if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACKET) {
               type = TokenType::DECREMENT_POSTFIX;
             } else {
               type = TokenType::DECREMENT_PREFIX;
             }
-          } else {
-            if (prevType == TokenType::IDENTIFIER ||
-              isLiteral(prevType) ||
-              prevType == TokenType::CLOSE_PAREN ||
-              prevType == TokenType::CLOSE_BRACE) {
-              type = TokenType::SUBTRACTION;
-            } else {
-              type = TokenType::NEGATIVE;
-              --position;
-            }
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::SUBTRACTION_ASSIGNMENT;
+          } else if (
+            prevType != TokenType::IDENTIFIER &&
+            prevType != TokenType::CLOSE_PAREN &&
+            prevType != TokenType::CLOSE_BRACKET && !isLiteral(prevType)
+          ) {
+            type = TokenType::NEGATIVE;
           }
-        } else if (c == '+' && cNext == '+') {
-          if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
-            type = TokenType::INCREMENT_POSTFIX;
-          } else {
-            type = TokenType::INCREMENT_PREFIX;
-          }
+          break;
         }
-        else {
-          --position;
-          if (c == '*' && (prevType == TokenType::OPEN_BRACE || prevType == TokenType::OPEN_PAREN || prevType == TokenType::OPEN_BRACKET || isBinaryOp(prevType))) {
+        case TokenType::ADDITION: {
+          if (tNext == TokenType::ADDITION) {
+            ++position;
+            if (prevType == TokenType::IDENTIFIER || prevType == TokenType::CLOSE_PAREN || prevType == TokenType::CLOSE_BRACE) {
+              type = TokenType::INCREMENT_POSTFIX;
+            } else {
+              type = TokenType::INCREMENT_PREFIX;
+            }
+          } else if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::ADDITION_ASSIGNMENT;
+          }
+          break;
+        }
+        case TokenType::MULTIPLICATION: {
+          if (tNext == TokenType::ASSIGNMENT) {
+            ++position;
+            type = TokenType::MULTIPLICATION_ASSIGNMENT;
+          } else if (prevType == TokenType::OPEN_BRACE || prevType == TokenType::OPEN_PAREN || prevType == TokenType::OPEN_BRACKET || isBinaryOp(prevType)) {
             type = TokenType::DEREFERENCE;
           }
+          break;
+        }
+        default: {
+          break;
         }
       }
       break;
@@ -224,9 +651,10 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
   }
 }
 
-void Tokenizer::movePastKeywordOrIdentifier() {
-  for (++position; position < size; ++position) {
-    if (numToType[(uint8_t)content[position]] != TokenType::IDENTIFIER && numToType[(uint8_t)content[position]] != TokenType::DECIMAL_NUMBER) {
+void Tokenizer::movePastIdentifier() {
+  for (; position < size; ++position) {
+    TokenType type = numToType[(uint8_t)content[position]];
+    if (type != TokenType::IDENTIFIER && type != TokenType::DECIMAL_NUMBER) {
       return;
     }
   }

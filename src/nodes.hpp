@@ -29,7 +29,7 @@ struct Expected {
   Expected() = delete;
   Expected(ExpectedType, const Token&);
   Expected(ExpectedType, const Token&, TokenType);
-  std::string getErrorMessage(Tokenizer&, const std::string&);
+  std::string getErrorMessage(const std::string&);
 };
 
 typedef struct BinOp BinOp;

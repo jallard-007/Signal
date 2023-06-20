@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   }
   if (!p.expected.empty()) {
     for (auto enx : p.expected) {
-      std::cout << enx.getErrorMessage(tk, argv[1]);
+      std::cout << enx.getErrorMessage(argv[1]);
     }
   }
   if (!p.unexpected.empty()) {

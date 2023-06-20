@@ -68,9 +68,9 @@ enum class TokenType : uint8_t {
   MULTIPLICATION,
   DIVISION,
   MODULO,
+  BITWISE_OR,
   BITWISE_AND,
   BITWISE_XOR,
-  BITWISE_OR,
   SHIFT_LEFT,
   SHIFT_RIGHT,
 
@@ -142,7 +142,7 @@ struct Token {
 };
 
 const TokenType numToType [128] {
-  TokenType::BAD_VALUE , // 0 null character
+  TokenType::END_OF_FILE , // 0 null character
   TokenType::BAD_VALUE,  // 1 start of heading
   TokenType::BAD_VALUE , // 2 start of text
   TokenType::BAD_VALUE , // 3 end of text
@@ -279,80 +279,6 @@ bool isUnaryOp(TokenType);
 bool isControlFlow(TokenType);
 bool isLiteral(TokenType);
 
-const std::unordered_map<std::string, TokenType> stringToType {
-  {"as", TokenType::AS},
-  {"break", TokenType::BREAK},
-  {"case", TokenType::CASE},
-  {"create", TokenType::CREATE},
-  {"continue", TokenType::CONTINUE},
-  {"char", TokenType::CHAR_TYPE},
-  {"default", TokenType::DEFAULT},
-  {"double", TokenType::DOUBLE_TYPE},
-  {"elif", TokenType::ELIF},
-  {"else", TokenType::ELSE},
-  {"enum", TokenType::ENUM},
-  {"false", TokenType::FALSE},
-  {"for", TokenType::FOR},
-  {"func", TokenType::FUNC},
-  {"float", TokenType::FLOAT_TYPE},
-  {"if", TokenType::IF},
-  {"int8", TokenType::INT8_TYPE},
-  {"int16", TokenType::INT16_TYPE},
-  {"int32", TokenType::INT32_TYPE},
-  {"int64", TokenType::INT64_TYPE},
-  {"uint8", TokenType::UINT8_TYPE},
-  {"uint16", TokenType::UINT16_TYPE},
-  {"uint32", TokenType::UINT32_TYPE},
-  {"uint64", TokenType::UINT64_TYPE},
-  {"include", TokenType::INCLUDE},
-  {"extern", TokenType::EXTERN},
-  {"nullptr", TokenType::NULL_PTR},
-  {"ptr", TokenType::POINTER},
-  {"void", TokenType::VOID},
-  {"bool", TokenType::BOOL},
-  {"ref", TokenType::REFERENCE},
-  {"return", TokenType::RETURN},
-  {"struct", TokenType::STRUCT},
-  {"switch", TokenType::SWITCH},
-  {"template", TokenType::TEMPLATE},
-  {"true", TokenType::TRUE},
-  {"while", TokenType::WHILE},
-};
-
-const std::unordered_map<char, TokenType> charWithEqualToType {
-  {'!', TokenType::NOT_EQUAL},
-  {'^', TokenType::BITWISE_XOR_ASSIGNMENT},
-  {'%', TokenType::MODULO_ASSIGNMENT},
-  {'&', TokenType::BITWISE_AND_ASSIGNMENT},
-  {'*', TokenType::MULTIPLICATION_ASSIGNMENT},
-  {'-', TokenType::SUBTRACTION_ASSIGNMENT},
-  {'+', TokenType::ADDITION_ASSIGNMENT},
-  {'=', TokenType::EQUAL},
-  {'|', TokenType::BITWISE_OR_ASSIGNMENT},
-  {'<', TokenType::LESS_THAN_EQUAL},
-  {'>', TokenType::GREATER_THAN_EQUAL},
-  {'/', TokenType::DIVISION_ASSIGNMENT},
-
-  {'@', TokenType::NOTHING},
-  {'#', TokenType::NOTHING},
-  {'(', TokenType::NOTHING},
-  {')', TokenType::NOTHING},
-  {'{', TokenType::NOTHING},
-  {'}', TokenType::NOTHING},
-  {']', TokenType::NOTHING},
-  {'[', TokenType::NOTHING},
-  {'\\', TokenType::NOTHING},
-  {':', TokenType::NOTHING},
-  {';', TokenType::NOTHING},
-  {'"', TokenType::NOTHING},
-  {'\'', TokenType::NOTHING},
-  {'\n', TokenType::NOTHING},
-  {'?', TokenType::NOTHING},
-  {',', TokenType::NOTHING},
-  {'.', TokenType::NOTHING},
-};
-
-// maps characters to tokens that can be matched with a single character
 const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::DEREFERENCE, "*"},
   {TokenType::NOT, "!"},
@@ -445,5 +371,3 @@ const std::unordered_map<TokenType, std::string> typeToString {
 };
 
 #define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)
-
-

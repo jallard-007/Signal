@@ -26,7 +26,7 @@ struct Tokenizer {
   void consumePeek();
 
   void moveToNextNonWhiteSpaceChar();
-  void movePastKeywordOrIdentifier();
+  void movePastIdentifier();
   void movePastNumber();
   void movePastHexNumber();
   bool movePastLiteral(char);

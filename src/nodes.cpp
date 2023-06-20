@@ -13,14 +13,22 @@ bool notFirstOfExpression(TokenType type) {
 
 
 Unexpected::Unexpected(const Token& tk): token{tk} {}
-std::string Unexpected::getErrorMessage(Tokenizer&, const std::string&) {
-  return "";
+std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  std::string message = file + ':' + std::to_string(token.lineNum) + ':' + std::to_string(token.linePos) + '\n';
+  return message + "Unexpected Token: " + tk.extractToken(token) + "\n\n";
 }
 
 Expected::Expected(ExpectedType exType, const Token& tk): tokenWhereExpected{tk}, expectedTokenType{TokenType::NOTHING}, expectedType{exType} {}
 Expected::Expected(ExpectedType exType, const Token& tk, TokenType tkType): tokenWhereExpected{tk}, expectedTokenType{tkType}, expectedType{exType} {}
-std::string Expected::getErrorMessage(Tokenizer&, const std::string&) {
-  return "";
+std::string Expected::getErrorMessage(const std::string& file) {
+  std::string message = file + ':' + std::to_string(tokenWhereExpected.lineNum) + ':' + std::to_string(tokenWhereExpected.linePos) + '\n';
+  if (expectedType == ExpectedType::EXPRESSION) {
+    return message + "Expected Expression\n\n";
+  }
+  if (expectedType == ExpectedType::TOKEN) {
+    return message + "Expected Token: " + typeToString.at(expectedTokenType) + "\n\n";
+  }
+  return message + "\n\n";
 }
 
 Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
