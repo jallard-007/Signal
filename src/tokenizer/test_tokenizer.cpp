@@ -132,7 +132,7 @@ TEST_CASE("Unit Test - Logical", "[tokenizer][tokenType]") {
 
 TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
    CHECK(firstToken("char") == TokenType::CHAR_TYPE);
-   CHECK(firstToken("int") == TokenType::INT_TYPE);
+   CHECK(firstToken("uint32") == TokenType::UINT32_TYPE);
    CHECK(firstToken("double") == TokenType::DOUBLE_TYPE);
    CHECK(firstToken("ptr") == TokenType::POINTER);
 }

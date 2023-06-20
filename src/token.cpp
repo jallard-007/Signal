@@ -1,7 +1,7 @@
 #include "token.hpp"
 
 bool isBuiltInType(TokenType type) {
-  return type >= TokenType::BOOL && type <= TokenType::VOID;
+  return type >= TokenType::BOOL && type <= TokenType::REFERENCE;
 }
 
 bool isBinaryOp(TokenType type) {

@@ -12,7 +12,7 @@ bool notFirstOfExpression(TokenType type) {
 }
 
 
-Unexpected::Unexpected(const Token& tk): token{tk} {};
+Unexpected::Unexpected(const Token& tk): token{tk} {}
 std::string Unexpected::getErrorMessage(Tokenizer&, const std::string&) {
   return "";
 }
@@ -61,7 +61,7 @@ ArrayAccess::ArrayAccess(const Token& tk): array{tk} {}
 
 BinOp::BinOp(const Token& token): op{token} {}
 
-UnOp::UnOp(const Token& token): op{token} {};
+UnOp::UnOp(const Token& token): op{token} {}
 
 FunctionCall::FunctionCall(const Token& tk): name{tk}, args{} {}
 

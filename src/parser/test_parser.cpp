@@ -1,11 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include "parser.hpp"
-#include <iostream>
 
 NodeMemPool memPool;
 
 TEST_CASE("getType", "[parser]") {
-  const std::string str = " char ptr ptr , int ptr ptr )";
+  const std::string str = " char ptr ptr , uint32 ptr ptr )";
   Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   {
@@ -28,12 +27,12 @@ TEST_CASE("getType", "[parser]") {
     CHECK_FALSE(tokens.next->next->next);
     CHECK(tokens.token.type == TokenType::POINTER);
     CHECK(tokens.next->token.type == TokenType::POINTER);
-    CHECK(tokens.next->next->token.type == TokenType::INT_TYPE);
+    CHECK(tokens.next->next->token.type == TokenType::UINT32_TYPE);
   }
 }
 
 TEST_CASE("Function Declaration", "[parser]") {
-  const std::string str = "func funcName(first: int ptr): int {}";
+  const std::string str = "func funcName(first: uint16 ptr): uint32 {}";
   Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
   Parser parser{tokenizer, memPool};
   parser.parse();
@@ -52,11 +51,11 @@ TEST_CASE("Function Declaration", "[parser]") {
   CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
   CHECK(func->params.curr.varDec->type.token.type == TokenType::POINTER);
   REQUIRE(func->params.curr.varDec->type.next);
-  CHECK(func->params.curr.varDec->type.next->token.type == TokenType::INT_TYPE);
+  CHECK(func->params.curr.varDec->type.next->token.type == TokenType::UINT16_TYPE);
 
   // check return type
   CHECK(func->returnType.next == nullptr);
-  CHECK(func->returnType.token.type == TokenType::INT_TYPE);
+  CHECK(func->returnType.token.type == TokenType::UINT32_TYPE);
   CHECK(func->body.scopeStatements.curr.type == StatementType::NOTHING);
 }
 

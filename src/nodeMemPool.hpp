@@ -51,8 +51,8 @@ public:
 
   UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
   BinOp* makeBinOp(const BinOp& ref) {return binOps.get(ref);}
-  GeneralDec* makeGlobalDec() {return decs.get();}
-  GeneralDecList* makeGlobalDecList() {return decLists.get();}
+  GeneralDec* makeGeneralDec() {return decs.get();}
+  GeneralDecList* makeGeneralDecList() {return decLists.get();}
   VariableDec* makeVariableDec(const VariableDec& ref) {return varDecs.get(ref);}
   FunctionCall* makeFunctionCall(const FunctionCall& ref) {return funcCalls.get(ref);}
   ElifStatementList* makeElifStatementList() {return elifs.get();}

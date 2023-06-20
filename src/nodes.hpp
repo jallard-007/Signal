@@ -72,7 +72,6 @@ struct ExpressionList {
   ExpressionList *next;
   ExpressionList();
   ExpressionList(const ExpressionList&) = default;
-  void prettyPrint(Tokenizer&, std::string&);
 };
 
 typedef struct ControlFlowStatement ControlFlowStatement;
@@ -140,7 +139,6 @@ struct StatementList {
   StatementList() = default;
   StatementList(const StatementList &) = default;
   void operator=(const StatementList &);
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 // scope:= { statementList }
@@ -220,7 +218,6 @@ struct ElifStatementList {
   ElifStatementList *next{nullptr};
   ElifStatementList() = default;
   ElifStatementList(const ElifStatementList&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
 };
 
 // conditionalStatement:= ifStatement

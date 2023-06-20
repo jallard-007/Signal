@@ -62,7 +62,7 @@ bool Parser::parse() {
       return false;
     }
     prev = list;
-    list->next = memPool.makeGlobalDecList();
+    list->next = memPool.makeGeneralDecList();
     list = list->next;
     token = tokenizer.peekNext();
   }

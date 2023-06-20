@@ -16,11 +16,11 @@ enum class CheckerErrorType: uint8_t {
 
   // no such
   NO_SUCH_FUNCTION,
-  NO_SUCH_TYPE,
+  NO_SUCH_STRUCT,
   NO_SUCH_VARIABLE,
   NO_SUCH_TEMPLATE,
-  NO_MUCH_MEMBER_VARIABLE,
-  NO_MUCH_MEMBER_FUNCTION,
+  NO_SUCH_MEMBER_VARIABLE,
+  NO_SUCH_MEMBER_FUNCTION,
 
   // semantic errors
   CANNOT_REF_A_REF,
@@ -34,19 +34,21 @@ enum class CheckerErrorType: uint8_t {
   EXPECTING_TYPE,
   EXPECTING_FUNCTION,
   EXPECTING_TEMPLATE,
+  EXPECTING_MEMBER_NAME,
   CANNOT_HAVE_BREAK_HERE,
   CANNOT_HAVE_CONTINUE_HERE,
 
   NOT_A_VARIABLE,
   NOT_A_FUNCTION,
-
+  NOT_A_STRUCT,
   WRONG_NUMBER_OF_ARGS,
 
-  MISSING_TYPE,
-
   // operator type compatibility
-  CANNOT_PERFORM_OPERATION_ON_TYPE,
-
+  CANNOT_DEREFERENCE_NON_POINTER_TYPE,
+  CANNOT_DEREFERENCE_TEMPORARY,
+  CANNOT_OPERATE_ON_TEMPORARY,
+  CANNOT_OPERATE_ON_WRAPPED,
+  CANNOT_BE_CONVERTED_TO_BOOL,
 };
 
 struct CheckerError {
@@ -56,7 +58,16 @@ struct CheckerError {
   CheckerError() = delete;
   CheckerError(CheckerErrorType, Token *);
   CheckerError(CheckerErrorType, Token *, GeneralDec*);
+  CheckerError(CheckerErrorType, Expression *);
   CheckerError(CheckerErrorType, Expression *, GeneralDec*);
+};
+
+
+struct ResultingType {
+  TokenList *type{nullptr};
+  bool isLValue{false};
+  ResultingType() = default;
+  ResultingType(TokenList*, bool);
 };
 
 struct Checker {
@@ -66,10 +77,12 @@ struct Checker {
   Program& program;
   Tokenizer& tokenizer;
   NodeMemPool &memPool;
+  TokenList badValue {Token{0,0,TokenType::BAD_VALUE}};
   TokenList boolValue {Token{0,0,TokenType::BOOL}};
-  TokenList intValue {Token{0,0,TokenType::INT_TYPE}};
+  TokenList intValue {Token{0,0,TokenType::INT32_TYPE}};
   TokenList charValue {Token{0,0,TokenType::CHAR_TYPE}};
   TokenList stringValue {Token{0,0,TokenType::STRING_LITERAL}};
+  TokenList floatValue {Token{0,0,TokenType::FLOAT_TYPE}};
   TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
   TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
   TokenList voidValue {Token{0,0,TokenType::VOID}};
@@ -85,9 +98,10 @@ struct Checker {
   bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
 
   bool checkStatement(Statement&);
-  TokenList *checkExpression(Expression& expression);
+  ResultingType checkExpression(Expression& expression, std::map<std::string, StructDecList *>* structMap = nullptr);
 
   bool checkType(TokenList&);
 };
+
 
 bool canBeConvertedToBool(TokenList&);

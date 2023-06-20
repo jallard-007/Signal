@@ -1,5 +1,4 @@
 #include "../nodes.hpp"
-#include <iostream>
 
 const uint8_t indentationSize = 2;
 
