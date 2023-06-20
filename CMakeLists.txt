@@ -21,10 +21,12 @@ target_link_libraries(test PRIVATE prettyPrint)
 target_link_libraries(test PRIVATE Catch2::Catch2WithMain)
 
 if ( UNIX )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -O0 -Wall -Wextra -Wpedantic -Werror")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -Wall -Wextra -Wpedantic -Werror")
 endif()
 if ( MSVC )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
+# -fprofile-arcs -ftest-coverage
+# -pg
 # gprof main gmon.out | gprof2dot -s | dot -Gdpi=200 -Tpng -o output.png

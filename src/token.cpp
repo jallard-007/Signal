@@ -1,15 +1,7 @@
 #include "token.hpp"
 
-bool isLiteral(TokenType type) {
-  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_PTR;
-}
-
-bool isKeyword(TokenType type) {
-  return type >= TokenType::AS && type <= TokenType::TEMPLATE;
-}
-
 bool isBuiltInType(TokenType type) {
-  return type >= TokenType::BOOL && type <= TokenType::VOID;
+  return type >= TokenType::BOOL && type <= TokenType::REFERENCE;
 }
 
 bool isBinaryOp(TokenType type) {
@@ -20,16 +12,20 @@ bool isUnaryOp(TokenType type) {
   return type >= TokenType::NOT && type <= TokenType::NEGATIVE;
 }
 
-bool isKeywordWithBody(TokenType type) {
-  return type >= TokenType::IF && type <= TokenType::WHILE;
-}
-
 bool isConcreteType(TokenType type) {
-  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::DOUBLE_TYPE);
+  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::VOID);
 }
 
 bool isLogicalOp(TokenType type) {
   return type >= TokenType::EQUAL && type <= TokenType::GREATER_THAN_EQUAL;
+}
+
+bool isControlFlow(TokenType type) {
+  return type >= TokenType::IF && type <= TokenType::WHILE;
+}
+
+bool isLiteral(TokenType type) {
+  return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_PTR;
 }
 
 bool Token::operator==(const Token& tk) const {

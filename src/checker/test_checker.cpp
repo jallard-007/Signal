@@ -33,31 +33,30 @@ TEST_CASE("checkType", "[checker]") {
   Checker tc{pr.program, tk, mem3};
   tc.firstTopLevelScan();
   {
-    Type typeList;
-    TokenList type;
-    typeList.tokens.curr.length = 5;
-    typeList.tokens.curr.position = 7;
-    typeList.tokens.curr.type = TokenType::IDENTIFIER;
-    CHECK(tc.checkType(typeList));
-    TokenList nextType = std::move(typeList.tokens);
-    typeList.tokens.next = &nextType;
-    typeList.tokens.curr.type = TokenType::POINTER;
-    CHECK(tc.checkType(typeList));
-    TokenList nextNextType = std::move(typeList.tokens);
-    typeList.tokens.next = &nextNextType;
-    typeList.tokens.curr.type = TokenType::REFERENCE;
-    CHECK(tc.checkType(typeList));
-    TokenList nextNextNextType = std::move(typeList.tokens);
-    typeList.tokens.next = &nextNextNextType;
-    typeList.tokens.curr.type = TokenType::POINTER;
-    CHECK_FALSE(tc.checkType(typeList));
+    TokenList tokenList;
+    tokenList.token.length = 5;
+    tokenList.token.position = 7;
+    tokenList.token.type = TokenType::IDENTIFIER;
+    CHECK(tc.checkType(tokenList));
+    TokenList nextType = tokenList;
+    tokenList.next = &nextType;
+    tokenList.token.type = TokenType::POINTER;
+    CHECK(tc.checkType(tokenList));
+    TokenList nextNextType = tokenList;
+    tokenList.next = &nextNextType;
+    tokenList.token.type = TokenType::REFERENCE;
+    CHECK(tc.checkType(tokenList));
+    TokenList nextNextNextType = tokenList;
+    tokenList.next = &nextNextNextType;
+    tokenList.token.type = TokenType::POINTER;
+    CHECK_FALSE(tc.checkType(tokenList));
   }
 
   {
-    Type notAType;
-    notAType.tokens.curr.length = 7;
-    notAType.tokens.curr.position = 38;
-    notAType.tokens.curr.type = TokenType::IDENTIFIER;
+    TokenList notAType;
+    notAType.token.length = 7;
+    notAType.token.position = 38;
+    notAType.token.type = TokenType::IDENTIFIER;
     CHECK_FALSE(tc.checkType(notAType));
   }
 }

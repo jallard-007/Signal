@@ -56,7 +56,7 @@ Token Tokenizer::tokenizeNext() {
   const uint32_t tokenStartPos = position;
   uint16_t length = 0;
   char c = content[position];
-  TokenType type = numToType[(int)c];
+  TokenType type = numToType[(uint8_t)c];
   switch (type) {
     case TokenType::IDENTIFIER: {
       movePastKeywordOrIdentifier();
@@ -226,7 +226,7 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
 
 void Tokenizer::movePastKeywordOrIdentifier() {
   for (++position; position < size; ++position) {
-    if (numToType[(int)content[position]] != TokenType::IDENTIFIER && numToType[(int)content[position]] != TokenType::DECIMAL_NUMBER) {
+    if (numToType[(uint8_t)content[position]] != TokenType::IDENTIFIER && numToType[(uint8_t)content[position]] != TokenType::DECIMAL_NUMBER) {
       return;
     }
   }
@@ -273,7 +273,7 @@ void Tokenizer::moveToNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
       ++lineNum;
-      lineStart = position + 1;
+      lineStart = ++position;
       return;
     }
   }

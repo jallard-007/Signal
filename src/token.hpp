@@ -27,9 +27,9 @@ enum class TokenType : uint8_t {
   CONTINUE,
   CREATE, //
   DEFAULT, //
-  IF,
   ELIF,
   ELSE,
+  IF,
   FOR,
   SWITCH, //
   RETURN,
@@ -110,12 +110,23 @@ enum class TokenType : uint8_t {
   // types
   BOOL,
   CHAR_TYPE,
-  INT_TYPE,
+  INT8_TYPE,
+  UINT8_TYPE,
+  INT16_TYPE,
+  UINT16_TYPE,
+  INT32_TYPE,
+  UINT32_TYPE,
+  INT64_TYPE,
+  UINT64_TYPE,
   FLOAT_TYPE,
   DOUBLE_TYPE,
+  VOID,
   POINTER,
   REFERENCE,
-  VOID,
+
+  // extra types used by parse to report errors
+  TYPE,
+  OPERATOR
 };
 
 struct Token {
@@ -261,14 +272,12 @@ const TokenType numToType [128] {
   TokenType::BAD_VALUE  // 127 DEL
 };
 
-bool isLiteral(TokenType);
-bool isLogicalOp(TokenType);
-bool isKeyword(TokenType);
 bool isBuiltInType(TokenType);
 bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
-bool isKeywordWithBody(TokenType);
+bool isControlFlow(TokenType);
+bool isLiteral(TokenType);
 
 const std::unordered_map<std::string, TokenType> stringToType {
   {"as", TokenType::AS},
@@ -287,7 +296,14 @@ const std::unordered_map<std::string, TokenType> stringToType {
   {"func", TokenType::FUNC},
   {"float", TokenType::FLOAT_TYPE},
   {"if", TokenType::IF},
-  {"int", TokenType::INT_TYPE},
+  {"int8", TokenType::INT8_TYPE},
+  {"int16", TokenType::INT16_TYPE},
+  {"int32", TokenType::INT32_TYPE},
+  {"int64", TokenType::INT64_TYPE},
+  {"uint8", TokenType::UINT8_TYPE},
+  {"uint16", TokenType::UINT16_TYPE},
+  {"uint32", TokenType::UINT32_TYPE},
+  {"uint64", TokenType::UINT64_TYPE},
   {"include", TokenType::INCLUDE},
   {"extern", TokenType::EXTERN},
   {"nullptr", TokenType::NULL_PTR},
@@ -405,7 +421,14 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::FUNC, "func "},
   {TokenType::FLOAT_TYPE, "float"},
   {TokenType::IF, "if "},
-  {TokenType::INT_TYPE, "int"},
+  {TokenType::INT8_TYPE, "int8"},
+  {TokenType::INT16_TYPE, "int16"},
+  {TokenType::INT32_TYPE, "int32"},
+  {TokenType::INT64_TYPE, "int64"},
+  {TokenType::UINT8_TYPE, "uint8"},
+  {TokenType::UINT16_TYPE, "uint16"},
+  {TokenType::UINT32_TYPE, "uint32"},
+  {TokenType::UINT64_TYPE, "uint64"},
   {TokenType::INCLUDE, "include "},
   {TokenType::RETURN, "return"},
   {TokenType::STRUCT, "struct "},

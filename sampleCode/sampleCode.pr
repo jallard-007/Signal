@@ -172,7 +172,7 @@ func yuh(): void {
   }
 }
 
-func prettyPrint(tk: Tokenizer ref, str: string ref , indentation: uint32_t ): void {
+func prettyPrint(tk: Tokenizer ref, str: string ref, indentation: uint32_t): void {
   str += typeToString.at(keyword.type);
   if (keyword.type == RETURN) {
     if (header.type != NONE) {
@@ -200,7 +200,7 @@ func prettyPrint(tk: Tokenizer ref, str: string ref , indentation: uint32_t ): v
       chars[j] = content[i];
     }
     if (stringToType.find(chars) != stringToType.end()) {
-      type = stringToType.at(chars)
+      type = stringToType.at(chars);
     } else {
       type = IDENTIFIER;
     }

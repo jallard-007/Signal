@@ -6,80 +6,88 @@
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
-  MemPool<Declaration> decs;
-  MemPool<Token> tokens;
+  MemPool<GeneralDec> decs;
+  MemPool<GeneralDecList> decLists;
   MemPool<VariableDec> varDecs;
   MemPool<FunctionCall> funcCalls;
+  MemPool<ElifStatementList> elifs;
+  MemPool<ControlFlowStatement> controlFlows;
   MemPool<ArrayAccess> arrayAccesses;
-  MemPool<Statement> statements;
+  MemPool<Token> tokens;
+  MemPool<TokenList> tokenLists;
+  MemPool<Expression> expressions;
+  MemPool<ExpressionList> expressionLists;
   MemPool<Scope> scopes;
-  MemPool<ArrOrStructLiteral> arrOrStructs;
-  MemPool<ForLoopHeader> lists;
-  MemPool<StatementList> statementList;
-  MemPool<TokenList> tokenList;
-  MemPool<KeywordWithBody> keysWBodies;
+  MemPool<StatementList> statementLists;
+  MemPool<StructDecList> structDecLists;
+  MemPool<ArrayOrStructLiteral> arraysOrStructs;
   MemPool<FunctionDec> functionDecs;
-  MemPool<Enum> enums;
-  MemPool<Struct> structs;
-  MemPool<Template> templates;
+  MemPool<StructDec> structDecs;
+  MemPool<TemplateDec> templateDecs;
 
 public:
   void reset() {
     unOps.reset();
     binOps.reset();
     decs.reset();
-    tokens.reset();
+    decLists.reset();
     varDecs.reset();
     funcCalls.reset();
+    elifs.reset();
+    controlFlows.reset();
     arrayAccesses.reset();
-    statements.reset();
+    tokens.reset();
+    tokenLists.reset();
+    expressions.reset();
+    expressionLists.reset();
     scopes.reset();
-    arrOrStructs.reset();
-    lists.reset();
-    statementList.reset();
-    tokenList.reset();
-    keysWBodies.reset();
+    statementLists.reset();
+    structDecLists.reset();
+    arraysOrStructs.reset();
     functionDecs.reset();
-    enums.reset();
-    structs.reset();
-    templates.reset();
+    structDecs.reset();
+    templateDecs.reset();
   }
 
-  UnOp* get(UnOp&& ref) {return unOps.get(std::move(ref));}
-  BinOp* get(BinOp&& ref) {return binOps.get(std::move(ref));}
-  Declaration* get(Declaration&& ref) {return decs.get(std::move(ref));}
-  VariableDec* get(VariableDec&& ref) {return varDecs.get(std::move(ref));}
-  FunctionCall* get(FunctionCall&& ref) {return funcCalls.get(std::move(ref));}
-  ArrayAccess* get(ArrayAccess&& ref) {return arrayAccesses.get(std::move(ref));}
-  Token* get(Token&& ref) {return tokens.get(std::move(ref));}
-  Statement* get(Statement&& ref) {return statements.get(std::move(ref));}
-  Scope* get(Scope&& ref) {return scopes.get(std::move(ref));}
-  ArrOrStructLiteral* get(ArrOrStructLiteral&& ref) {return arrOrStructs.get(std::move(ref));}
-  ForLoopHeader* get(ForLoopHeader&& ref) {return lists.get(std::move(ref));}
-  StatementList* getStatementList() {return statementList.get();}
-  TokenList* getTokenList() {return tokenList.get();}
-  KeywordWithBody* get(KeywordWithBody&& ref) {return keysWBodies.get(std::move(ref));}
-  FunctionDec* get(FunctionDec&& ref) {return functionDecs.get(std::move(ref));}
-  Enum* get(Enum&& ref) {return enums.get(std::move(ref));}
-  Struct* get(Struct&& ref) {return structs.get(std::move(ref));}
-  Template* get(Template&& ref) {return templates.get(std::move(ref));}
+  UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
+  BinOp* makeBinOp(const BinOp& ref) {return binOps.get(ref);}
+  GeneralDec* makeGeneralDec() {return decs.get();}
+  GeneralDecList* makeGeneralDecList() {return decLists.get();}
+  VariableDec* makeVariableDec(const VariableDec& ref) {return varDecs.get(ref);}
+  FunctionCall* makeFunctionCall(const FunctionCall& ref) {return funcCalls.get(ref);}
+  ElifStatementList* makeElifStatementList() {return elifs.get();}
+  ControlFlowStatement* makeControlFlowStatement() {return controlFlows.get();}
+  ArrayAccess* makeArrayAccess(const ArrayAccess& ref) {return arrayAccesses.get(ref);}
+  Token* makeToken(const Token& ref) {return tokens.get(ref);}
+  TokenList* makeTokenList() {return tokenLists.get();}
+  Expression* makeExpression() {return expressions.get();}
+  ExpressionList* makeExpressionList() {return expressionLists.get();}
+  Scope* makeScope() {return scopes.get();}
+  StatementList* makeStatementList() {return statementLists.get();}
+  StructDecList* makeStructDecList() {return structDecLists.get();}
+  ArrayOrStructLiteral* makeArrayOrStruct() {return arraysOrStructs.get();}
+  FunctionDec* makeFunctionDec() {return functionDecs.get();}
+  StructDec* makeStructDec() {return structDecs.get();}
+  TemplateDec* makeTemplateDec() {return templateDecs.get();}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
-  void release(Declaration* ptr) { decs.release(ptr);}
+  void release(GeneralDec* ptr) { decs.release(ptr);}
+  void release(GeneralDecList* ptr) { decLists.release(ptr);}
   void release(VariableDec* ptr) { varDecs.release(ptr);}
-  void release(Token* ptr) { tokens.release(ptr);}
   void release(FunctionCall* ptr) { funcCalls.release(ptr);}
+  void release(ElifStatementList* ptr) { elifs.release(ptr);}
+  void release(ControlFlowStatement* ptr) { controlFlows.release(ptr);}
   void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
-  void release(Statement* ptr) { statements.release(ptr);}
+  void release(Token* ptr) { tokens.release(ptr);}
+  void release(TokenList* ptr) { tokenLists.release(ptr);}
+  void release(Expression* ptr) { expressions.release(ptr);}
+  void release(ExpressionList* ptr) { expressionLists.release(ptr);}
   void release(Scope* ptr) { scopes.release(ptr);}
-  void release(ArrOrStructLiteral* ptr) { arrOrStructs.release(ptr);}
-  void release(ForLoopHeader* ptr) { lists.release(ptr);}
-  void release(StatementList* ptr) { statementList.release(ptr);}
-  void release(TokenList* ptr) { tokenList.release(ptr);}
-  void release(KeywordWithBody* ptr) { keysWBodies.release(ptr);}
+  void release(StatementList* ptr) { statementLists.release(ptr);}
+  void release(StructDecList* ptr) { structDecLists.release(ptr);}
+  void release(ArrayOrStructLiteral* ptr) { arraysOrStructs.release(ptr);}
   void release(FunctionDec* ptr) { functionDecs.release(ptr);}
-  void release(Enum* ptr) { enums.release(ptr);}
-  void release(Struct* ptr) { structs.release(ptr);}
-  void release(Template* ptr) { templates.release(ptr);}
+  void release(StructDec* ptr) { structDecs.release(ptr);}
+  void release(TemplateDec* ptr) { templateDecs.release(ptr);}
 };
