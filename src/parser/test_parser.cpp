@@ -94,7 +94,7 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
   REQUIRE(argsList.next == nullptr);
   auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(*arg1.value) == "arg1");
+  CHECK(tokenizer.extractToken(arg1.value) == "arg1");
 }
 
 TEST_CASE("Function Call - Multi Arg", "[parser]") {
@@ -114,12 +114,12 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   auto& argsList = statement.expression->funcCall->args;
   auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(*arg1.value) == "arg1");
+  CHECK(tokenizer.extractToken(arg1.value) == "arg1");
 
   REQUIRE(argsList.next);
   auto& arg2 = *argsList.next;
   REQUIRE(arg2.curr.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(*arg2.curr.value) == "arg2");
+  CHECK(tokenizer.extractToken(arg2.curr.value) == "arg2");
 }
 
 TEST_CASE("Function Call - Nested", "[parser]") {
@@ -166,14 +166,12 @@ TEST_CASE("Expressions", "[parser]") {
     REQUIRE(binOp);
     CHECK(binOp->op.type == TokenType::ADDITION);
     REQUIRE(binOp->leftSide.type == ExpressionType::VALUE);
-    REQUIRE(binOp->leftSide.value);
-    CHECK(binOp->leftSide.value->type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(*binOp->leftSide.value) == "4");
+    CHECK(binOp->leftSide.value.type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->leftSide.value) == "4");
 
     REQUIRE(binOp->rightSide.type == ExpressionType::VALUE);
-    REQUIRE(binOp->rightSide.value);
-    CHECK(binOp->rightSide.value->type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(*binOp->rightSide.value) == "4");
+    CHECK(binOp->rightSide.value.type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->rightSide.value) == "4");
   }
 
    // operator with higher precedence on right node
@@ -193,8 +191,7 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
     REQUIRE(binOp->leftSide.type == ExpressionType::VALUE);
-    REQUIRE(binOp->leftSide.value);
-    CHECK(tokenizer.extractToken(*binOp->leftSide.value) == "x");
+    CHECK(tokenizer.extractToken(binOp->leftSide.value) == "x");
 
     REQUIRE(binOp->rightSide.type == ExpressionType::BINARY_OP);
     REQUIRE(binOp->rightSide.binOp);
@@ -206,13 +203,11 @@ TEST_CASE("Expressions", "[parser]") {
     REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
     CHECK(rl.funcCall->args.next == nullptr);
     REQUIRE(rl.funcCall->args.curr.type == ExpressionType::VALUE);
-    REQUIRE(rl.funcCall->args.curr.value);
-    CHECK(tokenizer.extractToken(*rl.funcCall->args.curr.value) == "var");
+    CHECK(tokenizer.extractToken(rl.funcCall->args.curr.value) == "var");
 
     auto& rr = binOp->rightSide.binOp->rightSide;
     CHECK(rr.type == ExpressionType::VALUE);
-    REQUIRE(rr.value);
-    CHECK(tokenizer.extractToken(*rr.value) == "9");
+    CHECK(tokenizer.extractToken(rr.value) == "9");
   }
 
    // operator with higher precedence on left node
@@ -232,8 +227,7 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
     REQUIRE(binOp->rightSide.type == ExpressionType::VALUE);
-    REQUIRE(binOp->rightSide.value);
-    CHECK(tokenizer.extractToken(*binOp->rightSide.value) == "9");
+    CHECK(tokenizer.extractToken(binOp->rightSide.value) == "9");
 
     REQUIRE(binOp->leftSide.type == ExpressionType::BINARY_OP);
     REQUIRE(binOp->leftSide.binOp);
@@ -245,13 +239,11 @@ TEST_CASE("Expressions", "[parser]") {
     REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
     CHECK(rl.funcCall->args.next == nullptr);
     REQUIRE(rl.funcCall->args.curr.type == ExpressionType::VALUE);
-    REQUIRE(rl.funcCall->args.curr.value);
-    CHECK(tokenizer.extractToken(*rl.funcCall->args.curr.value) == "var");
+    CHECK(tokenizer.extractToken(rl.funcCall->args.curr.value) == "var");
 
     auto& rr = binOp->leftSide.binOp->leftSide;
     CHECK(rr.type == ExpressionType::VALUE);
-    REQUIRE(rr.value);
-    CHECK(tokenizer.extractToken(*rr.value) == "x");
+    CHECK(tokenizer.extractToken(rr.value) == "x");
   }
 }
 

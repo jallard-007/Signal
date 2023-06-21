@@ -40,7 +40,7 @@ struct Parser {
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
-  ParseStatementErrorType parseIdentifierStatement(Statement&);
+  ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&);
   ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);

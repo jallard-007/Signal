@@ -555,7 +555,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
   else if (token.type == TokenType::BREAK || token.type == TokenType::CONTINUE) {
     tokenizer.consumePeek();
     statement.type = StatementType::KEYWORD;
-    statement.keyword = memPool.makeToken(token);
+    statement.keyword = token;
     if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
       expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::SEMICOLON);
       return ParseStatementErrorType::REPORTED;
@@ -639,7 +639,7 @@ ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
  * \param token the identifier token. It should be consumed by the tokenizer
  * Does NOT consume the token after the statement (semicolon, comma, etc.)
 */
-ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, Token& token) {
+ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, Token token) {
   Token next = tokenizer.peekNext();
   if (next.type == TokenType::COLON) {
     tokenizer.consumePeek();
@@ -651,7 +651,9 @@ ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, T
   // expression
   statement.type = StatementType::EXPRESSION;
   statement.expression = memPool.makeExpression();
-  ParseExpressionErrorType errorType = parseExpression(*statement.expression, &token);
+  tokenizer.position = token.position;
+  tokenizer.peeked.type = TokenType::NOTHING;
+  ParseExpressionErrorType errorType = parseExpression(*statement.expression);
   if (errorType != ParseExpressionErrorType::NONE) {
     if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
       return ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION;
@@ -763,9 +765,9 @@ ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral&
  * Parses a complete expression until it reaches something else, placing the root expression in rootExpression
  * Consumes the entire expression unless there was an error
 */
-ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Token* start) {
+ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
   Expression *bottom = nullptr;
-  Token token = start ? *start : tokenizer.peekNext();
+  Token token = tokenizer.peekNext();
   while (true) {
     bool binary = isBinaryOp(token.type);
     if (binary || isUnaryOp(token.type)) {
@@ -868,7 +870,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
       if (isLiteral(token.type)) {
         tokenizer.consumePeek();
         expression.type = ExpressionType::VALUE;
-        expression.value = memPool.makeToken(token);
+        expression.value = token;
       }
       else if (token.type == TokenType::OPEN_PAREN) {
         tokenizer.consumePeek();
@@ -890,11 +892,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
         tokenizer.consumePeek();
       }
       else if (token.type == TokenType::IDENTIFIER) {
-        if (!start) {
-          tokenizer.consumePeek();
-        } else {
-          start = nullptr;
-        }
+        tokenizer.consumePeek();
         Token next = tokenizer.peekNext();
         if (next.type == TokenType::OPEN_PAREN) {
           tokenizer.consumePeek();
@@ -940,7 +938,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
         }
         else {
           expression.type = ExpressionType::VALUE;
-          expression.value = memPool.makeToken(token);
+          expression.value = token;
         }
       }
       else {
