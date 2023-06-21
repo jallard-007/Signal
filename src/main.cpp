@@ -5,7 +5,6 @@
 #include <time.h>
 
 int main(int argc, char **argv) {
-  clock_t begin = clock();
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;
@@ -23,6 +22,7 @@ int main(int argc, char **argv) {
   t.seekg(0);
   t.read(&buffer[0], size);
   t.close();
+  clock_t begin = clock();
   Tokenizer tk(argv[1], buffer);
   NodeMemPool mem;
   Parser p{tk, mem};
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   }
   if (!p.expected.empty()) {
     for (auto enx : p.expected) {
-      std::cout << enx.getErrorMessage(argv[1]);
+      std::cout << enx.getErrorMessage(tk, argv[1]);
     }
   }
   if (!p.unexpected.empty()) {

@@ -4,16 +4,22 @@
 #include <unordered_map>
 #include "../token.hpp"
 
+struct TokenPositionInfo{
+  uint32_t lineNum;
+  uint32_t linePos;
+  TokenPositionInfo() = delete;
+  TokenPositionInfo(uint32_t, uint32_t);
+};
+
 struct Tokenizer {
   std::vector<Token> badTokens;
+  std::vector<uint32_t> newlinePositions;
   const std::string& filePath;
   const std::string& content;
   Token peeked;
   Token error;
   const uint32_t size;
   uint32_t position;
-  uint32_t lineNum;
-  uint32_t lineStart;
   TokenType prevType;
 
   Tokenizer() = delete;
@@ -32,4 +38,5 @@ struct Tokenizer {
   bool movePastLiteral(char);
   void moveToNewLine();
   std::string extractToken(Token&);
+  TokenPositionInfo getTokenPositionInfo(const Token&);
 };

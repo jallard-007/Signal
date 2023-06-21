@@ -14,14 +14,16 @@ bool notFirstOfExpression(TokenType type) {
 
 Unexpected::Unexpected(const Token& tk): token{tk} {}
 std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
-  std::string message = file + ':' + std::to_string(token.lineNum) + ':' + std::to_string(token.linePos) + '\n';
+  TokenPositionInfo posInfo = tk.getTokenPositionInfo(token);
+  std::string message = file + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
   return message + "Unexpected Token: " + tk.extractToken(token) + "\n\n";
 }
 
 Expected::Expected(ExpectedType exType, const Token& tk): tokenWhereExpected{tk}, expectedTokenType{TokenType::NOTHING}, expectedType{exType} {}
 Expected::Expected(ExpectedType exType, const Token& tk, TokenType tkType): tokenWhereExpected{tk}, expectedTokenType{tkType}, expectedType{exType} {}
-std::string Expected::getErrorMessage(const std::string& file) {
-  std::string message = file + ':' + std::to_string(tokenWhereExpected.lineNum) + ':' + std::to_string(tokenWhereExpected.linePos) + '\n';
+std::string Expected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  TokenPositionInfo posInfo = tk.getTokenPositionInfo(tokenWhereExpected);
+  std::string message = file + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
   if (expectedType == ExpectedType::EXPRESSION) {
     return message + "Expected Expression\n\n";
   }
@@ -54,7 +56,7 @@ void TokenList::operator=(const TokenList& ref) {
   next = ref.next;
 }
 
-VariableDec::VariableDec(const Token& tk): name{tk}, type{}, initialAssignment{nullptr} {}
+VariableDec::VariableDec(const Token& tk): name{tk} {}
 
 void StatementList::operator=(const StatementList &ref) {
   curr = ref.curr;
@@ -71,13 +73,13 @@ BinOp::BinOp(const Token& token): op{token} {}
 
 UnOp::UnOp(const Token& token): op{token} {}
 
-FunctionCall::FunctionCall(const Token& tk): name{tk}, args{} {}
+FunctionCall::FunctionCall(const Token& tk): name{tk} {}
 
-ReturnStatement::ReturnStatement(const Token& tk): token{tk}, returnValue{} {}
+ReturnStatement::ReturnStatement(const Token& tk): token{tk} {}
 
-SwitchStatement::SwitchStatement(const Token& token): token{token}, switched{0,0,TokenType::NOTHING}, body{} {}
+SwitchStatement::SwitchStatement(const Token& token): token{token} {}
 
-ForLoop::ForLoop(const ForLoop &ref): initialize{ref.initialize}, condition{ref.condition}, iteration{ref.iteration}, body{ref.body} {}
+ForLoop::ForLoop(const ForLoop &ref):  body{ref.body}, initialize{ref.initialize}, condition{ref.condition}, iteration{ref.iteration} {}
 
 ControlFlowStatement::ControlFlowStatement(): forLoop{}, type{ControlFlowStatementType::NONE} {}
 ControlFlowStatement::ControlFlowStatement(const ForLoop& val): forLoop{val}, type{ControlFlowStatementType::FOR_LOOP} {}

@@ -1,16 +1,41 @@
 #include <iostream>
 #include "tokenizer.hpp"
 
+TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
+
 Tokenizer::Tokenizer(const std::string& filePath, const std::string& fileContent):
-  badTokens{}, filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
+  badTokens{}, newlinePositions{}, filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
   }
-  lineNum = 1;
-  lineStart = 0;
+  newlinePositions.reserve(fileContent.size() / 40);
+  newlinePositions.emplace_back(0);
   position = 0;
   prevType = TokenType::NOTHING;
+}
+
+// does binary search on the newline list to find the line number
+TokenPositionInfo Tokenizer::getTokenPositionInfo(const Token& tk) {
+  if (newlinePositions.empty()) {
+    return {1, tk.position + 1};
+  }
+  uint32_t high = newlinePositions.size() - 1;
+  uint32_t low = 0;
+  uint32_t middle = high / 2;
+  while (low < high) {
+    if (tk.position < newlinePositions[middle]) {
+      high = middle - 1;
+    }
+    else if (tk.position >= newlinePositions[middle + 1]) {
+      low = middle + 1;
+    }
+    else {
+      return {middle + 1, tk.position + 1 - newlinePositions[middle]};
+    }
+    middle = (high + low) / 2;
+  }
+  return {high + 1, tk.position + 1 - newlinePositions[high]};
 }
 
 std::vector<Token> Tokenizer::tokenizeAll() {
@@ -435,14 +460,14 @@ Token Tokenizer::tokenizeNext() {
 
     case TokenType::STRING_LITERAL: {
       if (!movePastLiteral('"')) {
-        badTokens.emplace_back(position, lineNum, position - lineStart, 0, TokenType::STRING_LITERAL);
+        badTokens.emplace_back(position, 0, TokenType::STRING_LITERAL);
       }
       break;
     }
 
     case TokenType::CHAR_LITERAL: {
       if (!movePastLiteral('\'')) {
-        badTokens.emplace_back(position, lineNum, position - lineStart, 0, TokenType::CHAR_LITERAL);
+        badTokens.emplace_back(position, 0, TokenType::CHAR_LITERAL);
       }
       // TODO: validate content of character. escaped characters :(
       // maybe do this during type checking?
@@ -459,8 +484,7 @@ Token Tokenizer::tokenizeNext() {
     }
 
     case TokenType::NEWLINE: {
-      ++lineNum;
-      lineStart = ++position;
+      newlinePositions.emplace_back(++position);
       return tokenizeNext();
     }
 
@@ -487,7 +511,7 @@ Token Tokenizer::tokenizeNext() {
     }
   
     case TokenType::BAD_VALUE: {
-      std::cerr << filePath << ':' << lineNum << ':' << position + 1 - lineStart << '\n'; 
+      std::cerr << filePath << ':' << std::to_string(newlinePositions.size() + 1) << ':' << std::to_string(position + 1 - newlinePositions.back()) << '\n'; 
       std::cerr << "Invalid character with ASCII code: [" << (int)c << "]\n";
       exit(1);
     }
@@ -639,7 +663,7 @@ Token Tokenizer::tokenizeNext() {
     exit(1);
   }
   prevType = type;
-  return {tokenStartPos, lineNum, tokenStartPos + 1 - lineStart, static_cast<uint16_t>(position - tokenStartPos), type};
+  return {tokenStartPos, (uint16_t)(position - tokenStartPos), type};
 }
 
 void Tokenizer::moveToNextNonWhiteSpaceChar() {
@@ -700,8 +724,7 @@ bool Tokenizer::movePastLiteral(char delimiter) {
 void Tokenizer::moveToNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
-      ++lineNum;
-      lineStart = ++position;
+      ++position;
       return;
     }
   }

@@ -271,7 +271,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 11);
     CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
@@ -284,7 +284,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 7);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -296,7 +296,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::NONE);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 3);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 2);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -308,7 +308,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 7);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -320,7 +320,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 17);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 16);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -332,7 +332,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 8);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 7);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -344,7 +344,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 9);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -357,7 +357,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 6);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 5);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -370,7 +370,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 5);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 4);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -383,7 +383,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 6);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 5);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
 
@@ -396,7 +396,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 9);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 8);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
   }
 
@@ -409,7 +409,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 10);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 9);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
   
@@ -419,7 +419,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 32);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 31);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::CLOSE_BRACE);
   }
@@ -430,7 +430,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 21);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 20);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::CLOSE_BRACE);
   }
@@ -444,7 +444,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
 
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 10);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
   }
@@ -460,7 +460,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     auto& ex = parser.expected;
     REQUIRE(ex.size() == 1);
     CHECK(ex[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(ex[0].tokenWhereExpected.linePos == 6);
+    CHECK(ex[0].tokenWhereExpected.position == 5);
   }
 
   { // missing colon
@@ -490,7 +490,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 11);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 10);
     CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
@@ -501,7 +501,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 16);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 15);
     CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
@@ -512,7 +512,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 11);
     CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
   }
 
@@ -523,7 +523,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 14);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 13);
     CHECK(parser.expected[0].expectedTokenType == TokenType::COMMA);
   }
 
@@ -537,7 +537,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
 
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 16);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 15);
   }
 
   { // missing function name
@@ -548,7 +548,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::IDENTIFIER);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 7);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 6);
   }
 
   { // missing open paren
@@ -559,7 +559,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::OPEN_PAREN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 11);
   }
 
   { // missing expression
@@ -571,7 +571,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     CHECK(errorType == ParseStatementErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 12);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 11);
   }
 
   { // doesn't make sense
@@ -582,7 +582,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 13);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 12);
   }
 
   { //  global type not delimited 
@@ -593,7 +593,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
     CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 22);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 21);
   }
 
   { // semicolon in function call
@@ -603,7 +603,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Statement statement;
     CHECK(parser.parseStatement(statement) == ParseStatementErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.linePos == 22);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 21);
     CHECK(parser.expected[0].expectedTokenType == TokenType::CLOSE_PAREN);
   }
 }
@@ -615,7 +615,7 @@ TEST_CASE("Unexpected tokens", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.unexpected.size() == 1);
-    CHECK(parser.unexpected[0].token.linePos == 2);
+    CHECK(parser.unexpected[0].token.position == 1);
     CHECK(parser.unexpected[0].token.type == TokenType::WHILE);
   }
 
@@ -625,7 +625,7 @@ TEST_CASE("Unexpected tokens", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.unexpected.size() == 1);
-    CHECK(parser.unexpected[0].token.linePos == 10);
+    CHECK(parser.unexpected[0].token.position == 9);
     CHECK(parser.unexpected[0].token.type == TokenType::INCREMENT_PREFIX);
   }
 }

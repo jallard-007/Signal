@@ -131,13 +131,10 @@ enum class TokenType : uint8_t {
 
 struct Token {
   uint32_t position;
-  uint32_t lineNum;
-  uint32_t linePos;
   uint16_t length;
   TokenType type;
   Token() = delete;
-  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, lineNum{0}, linePos{0}, length{len}, type{t} {}
-  Token(uint32_t pos, uint32_t lineNum, uint32_t linePos, uint16_t len, TokenType t): position{pos}, lineNum{lineNum}, linePos{linePos}, length{len}, type{t} {}
+  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
   bool operator==(const Token&) const;
 };
 

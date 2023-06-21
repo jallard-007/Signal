@@ -11,3 +11,4 @@ Makefile
 Testing
 gmon.out
 coverage
+sampleCode/benchmark.pr

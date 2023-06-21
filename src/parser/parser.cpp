@@ -1,5 +1,52 @@
 #include "parser.hpp"
 
+// TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
+uint8_t operatorPrecedence [83]{};
+__attribute__((constructor))
+constexpr void initializeOperatorPrecedence() {
+  operatorPrecedence[(uint8_t)TokenType::COMMA] = 0;
+  operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::MODULO_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::ADDITION_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::DIVISION_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_OR_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::SHIFT_LEFT_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_AND_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::SHIFT_RIGHT_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::SUBTRACTION_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::MULTIPLICATION_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_XOR_ASSIGNMENT] = 1;
+  operatorPrecedence[(uint8_t)TokenType::TERNARY] = 1;
+  operatorPrecedence[(uint8_t)TokenType::LOGICAL_OR] = 2;
+  operatorPrecedence[(uint8_t)TokenType::LOGICAL_AND] = 3;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_OR] = 4;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_XOR] = 5;
+  operatorPrecedence[(uint8_t)TokenType::BITWISE_AND] = 6;
+  operatorPrecedence[(uint8_t)TokenType::EQUAL] = 7;
+  operatorPrecedence[(uint8_t)TokenType::NOT_EQUAL] = 7;
+  operatorPrecedence[(uint8_t)TokenType::GREATER_THAN] = 8;
+  operatorPrecedence[(uint8_t)TokenType::GREATER_THAN_EQUAL] = 8;
+  operatorPrecedence[(uint8_t)TokenType::LESS_THAN] = 8;
+  operatorPrecedence[(uint8_t)TokenType::LESS_THAN_EQUAL] = 8;
+  operatorPrecedence[(uint8_t)TokenType::SHIFT_LEFT] = 9;
+  operatorPrecedence[(uint8_t)TokenType::SHIFT_RIGHT] = 9;
+  operatorPrecedence[(uint8_t)TokenType::ADDITION] = 10;
+  operatorPrecedence[(uint8_t)TokenType::SUBTRACTION] = 10;
+  operatorPrecedence[(uint8_t)TokenType::MULTIPLICATION] = 11;
+  operatorPrecedence[(uint8_t)TokenType::DIVISION] = 11;
+  operatorPrecedence[(uint8_t)TokenType::MODULO] = 11;
+  operatorPrecedence[(uint8_t)TokenType::ADDRESS_OF] = 13;
+  operatorPrecedence[(uint8_t)TokenType::DEREFERENCE] = 13;
+  operatorPrecedence[(uint8_t)TokenType::NOT] = 13;
+  operatorPrecedence[(uint8_t)TokenType::NEGATIVE] = 13;
+  operatorPrecedence[(uint8_t)TokenType::DECREMENT_PREFIX] = 13;
+  operatorPrecedence[(uint8_t)TokenType::INCREMENT_PREFIX] = 13;
+  operatorPrecedence[(uint8_t)TokenType::DOT] = 14;
+  operatorPrecedence[(uint8_t)TokenType::PTR_MEMBER_ACCESS] = 14;
+  operatorPrecedence[(uint8_t)TokenType::DECREMENT_POSTFIX] = 14;
+  operatorPrecedence[(uint8_t)TokenType::INCREMENT_POSTFIX] = 14;
+}
+
 Parser::Parser(Tokenizer& tokenizer, NodeMemPool& memPool):
   tokenizer{tokenizer}, memPool{memPool}, errorToken{0,0,TokenType::NOTHING} {}
 
@@ -784,7 +831,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression, Tok
           } else {
             break;
           }
-          if (operatorPrecedence.at(token.type) <= operatorPrecedence.at(op)) {
+          if (operatorPrecedence[(uint_fast8_t)token.type] <= operatorPrecedence[(uint_fast8_t)op]) {
             break;
           }
           prev = listIter;
