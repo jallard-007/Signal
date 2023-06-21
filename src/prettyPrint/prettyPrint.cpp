@@ -38,7 +38,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
       scope->prettyPrint(tk, str, indentation); break;
     case StatementType::VARIABLE_DEC:
       varDec->prettyPrint(tk, str); break;
-    case StatementType::KEYWORD: str += typeToString.at(keyword->type); break;
+    case StatementType::KEYWORD: str += typeToString.at(keyword.type); break;
     case StatementType::NOTHING: break;
     default: str += "{not yet implemented in pretty printer}"; break;
   }
@@ -202,7 +202,7 @@ void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
     case ExpressionType::BINARY_OP: binOp->prettyPrint(tk, str); break;
     case ExpressionType::FUNCTION_CALL: funcCall->prettyPrint(tk, str); break;
     case ExpressionType::UNARY_OP: unOp->prettyPrint(tk, str); break;
-    case ExpressionType::VALUE: str += tk.extractToken(*value); break;
+    case ExpressionType::VALUE: str += tk.extractToken(value); break;
     case ExpressionType::WRAPPED: str += '('; wrapped->prettyPrint(tk, str); str += ')'; break;
     case ExpressionType::NONE: break;
     default: str += "{not yet implemented in pretty printer}"; break;

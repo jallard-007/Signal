@@ -5,7 +5,7 @@
 
 class NodeMemPool {
   MemPool<UnOp> unOps;
-  MemPool<BinOp> binOps;
+  MemPool<BinOp> binOps{500};
   MemPool<GeneralDec> decs;
   MemPool<GeneralDecList> decLists;
   MemPool<VariableDec> varDecs;
@@ -13,7 +13,6 @@ class NodeMemPool {
   MemPool<ElifStatementList> elifs;
   MemPool<ControlFlowStatement> controlFlows;
   MemPool<ArrayAccess> arrayAccesses;
-  MemPool<Token> tokens;
   MemPool<TokenList> tokenLists;
   MemPool<Expression> expressions;
   MemPool<ExpressionList> expressionLists;
@@ -36,7 +35,6 @@ public:
     elifs.reset();
     controlFlows.reset();
     arrayAccesses.reset();
-    tokens.reset();
     tokenLists.reset();
     expressions.reset();
     expressionLists.reset();
@@ -58,7 +56,6 @@ public:
   ElifStatementList* makeElifStatementList() {return elifs.get();}
   ControlFlowStatement* makeControlFlowStatement() {return controlFlows.get();}
   ArrayAccess* makeArrayAccess(const ArrayAccess& ref) {return arrayAccesses.get(ref);}
-  Token* makeToken(const Token& ref) {return tokens.get(ref);}
   TokenList* makeTokenList() {return tokenLists.get();}
   Expression* makeExpression() {return expressions.get();}
   ExpressionList* makeExpressionList() {return expressionLists.get();}
@@ -79,7 +76,6 @@ public:
   void release(ElifStatementList* ptr) { elifs.release(ptr);}
   void release(ControlFlowStatement* ptr) { controlFlows.release(ptr);}
   void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
-  void release(Token* ptr) { tokens.release(ptr);}
   void release(TokenList* ptr) { tokenLists.release(ptr);}
   void release(Expression* ptr) { expressions.release(ptr);}
   void release(ExpressionList* ptr) { expressionLists.release(ptr);}

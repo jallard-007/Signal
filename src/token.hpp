@@ -130,10 +130,10 @@ enum class TokenType : uint8_t {
 };
 
 struct Token {
-  uint32_t position;
-  uint16_t length;
-  TokenType type;
-  Token() = delete;
+  uint32_t position{0};
+  uint16_t length{0};
+  TokenType type{TokenType::NOTHING};
+  Token() = default;
   Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
   bool operator==(const Token&) const;
 };

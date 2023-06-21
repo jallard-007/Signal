@@ -53,7 +53,7 @@ struct Expression {
   union {
     BinOp *binOp;
     UnOp *unOp;
-    Token *value;
+    Token value;
     FunctionCall *funcCall;
     ArrayAccess *arrAccess;
     Expression *wrapped;
@@ -61,7 +61,7 @@ struct Expression {
   };
   ExpressionType type;
   Expression();
-  explicit Expression(Token *);
+  explicit Expression(Token);
   Expression(const Expression&);
   void operator=(const Expression&);
   void prettyPrint(Tokenizer&, std::string&);
@@ -94,7 +94,7 @@ struct Statement {
     ControlFlowStatement *controlFlow;
     Scope *scope;
     VariableDec *varDec;
-    Token *keyword;
+    Token keyword;
   };
   StatementType type;
   Statement();

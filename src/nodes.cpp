@@ -35,7 +35,7 @@ std::string Expected::getErrorMessage(Tokenizer& tk, const std::string& file) {
 
 Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
 Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
-Expression::Expression(Token *tk): value{tk}, type{ExpressionType::VALUE} {}
+Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
 void Expression::operator=(const Expression&ref) {
   binOp = ref.binOp;
   type = ref.type;

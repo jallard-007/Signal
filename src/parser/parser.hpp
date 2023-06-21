@@ -40,9 +40,9 @@ struct Parser {
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
-  ParseStatementErrorType parseIdentifierStatement(Statement&, Token&);
+  ParseStatementErrorType parseIdentifierStatement(Statement&);
   ParseStatementErrorType parseVariableDec(VariableDec&);
-  ParseExpressionErrorType parseExpression(Expression&, Token* start = nullptr);
+  ParseExpressionErrorType parseExpression(Expression&);
   ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);
