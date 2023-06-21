@@ -60,3 +60,41 @@ TEST_CASE("checkType", "[checker]") {
     CHECK_FALSE(tc.checkType(notAType));
   }
 }
+
+TEST_CASE("secondScan", "[checker]") {
+  const std::string str = 
+R"(
+
+func main(): int32 {
+  obj: customType;
+  obj.size = 10;
+  if (functionName(0, @customType)) {
+    return 0;
+  }
+  return 1;
+}
+
+func functionName(param1: int32, param2: customType): bool {
+  if (customType.size < param1) {
+    return false;
+  }
+  return true;
+}
+
+struct customType {
+  size: uint64 = 0;
+  position: uint64 = 0;
+  data: char ptr = nullptr;
+}
+
+)";
+  Tokenizer tk{R"(./src/checker/test_checker.cpp)", str};
+  Parser pr{tk, mem3};
+  pr.parse();
+  REQUIRE(pr.expected.empty());
+  REQUIRE(pr.unexpected.empty());
+  Checker tc{pr.program, tk, mem3};
+  tc.firstTopLevelScan();
+  tc.secondTopLevelScan();
+  CHECK(tc.errors.empty());
+}

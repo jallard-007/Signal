@@ -1,6 +1,6 @@
 template [T] struct vectorTemplate {
   data : T ptr;
-  size : int;
+  size : int32;
 
   func findMax() : T {
     max : T = 0;
@@ -14,7 +14,7 @@ template [T] struct vectorTemplate {
 
   func findMin(): T {
     min : T = 0;
-    for (i : int = 0; i < arr->size; ++i) {
+    for (i : int32 = 0; i < arr->size; ++i) {
       if (this->data[i] < min) {
         min = arr[i];
       }
@@ -23,22 +23,47 @@ template [T] struct vectorTemplate {
   }
 }
 
-func main(): int {
+template [T] struct cd {
+  data : T ptr;
+  size : int32;
+
+  func findMax() : T {
+    max : T = 0;
+    for (i : int32 = 0; i < arr->size; ++i) {
+      if (this->data[i] > max) {
+        max = arr[i];
+      }
+    }
+    return max;
+  }
+
+  func findMin(): T {
+    min : T = 0;
+    for (i : int32 = 0; i < arr->size; ++i) {
+      if (this->data[i] < min) {
+        min = arr[i];
+      }
+    }
+    return min;
+  }
+}
+
+func main(): int32 {
   {
-    arraySize: int = 9;
-    data: int ptr = [-3 , 23, 21, 554, 3, 6, -234, 123, 43];
+    arraySize: int32 = 9;
+    data: int32 ptr = [-3 , 23, 21, 554, 3, 6, -234, 123, 43];
     vector: intVector;
     vector.arr = data;
     vector.size = arraySize;
-    max: int = vector.findMax();
-    min: int = vector.findMin();
+    max: int32 = vector.findMax();
+    min: int32 = vector.findMin();
     print(max);
     print('\n');
     print(min);
   }
 
   {
-    arraySize: int = 4;
+    arraySize: int32 = 4;
     data: double ptr = [-3.4, 23.2, 21.3, 43.8];
     vector: intVector;
     vector.arr = data;
@@ -51,6 +76,9 @@ func main(): int {
   }
 
 }
+
+struct Type { type : uint8 ; }
+struct Token { type : uint8 ; }
 
 func getType(type: Type ref): Token {
   tp: Token = tokenizer.peekNext();
@@ -172,7 +200,10 @@ func yuh(): void {
   }
 }
 
-func prettyPrint(tk: Tokenizer ref, str: string ref, indentation: uint32_t): void {
+struct Tokenizer {j : char; }
+struct string {j : char; }
+
+func prettyPrint(tk: Tokenizer ref, str: string ref, indentation: uint32): void {
   str += typeToString.at(keyword.type);
   if (keyword.type == RETURN) {
     if (header.type != NONE) {

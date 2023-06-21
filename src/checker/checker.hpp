@@ -16,7 +16,7 @@ enum class CheckerErrorType: uint8_t {
 
   // no such
   NO_SUCH_FUNCTION,
-  NO_SUCH_STRUCT,
+  NO_SUCH_TYPE,
   NO_SUCH_VARIABLE,
   NO_SUCH_TEMPLATE,
   NO_SUCH_MEMBER_VARIABLE,
@@ -25,29 +25,22 @@ enum class CheckerErrorType: uint8_t {
   // semantic errors
   CANNOT_REF_A_REF,
   CANNOT_PTR_A_REF,
-  PTR_MUST_POINT_TO_A_TYPE,
-  REF_MUST_REF_A_TYPE,
   CANNOT_HAVE_MULTI_TYPE,
   
   // things in the wrong spot
-  EXPECTING_VARIABLE,
   EXPECTING_TYPE,
-  EXPECTING_FUNCTION,
-  EXPECTING_TEMPLATE,
-  EXPECTING_MEMBER_NAME,
   CANNOT_HAVE_BREAK_HERE,
   CANNOT_HAVE_CONTINUE_HERE,
 
   NOT_A_VARIABLE,
   NOT_A_FUNCTION,
-  NOT_A_STRUCT,
+  NOT_A_TYPE,
+  NOT_A_TEMPLATE,
   WRONG_NUMBER_OF_ARGS,
 
   // operator type compatibility
   CANNOT_DEREFERENCE_NON_POINTER_TYPE,
-  CANNOT_DEREFERENCE_TEMPORARY,
   CANNOT_OPERATE_ON_TEMPORARY,
-  CANNOT_OPERATE_ON_WRAPPED,
   CANNOT_BE_CONVERTED_TO_BOOL,
 };
 
@@ -60,8 +53,8 @@ struct CheckerError {
   CheckerError(CheckerErrorType, Token , GeneralDec*);
   CheckerError(CheckerErrorType, Expression *);
   CheckerError(CheckerErrorType, Expression *, GeneralDec*);
+  std::string getErrorMessage(Tokenizer&, const std::string&);
 };
-
 
 struct ResultingType {
   TokenList *type{nullptr};
@@ -88,12 +81,12 @@ struct Checker {
   TokenList voidValue {Token{0,0,TokenType::VOID}};
 
   Checker(Program&, Tokenizer&, NodeMemPool &);
-  
+  bool check();
   void firstTopLevelScan();
   void secondTopLevelScan();
-
   bool checkFunction(FunctionDec&);
   bool validateFunctionHeader(FunctionDec&);
+  bool validateStructInnards(StructDecList& innerDecs);
   
   bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
 

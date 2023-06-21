@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include "./parser/parser.hpp"
+#include "./checker/checker.hpp"
 #include <time.h>
 
 int main(int argc, char **argv) {
@@ -42,6 +43,20 @@ int main(int argc, char **argv) {
   if (!p.unexpected.empty() || !p.expected.empty()) {
     exit(1);
   }
+  Checker checker{p.program, tk, mem};
+  checker.check();
+  if (!checker.errors.empty()) {
+    int i = 0;
+    for (auto enx : checker.errors) {
+      std::cout << enx.getErrorMessage(tk, argv[1]);
+      if (++i >= 20) {
+        std::cout << "max errors reached\n";
+        return 1;
+      }
+    }
+    return 1;
+  }
+  
   clock_t end = clock();
   // std::string pretty;
   // pretty.reserve(size);

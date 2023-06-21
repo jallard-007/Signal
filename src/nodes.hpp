@@ -130,6 +130,7 @@ struct VariableDec {
   VariableDec(const VariableDec&) = default;
   VariableDec& operator=(const VariableDec&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
 };
 
 // statementList:= statement statementList | nothing
@@ -321,6 +322,7 @@ struct FunctionDec {
   FunctionDec(const FunctionDec&) = default;
   void operator=(const FunctionDec&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
 };
 
 
@@ -341,6 +343,7 @@ struct StructDecList {
   bool isValid{false};
   StructDecList();
   StructDecList(const StructDecList&);
+
 };
 
 // structDec:= struct identifier { structDecList }
@@ -351,6 +354,8 @@ struct StructDec {
   explicit StructDec(const Token&);
   StructDec(const StructDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
+
 };
 
 // enumDec:= enum identifier { identifierList }
@@ -377,16 +382,20 @@ struct TemplateDec {
   bool isStruct{false};
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
+
 };
 
 //templateCreation:= create identifier [ identifierList ] as identifier ;
 struct TemplateCreation {
-  Token token;
+  Token templateName;
   TemplateDec *templateDec{nullptr};
   TokenList templateTypes{};
-  Token identifier;
+  Token typeName;
   TemplateCreation() = delete;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
+
 };
 
 enum class GeneralDecType: uint8_t {
@@ -413,6 +422,7 @@ struct GeneralDec {
   bool isValid{false};
   GeneralDec();
   void prettyPrint(Tokenizer&, std::string&);
+  void prettyPrintDefinition(Tokenizer&, std::string&);
 };
 
 // globalDecList:= globalDec globalDecList | nothing

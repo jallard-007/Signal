@@ -16,6 +16,11 @@ void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
   str += tk.extractToken(r.front()->token);
 }
 
+void VariableDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+  str += tk.extractToken(name) + ": ";
+  type.prettyPrint(tk, str);
+}
+
 void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
   str += tk.extractToken(name) + ": ";
   type.prettyPrint(tk, str);
@@ -97,6 +102,21 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += std::string(indentation, ' ') + "}\n";
 }
 
+void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+  str += typeToString.at(TokenType::FUNC);
+  str += tk.extractToken(name) + '(';
+  if (params.curr.type != StatementType::NOTHING) {
+    StatementList * iter = &params;
+    for (; iter->next; iter = iter->next) {
+      iter->curr.prettyPrint(tk, str, indentationSize);
+      str += ", ";
+    }
+    iter->curr.prettyPrint(tk, str, indentationSize);
+  }
+  str += "): ";
+  returnType.prettyPrint(tk, str);
+}
+
 void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::FUNC);
   str += tk.extractToken(name) + '(';
@@ -124,6 +144,23 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
   }
   indentation -= indentationSize;
   str += std::string(indentation, ' ') + "}\n";
+}
+
+void GeneralDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+  if (type == GeneralDecType::NOTHING) {
+    return;
+  }
+  switch (type) {
+    case GeneralDecType::FUNCTION:
+      funcDec->prettyPrintDefinition(tk, str); break;
+    case GeneralDecType::VARIABLE:
+      varDec->prettyPrintDefinition(tk, str); break;
+    case GeneralDecType::TEMPLATE:
+      tempDec->prettyPrintDefinition(tk, str); break;
+    case GeneralDecType::STRUCT:
+      structDec->prettyPrintDefinition(tk, str); break;
+    default: break;
+  }
 }
 
 void GeneralDec::prettyPrint(Tokenizer& tk, std::string& str) {
@@ -154,6 +191,10 @@ void GeneralDecList::prettyPrint(Tokenizer& tk, std::string& str) {
   list->curr.prettyPrint(tk, str);
 }
 
+void StructDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+  str += typeToString.at(TokenType::STRUCT) + tk.extractToken(name);
+}
+
 void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::STRUCT) + tk.extractToken(name) + " {\n";
   indentation += indentationSize;
@@ -168,6 +209,24 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
   }
   indentation -= indentationSize;
   str += std::string(indentation, ' ') + "}\n";
+}
+
+void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+  str += typeToString.at(TokenType::TEMPLATE) + '[';
+  if (templateTypes.token.type != TokenType::NOTHING) {
+    TokenList * iter = &templateTypes;
+    for (; iter->next; iter = iter->next) {
+      str += tk.extractToken(iter->token);
+      str += ", ";
+    }
+    str += tk.extractToken(iter->token);
+  }
+  str += "] ";
+  if (isStruct) {
+    structDec.prettyPrintDefinition(tk, str);
+  } else {
+    funcDec.prettyPrintDefinition(tk, str);
+  }
 }
 
 void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
