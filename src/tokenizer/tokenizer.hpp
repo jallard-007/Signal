@@ -26,7 +26,7 @@ struct Tokenizer {
 
   explicit Tokenizer(const std::string&, const std::string&);
 
-  std::vector<Token> tokenizeAll();
+  void tokenizeAll(std::vector<Token>&);
   Token tokenizeNext();
   Token peekNext();
   void consumePeek();

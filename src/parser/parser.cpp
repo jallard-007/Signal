@@ -3,7 +3,7 @@
 // TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
 uint8_t operatorPrecedence [83]{};
 __attribute__((constructor))
-constexpr void initializeOperatorPrecedence() {
+void initializeOperatorPrecedence() {
   operatorPrecedence[(uint8_t)TokenType::COMMA] = 0;
   operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
   operatorPrecedence[(uint8_t)TokenType::MODULO_ASSIGNMENT] = 1;

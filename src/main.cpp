@@ -43,10 +43,10 @@ int main(int argc, char **argv) {
     exit(1);
   }
   clock_t end = clock();
-  std::string pretty;
-  pretty.reserve(size);
-  p.program.prettyPrint(tk, pretty);
-  std::cout << pretty << '\n';
+  // std::string pretty;
+  // pretty.reserve(size);
+  // p.program.prettyPrint(tk, pretty);
+  // std::cout << pretty << '\n';
   double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
   std::cout << time_spent << '\n';
   return 0;

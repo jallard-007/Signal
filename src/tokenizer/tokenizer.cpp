@@ -38,10 +38,8 @@ TokenPositionInfo Tokenizer::getTokenPositionInfo(const Token& tk) {
   return {high + 1, tk.position + 1 - newlinePositions[high]};
 }
 
-std::vector<Token> Tokenizer::tokenizeAll() {
-  std::vector<Token> tokens;
+void Tokenizer::tokenizeAll(std::vector<Token>& tokens) {
   while (tokens.emplace_back(tokenizeNext()).type != TokenType::END_OF_FILE);
-  return tokens;
 }
 
 #define END_OF_IDENTIFIER(c) TokenType tNext = numToType[(uint8_t)content[++position]]; \

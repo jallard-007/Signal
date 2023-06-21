@@ -138,10 +138,12 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 }
 
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
+   std::vector<Token> tokens;
    {
    const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
    Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
-   auto tokens = tokenizer.tokenizeAll();
+   tokens.clear();
+   tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 14);
    CHECK(tokenizer.extractToken(tokens[0]) == "func");
    CHECK(tokenizer.extractToken(tokens[1]) == "functionName");
@@ -155,7 +157,8 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    {
    const std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
    Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
-   auto tokens = tokenizer.tokenizeAll();
+   tokens.clear();
+   tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 4);
    CHECK(tokenizer.extractToken(tokens[0]) == "0xFFF");
    CHECK(tokenizer.extractToken(tokens[1]) == "0b10101101");
