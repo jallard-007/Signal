@@ -474,11 +474,8 @@ Token Tokenizer::tokenizeNext() {
     }
 
     case TokenType::COMMENT: {
-      moveToNewLine();
-      Token tk = tokenizeNext();
-      type = tk.type;
-      prevType = type;
-      return tk;
+      movePastNewLine();
+      return tokenizeNext();
     }
 
     case TokenType::NEWLINE: {
@@ -719,9 +716,10 @@ bool Tokenizer::movePastLiteral(char delimiter) {
   return false;
 }
 
-void Tokenizer::moveToNewLine() {
+void Tokenizer::movePastNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
+      newlinePositions.emplace_back(position);
       ++position;
       return;
     }

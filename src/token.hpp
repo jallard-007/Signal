@@ -286,7 +286,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::BITWISE_XOR_ASSIGNMENT, " ^= "},
   {TokenType::MODULO, " % "},
   {TokenType::MODULO_ASSIGNMENT, " %= "},
-  {TokenType::POINTER, "^"},
+  {TokenType::POINTER, "ptr"},
   {TokenType::BITWISE_AND, " & "},
   {TokenType::BITWISE_AND_ASSIGNMENT, " &= "},
   {TokenType::LOGICAL_AND, " && "},

@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     }
   }
   if (!p.unexpected.empty() || !p.expected.empty()) {
-    exit(1);
+    return 1;
   }
   Checker checker{p.program, tk, mem};
   checker.check();
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
   }
   
   clock_t end = clock();
+  std::cout << "No errors found\n";
   // std::string pretty;
   // pretty.reserve(size);
   // p.program.prettyPrint(tk, pretty);
