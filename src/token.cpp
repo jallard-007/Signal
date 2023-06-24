@@ -1,7 +1,7 @@
 #include "token.hpp"
 
 bool isBuiltInType(TokenType type) {
-  return type >= TokenType::BOOL && type <= TokenType::REFERENCE;
+  return type >= TokenType::BOOL && type <= TokenType::VOID;
 }
 
 bool isBinaryOp(TokenType type) {
@@ -26,6 +26,10 @@ bool isControlFlow(TokenType type) {
 
 bool isLiteral(TokenType type) {
   return type >= TokenType::CHAR_LITERAL && type <= TokenType::NULL_PTR;
+}
+
+bool isAssignment(TokenType type) {
+  return type >= TokenType::ASSIGNMENT && type <= TokenType::SHIFT_RIGHT_ASSIGNMENT;
 }
 
 bool Token::operator==(const Token& tk) const {

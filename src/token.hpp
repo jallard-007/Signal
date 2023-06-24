@@ -54,11 +54,11 @@ enum class TokenType : uint8_t {
   SEMICOLON,
   BACK_SLASH,
   COLON,
+  COMMA,
+  TERNARY,
 
   // BINARY
   // general
-  TERNARY,
-  COMMA,
   DOT,
   PTR_MEMBER_ACCESS,
 
@@ -118,10 +118,10 @@ enum class TokenType : uint8_t {
   UINT32_TYPE,
   INT64_TYPE,
   UINT64_TYPE,
+  POINTER,
   FLOAT_TYPE,
   DOUBLE_TYPE,
   VOID,
-  POINTER,
   REFERENCE,
 
   // extra types used by parse to report errors
@@ -275,6 +275,8 @@ bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);
 bool isControlFlow(TokenType);
 bool isLiteral(TokenType);
+bool isLogicalOp(TokenType);
+bool isAssignment(TokenType);
 
 const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::DEREFERENCE, "*"},

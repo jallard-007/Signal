@@ -4,7 +4,6 @@
 uint8_t operatorPrecedence [83]{};
 __attribute__((constructor))
 void initializeOperatorPrecedence() {
-  operatorPrecedence[(uint8_t)TokenType::COMMA] = 0;
   operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
   operatorPrecedence[(uint8_t)TokenType::MODULO_ASSIGNMENT] = 1;
   operatorPrecedence[(uint8_t)TokenType::ADDITION_ASSIGNMENT] = 1;
@@ -788,7 +787,8 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
           expected.emplace_back(ExpectedType::EXPRESSION, token);
           return ParseExpressionErrorType::REPORTED;
         }
-      } else {
+      }
+      else {
         expression.type = ExpressionType::UNARY_OP;
         expression.unOp = memPool.makeUnOp(UnOp{token});
         if (!bottom) {

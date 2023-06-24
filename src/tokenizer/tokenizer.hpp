@@ -37,6 +37,6 @@ struct Tokenizer {
   void movePastHexNumber();
   bool movePastLiteral(char);
   void movePastNewLine();
-  std::string extractToken(Token&);
+  std::string extractToken(const Token&);
   TokenPositionInfo getTokenPositionInfo(const Token&);
 };

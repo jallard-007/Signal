@@ -51,6 +51,7 @@ void Statement::operator=(const Statement& ref) {
 }
 
 TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
+TokenList::TokenList(const Token& tk, TokenList* next): token{tk}, next{next} {}
 void TokenList::operator=(const TokenList& ref) {
   token = ref.token;
   next = ref.next;
@@ -116,14 +117,14 @@ GeneralDec::GeneralDec(): tempDec{nullptr} {}
 bool TokenList::operator==(const TokenList& ref) const {
   const TokenList* refCurr = &ref;
   const TokenList* thisCurr = this;
-  while (refCurr->next && thisCurr->next) {
-    if (!(refCurr->token == thisCurr->token)) {
+  while (refCurr && thisCurr) {
+    if (refCurr->token.type != thisCurr->token.type) {
       return false;
     }
     refCurr = refCurr->next;
     thisCurr = thisCurr->next;
   }
-  if (refCurr->next || thisCurr->next) {
+  if (refCurr || thisCurr) {
     return false;
   }
   return true;

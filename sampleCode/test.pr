@@ -1,9 +1,13 @@
-func checkForRegistrationOfEvent(eventCode: int): int ptr {
-  currRegistration: RegistrationNode ptr = registrationList;
-  while (currRegistration) {
-    if (*currRegistration->registration == eventCode) {
-      array[length - 1] = currRegistration->registration.registrationCode;
+
+func test(i: structTest): int32 {
+  currRegistration: structTest ptr = @i;
+  x: int32 = currRegistration.j;
+  return x;
+}
+
+struct structTest {
+i : int32 ;
+    func doSomethingElse(j : char): int32 {
+        return i;
     }
-  }
-  return array;
 }

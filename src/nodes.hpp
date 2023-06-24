@@ -113,6 +113,7 @@ struct TokenList {
   TokenList *next{nullptr};
   TokenList() = default;
   TokenList(const Token&);
+  TokenList(const Token&, TokenList*);
   TokenList(const TokenList&) = default;
   void operator=(const TokenList&);
   void prettyPrint(Tokenizer&, std::string&);
@@ -419,7 +420,7 @@ struct GeneralDec {
     TemplateCreation *tempCreate;
   };
   GeneralDecType type{GeneralDecType::NOTHING};
-  bool isValid{false};
+  bool isValid{true};
   GeneralDec();
   void prettyPrint(Tokenizer&, std::string&);
   void prettyPrintDefinition(Tokenizer&, std::string&);

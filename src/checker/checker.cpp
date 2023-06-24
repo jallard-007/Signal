@@ -30,6 +30,20 @@ Token getTokenOfExpression(Expression& exp) {
   }
 }
 
+TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
+TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
+TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
+TokenList Checker::uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
+TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
+TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
+TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
+TokenList Checker::stringValue {Token{0,0,TokenType::POINTER}, &Checker::charValue};
+TokenList Checker::floatValue {Token{0,0,TokenType::FLOAT_TYPE}};
+TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
+TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
+TokenList Checker::ptrValue {Token{0,0,TokenType::POINTER}, &Checker::voidValue};
+TokenList Checker::nullptrValue {Token{0,0,TokenType::NULL_PTR}};
+
 CheckerError::CheckerError(CheckerErrorType type, Token token): token{token}, dec{nullptr}, type{type}  {}
 CheckerError::CheckerError(CheckerErrorType type, Token token, GeneralDec *decPtr): token{token}, dec{decPtr}, type{type} {}
 CheckerError::CheckerError(CheckerErrorType type, Expression *expression): dec{}, type{type} {
@@ -41,7 +55,6 @@ CheckerError::CheckerError(CheckerErrorType type, Expression *expression, Genera
 
 std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file) {
   std::cout << tk.extractToken(token) << '\n';
-  std::cout << token.position << '\n';
 
   TokenPositionInfo posInfo = tk.getTokenPositionInfo(token);
   std::string message = file + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
@@ -52,6 +65,7 @@ std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file
     case CheckerErrorType::CANNOT_HAVE_CONTINUE_HERE: message += "\"continue\" can only be inside loops\n"; break;
     case CheckerErrorType::CANNOT_HAVE_MULTI_TYPE: message += "Multi type not allowed\n"; break;
     case CheckerErrorType::CANNOT_OPERATE_ON_TEMPORARY: message += "Cannot perform this operation on a temporary value\n"; break;
+    case CheckerErrorType::CANNOT_ASSIGN_TO_TEMPORARY: message += "Cannot assign a value to a temporary value\n"; break;
     case CheckerErrorType::CANNOT_PTR_A_REF: message += "Cannot have a pointer to a reference type\n"; break;
     case CheckerErrorType::CANNOT_REF_A_REF: message += "Cannot have a reference to a reference type\n"; break;
     case CheckerErrorType::NAME_ALREADY_IN_USE: message += "Name already in use\n"; break;
@@ -62,7 +76,7 @@ std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file
     case CheckerErrorType::NO_SUCH_TEMPLATE: message += "No such template\n"; break;
     case CheckerErrorType::NO_SUCH_VARIABLE: message += "No such variable\n"; break;
     case CheckerErrorType::NOT_A_FUNCTION: message += "Not a function\n"; break;
-    case CheckerErrorType::NOT_A_TYPE: message += "Not a type\n"; break;
+    case CheckerErrorType::NOT_A_STRUCT: message += "Not a type\n"; break;
     case CheckerErrorType::NOT_A_TEMPLATE: message += "Not a template\n"; break;
     case CheckerErrorType::NOT_A_VARIABLE: message += "Not a variable\n"; break;
     case CheckerErrorType::TYPE_DOES_NOT_MATCH: message += "Type does not match\n"; break;
@@ -88,7 +102,17 @@ structsLookUp{}, lookUp{}, errors{}, program{prog}, tokenizer{tk}, memPool{mem} 
 
 bool Checker::check() {
   firstTopLevelScan();
+  if (!errors.empty()) {
+    return false;
+  }
   secondTopLevelScan();
+  if (!errors.empty()) {
+    return false;
+  }
+  fullScan();
+  if (!errors.empty()) {
+    return false;
+  }
   return true;
 }
 
@@ -186,6 +210,114 @@ void Checker::firstTopLevelScan() {
   }
 }
 
+/**
+ * Validates function types, global variable types, struct member variable types, struct member function types.
+ * Everything that was registered in the first pass
+*/
+void Checker::secondTopLevelScan() {
+  for (GeneralDecList* list = &program.decs; list; list = list->next) {
+    switch (list->curr.type) {
+      case GeneralDecType::FUNCTION: {
+        list->curr.isValid = validateFunctionHeader(*list->curr.funcDec);
+        break;
+      }
+      case GeneralDecType::VARIABLE: {
+        list->curr.isValid = checkType(list->curr.varDec->type);
+        break;
+      }
+      case GeneralDecType::STRUCT: {
+        list->curr.isValid = validateStructTopLevel(list->curr.tempDec->structDec.decs);
+        break;
+      }
+      case GeneralDecType::TEMPLATE: {
+        // parser validates that there is at least one type
+        std::vector<std::string> templateTypes;
+        TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
+        // add templated types to global lookup
+        do {
+          templateTypes.push_back(tokenizer.extractToken(templateIdentifiers->token));
+          GeneralDec *&tempTypeDec = lookUp[templateTypes.back()];
+          if (tempTypeDec) {
+            errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, templateIdentifiers->token, tempTypeDec);
+            list->curr.isValid = false;
+            break;
+          }
+          tempTypeDec = memPool.makeGeneralDec();
+          tempTypeDec->type = GeneralDecType::STRUCT;
+          templateIdentifiers = templateIdentifiers->next;
+        } while (templateIdentifiers);
+        // validate top level types
+        if (!list->curr.isValid) {
+          break;
+        }
+        if (list->curr.tempDec->isStruct) {
+          list->curr.isValid = validateStructTopLevel(list->curr.tempDec->structDec.decs);
+        } else {
+          list->curr.isValid = validateFunctionHeader(list->curr.tempDec->funcDec);
+        }
+        // remove templated types
+        while (!templateTypes.empty()) {
+          auto tempType = lookUp.find(templateTypes.back());
+          memPool.release(tempType->second);
+          lookUp.erase(tempType);
+          templateTypes.pop_back();
+        }
+        break;
+      }
+      case GeneralDecType::TEMPLATE_CREATE: {
+        // check that the template exists
+        GeneralDec* dec = lookUp[tokenizer.extractToken(list->curr.tempCreate->templateName)];
+        if (!dec) {
+          errors.emplace_back(CheckerErrorType::NO_SUCH_TEMPLATE, list->curr.tempCreate->templateName);
+          list->curr.isValid = false;
+          break;
+        } else if (dec->type != GeneralDecType::TEMPLATE) {
+          errors.emplace_back(CheckerErrorType::NOT_A_TEMPLATE, list->curr.tempCreate->templateName, dec);
+          list->curr.isValid = false;
+          break;
+        }
+        // check that the number of types match and that the types exist
+        TokenList *tempList = &dec->tempDec->templateTypes, *createList = &list->curr.tempCreate->templateTypes;
+        for (;tempList && createList; tempList = tempList->next, createList = createList->next) {
+          GeneralDec *templateType = lookUp[tokenizer.extractToken(createList->token)];
+          if (!templateType) {
+            errors.emplace_back(CheckerErrorType::NO_SUCH_TYPE, createList->token);
+            list->curr.isValid = false;
+            break;
+          }
+        }
+        if (tempList || createList) {
+          if (createList) {
+            errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, createList->token, dec);
+          } else {
+            errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, list->curr.tempCreate->templateTypes.token, dec);
+          }
+          list->curr.isValid = false;
+          break;
+        }
+        break;
+        // have to deep copy the template declaration, replace all occurrences of templated types with the actual
+      }
+
+      default: break;
+    }
+
+  }
+}
+
+void Checker::fullScan() {
+  for (GeneralDecList* list = &program.decs; list; list = list->next) {
+    switch (list->curr.type) {
+      case GeneralDecType::FUNCTION: {
+        checkFunction(*list->curr.funcDec);
+        break;
+      }
+      
+      default: break;
+    }
+  }
+}
+
 bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
   bool valid = true;
   // check return type
@@ -209,7 +341,7 @@ bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
   return valid;
 }
 
-bool Checker::validateStructInnards(StructDecList& innerDecs) {
+bool Checker::validateStructTopLevel(StructDecList& innerDecs) {
   bool isValid = true;
   for (StructDecList *inner = &innerDecs; inner; inner = inner->next) {
     if (inner->type == StructDecType::VAR) {
@@ -227,95 +359,6 @@ bool Checker::validateStructInnards(StructDecList& innerDecs) {
     }
   }
   return isValid;
-}
-
-/**
- * Validates function types, global variable types, struct member variable types, struct member function types
-*/
-void Checker::secondTopLevelScan() {
-  for (GeneralDecList* list = &program.decs; list; list = list->next) {
-    switch (list->curr.type) {
-      case GeneralDecType::FUNCTION: {
-        list->curr.isValid = validateFunctionHeader(*list->curr.funcDec);
-        break;
-      }
-      case GeneralDecType::VARIABLE: {
-        list->curr.isValid = checkType(list->curr.varDec->type);
-        break;
-      }
-      case GeneralDecType::STRUCT: {
-        list->curr.isValid = validateStructInnards(list->curr.tempDec->structDec.decs);
-        break;
-      }
-      case GeneralDecType::TEMPLATE: {
-        // parser validates that there is at least one type
-        std::vector<std::string> templateTypes;
-        TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
-        // add templated types to global lookup
-        do {
-          templateTypes.push_back(tokenizer.extractToken(templateIdentifiers->token));
-          GeneralDec *&tempTypeDec = lookUp[templateTypes.back()];
-          if (tempTypeDec) {
-            std::cout << "\n\nsecond scan\n\n";
-            errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, templateIdentifiers->token, tempTypeDec);
-          } else {
-            tempTypeDec = memPool.makeGeneralDec();
-            tempTypeDec->type = GeneralDecType::STRUCT;
-          }
-          templateIdentifiers = templateIdentifiers->next;
-        } while (templateIdentifiers);
-        // validate top level types
-        if (list->curr.tempDec->isStruct) {
-          list->curr.isValid = validateStructInnards(list->curr.tempDec->structDec.decs);
-        } else {
-          list->curr.isValid = validateFunctionHeader(list->curr.tempDec->funcDec);
-        }
-        // remove templated types
-        while (!templateTypes.empty()) {
-          auto tempType = lookUp.find(templateTypes.back());
-          memPool.release(tempType->second);
-          lookUp.erase(tempType);
-          templateTypes.pop_back();
-        }
-        break;
-      }
-      case GeneralDecType::TEMPLATE_CREATE: {
-        // check that the template exists
-        GeneralDec* dec = lookUp[tokenizer.extractToken(list->curr.tempCreate->templateName)];
-        if (!dec) {
-          errors.emplace_back(CheckerErrorType::NO_SUCH_TEMPLATE, list->curr.tempCreate->templateName);
-          break;
-        } else if (dec->type != GeneralDecType::TEMPLATE) {
-          errors.emplace_back(CheckerErrorType::NOT_A_TEMPLATE, list->curr.tempCreate->templateName, dec);
-          break;
-        }
-        // check that the number of types match and that the types exist
-        TokenList *tempList = &dec->tempDec->templateTypes, *createList = &list->curr.tempCreate->templateTypes;
-        for (;tempList && createList; tempList = tempList->next, createList = createList->next) {
-          GeneralDec *templateType = lookUp[tokenizer.extractToken(createList->token)];
-          if (!templateType) {
-            errors.emplace_back(CheckerErrorType::NO_SUCH_TYPE, createList->token);
-            break;
-          }
-        }
-        if (tempList || createList) {
-          if (createList) {
-            errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, createList->token, dec);
-          } else {
-            errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, list->curr.tempCreate->templateTypes.token, dec);
-          }
-          break;
-        }
-        //list->curr.tempCreate->templateTypes;
-        break;
-        // have to deep copy the template declaration, replace all occurrences of templated types with the actual
-      }
-
-      default: {
-        break;
-      }
-    }
-  }
 }
 
 /**
@@ -362,13 +405,42 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
 bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
   const uint32_t marker = locals.size();
   StatementList* list = &scope.scopeStatements;
+  bool valid = true;
+  bool wasReturned = true;
   do {
     switch (list->curr.type) {
       case StatementType::CONTROL_FLOW: {
+        switch (list->curr.controlFlow->type) {
+          // ForLoop forLoop;
+          case ControlFlowStatementType::FOR_LOOP: {
+            break;
+          }
+          case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
+            break;
+
+          }
+          case ControlFlowStatementType::RETURN_STATEMENT: {
+            break;
+
+          }
+          case ControlFlowStatementType::SWITCH_STATEMENT: {
+            break;
+
+          }
+          case ControlFlowStatementType::WHILE_LOOP: {
+            break;
+
+          }
+          case ControlFlowStatementType::NONE: {
+            break;
+          }
+        }
       }
       
       case StatementType::EXPRESSION: {
-        checkExpression(*list->curr.expression);
+        if (checkExpression(*list->curr.expression).type->token.type == TokenType::BAD_VALUE) {
+          valid = false;
+        }
         break;
       }
       
@@ -376,12 +448,14 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
         if (list->curr.keyword.type == TokenType::CONTINUE) {
           if (!isLoop) {
             errors.emplace_back(CheckerErrorType::CANNOT_HAVE_CONTINUE_HERE, list->curr.keyword);
+            valid = false;
           }
           break;
         }
         else if (list->curr.keyword.type == TokenType::BREAK) {
           if (!isLoop && !isSwitch) {
             errors.emplace_back(CheckerErrorType::CANNOT_HAVE_BREAK_HERE, list->curr.keyword);
+            valid = false;
           }
           break;
         } else {
@@ -394,17 +468,44 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
       
       case StatementType::SCOPE: {
         if (!checkScope(*list->curr.scope, locals, returnType, false, isLoop, isSwitch)) {
-          return false;
+          valid = false;
         }
         break;
       }
 
       case StatementType::VARIABLE_DEC: {
+        // add local to table
+        GeneralDec*& dec = lookUp[tokenizer.extractToken(list->curr.varDec->name)];
+        if (dec) {
+          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, list->curr.varDec->name, dec);
+          valid = false;
+          break;
+        }
+        if (!checkType(list->curr.varDec->type)) {
+          valid = false;
+          break;
+        }
+        dec = memPool.makeGeneralDec();
+        dec->type = GeneralDecType::VARIABLE;
+        dec->varDec = list->curr.varDec;
+        if (dec->varDec->initialAssignment) {
+          ResultingType expressionType = checkExpression(*list->curr.varDec->initialAssignment);
+          if (expressionType.type->token.type == TokenType::BAD_VALUE) {
+            valid = false;
+          }
+          else {
+            ResultingType varType {&list->curr.varDec->type, true};
+            if (!checkAssignment(varType, expressionType)) {
+              errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN, list->curr.varDec->initialAssignment);
+              valid = false;
+            }
+          }
+        }
         break;
       }
       
       default: {
-        break;
+        exit(1);
       }
     }
     list = list->next;
@@ -414,82 +515,112 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
     lookUp.erase(locals.back());
     locals.pop_back();
   }
-  return isReturnRequired;
+  if (isReturnRequired && !wasReturned) {
+    return false;
+  }
+  return valid;
 }
 
+/**
+ * Returns the resulting type from an expression
+ * the ResultingType always contains a valid pointer
+ * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
+*/
 ResultingType Checker::checkExpression(Expression& expression, std::map<std::string, StructDecList *>* structMap) {
   switch(expression.type) {
     case ExpressionType::BINARY_OP: {
+      ResultingType leftSide = checkExpression(expression.binOp->leftSide);
 
-        // logical
-      // EQUAL,
-      // NOT_EQUAL,
-      // LESS_THAN,
-      // LESS_THAN_EQUAL,
-      // GREATER_THAN,
-      // GREATER_THAN_EQUAL,
-
-      // ADDITION,
-      // SUBTRACTION,
-      // MULTIPLICATION,
-      // DIVISION,
-      // MODULO,
-      // BITWISE_AND,
-      // BITWISE_XOR,
-      // BITWISE_OR,
-      // SHIFT_LEFT,
-      // SHIFT_RIGHT,
-      // ASSIGNMENT,
-      // ADDITION_ASSIGNMENT,
-      // SUBTRACTION_ASSIGNMENT,
-      // MULTIPLICATION_ASSIGNMENT,
-      // DIVISION_ASSIGNMENT,
-      // MODULO_ASSIGNMENT,
-      // BITWISE_OR_ASSIGNMENT,
-      // BITWISE_XOR_ASSIGNMENT,
-      // BITWISE_AND_ASSIGNMENT,
-      // SHIFT_LEFT_ASSIGNMENT,
-      // SHIFT_RIGHT_ASSIGNMENT,
-
-
-      ResultingType leftSide = checkExpression(expression.binOp->leftSide, structMap);
-
-      // LOGICAL_AND,
-      // LOGICAL_OR,
       if (expression.binOp->op.type == TokenType::LOGICAL_AND || expression.binOp->op.type == TokenType::LOGICAL_OR) {
-        ResultingType rightSide = checkExpression(expression.binOp->rightSide);
-        if (!canBeConvertedToBool(*leftSide.type)) {
-          errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, expression.unOp->op);
+        if (leftSide.type->token.type != TokenType::BAD_VALUE) {
+          if (!canBeConvertedToBool(*leftSide.type)) {
+            errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &expression.binOp->leftSide);
+          }
         }
+        ResultingType rightSide = checkExpression(expression.binOp->rightSide);
         if (!canBeConvertedToBool(*rightSide.type)) {
-          errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, expression.unOp->op);
+          errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &expression.binOp->rightSide);
         }
         return {&boolValue, false};
       }
       
-      // member access
+      if (isLogicalOp(expression.binOp->op.type)) {
+        if (leftSide.type->token.type == TokenType::IDENTIFIER || leftSide.type->token.type == TokenType::VOID) {
+          errors.emplace_back(CheckerErrorType::CANNOT_COMPARE_TYPE, &expression.binOp->leftSide);
+        }
+        ResultingType rightSide = checkExpression(expression.binOp->leftSide);
+        if (rightSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::VOID) {
+          errors.emplace_back(CheckerErrorType::CANNOT_COMPARE_TYPE, &expression.binOp->rightSide);
+        }
+        return {&boolValue, false};
+      }
+
+      // member access or number with decimal
       if (expression.binOp->op.type == TokenType::DOT) {
-        structMap = &structsLookUp[tokenizer.extractToken(leftSide.type->token)];
-        if (!structMap) {
-          errors.emplace_back(CheckerErrorType::NOT_A_TYPE, &expression.binOp->leftSide);
+        TokenType tkType = leftSide.type->token.type;
+        if (tkType == TokenType::DECIMAL_NUMBER || tkType == TokenType::HEX_NUMBER || tkType == TokenType::BINARY_NUMBER) {
+          if (expression.binOp->rightSide.type != ExpressionType::VALUE) {
+            errors.emplace_back(CheckerErrorType::EXPECTING_NUMBER, &expression.binOp->rightSide);
+          }
+          else {
+            tkType = expression.binOp->rightSide.value.type;
+            if (tkType != TokenType::DECIMAL_NUMBER || tkType == TokenType::HEX_NUMBER || tkType == TokenType::BINARY_NUMBER) {
+              errors.emplace_back(CheckerErrorType::EXPECTING_NUMBER, &expression.binOp->rightSide);
+            }
+          }
+          return {&doubleValue, false};
+        } else {
+          if (leftSide.type->token.type == TokenType::BAD_VALUE) {
+            return {&badValue, false};
+          }
+          return checkMemberAccess(leftSide, expression);
+        }
+      }
+      
+      // pointer member access
+      if (expression.binOp->op.type == TokenType::PTR_MEMBER_ACCESS) {
+        if (leftSide.type->token.type == TokenType::BAD_VALUE) {
           return {&badValue, false};
         }
-        return checkExpression(expression.binOp->rightSide, structMap);
-      }
-      if (expression.binOp->op.type == TokenType::PTR_MEMBER_ACCESS) {
         if (leftSide.type->token.type != TokenType::POINTER) {
           errors.emplace_back(CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, expression.binOp->op);
           return {&badValue, false};
         }
-        structMap = &structsLookUp[tokenizer.extractToken(leftSide.type->next->token)];
-        if (!structMap) {
-          errors.emplace_back(CheckerErrorType::NOT_A_TYPE, &expression.binOp->leftSide);
-          return {&badValue, false};
-        }
-        return checkExpression(expression.binOp->rightSide, structMap);
+        return checkMemberAccess(leftSide, expression);
       }
 
-      return {&badValue, false};
+      ResultingType rightSide = checkExpression(expression.binOp->rightSide);
+      if (isAssignment(expression.binOp->op.type)) {
+        if (!leftSide.isLValue) {
+          errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN_TO_TEMPORARY, &expression.binOp->leftSide);
+        }
+        else if (!checkAssignment(leftSide, rightSide)) {
+          errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN, &expression);
+        }
+        return {leftSide.type, true};
+      }
+
+      if (leftSide.type->token.type == TokenType::BAD_VALUE && rightSide.type->token.type == TokenType::BAD_VALUE) {
+        return {&badValue, false};
+      } else if (leftSide.type->token.type == TokenType::BAD_VALUE) {
+        return {rightSide.type, false};
+      } else if (rightSide.type->token.type == TokenType::BAD_VALUE) {
+        return {leftSide.type, false};
+      }
+
+      if (leftSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::IDENTIFIER) {
+        errors.emplace_back(CheckerErrorType::OPERATION_NOT_DEFINED, &expression);
+        return {&badValue, false};
+      }
+      if (leftSide.type->token.type == TokenType::VOID || rightSide.type->token.type == TokenType::VOID) {
+        errors.emplace_back(CheckerErrorType::OPERATION_ON_VOID, &expression);
+        return {&badValue, false};
+      }
+      TokenList& largest = largestType(*leftSide.type, *rightSide.type);
+      if (largest.token.type < TokenType::INT32_TYPE) {
+        return {&int32Value, false};
+      }
+      return {&largest, false};
     }
     
     case ExpressionType::UNARY_OP: {
@@ -512,10 +643,13 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
         if (!res.isLValue) {
           errors.emplace_back(CheckerErrorType::CANNOT_OPERATE_ON_TEMPORARY, expression.unOp->op);
         }
-        TokenList *ptrToType = memPool.makeTokenList();
-        ptrToType->token.type = TokenType::POINTER;
-        ptrToType->next = res.type;
-        return {ptrToType, false};
+        if (expression.unOp->op.type == TokenType::ADDRESS_OF) {
+          TokenList *ptrToType = memPool.makeTokenList();
+          ptrToType->token.type = TokenType::POINTER;
+          ptrToType->next = res.type;
+          return {ptrToType, false};
+        }
+        return {res.type, false};
       }
       if (expression.unOp->op.type == TokenType::NEGATIVE) {
         // nothing for now
@@ -530,11 +664,11 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
         if (structMap) {
           StructDecList *structDec = (*structMap)[tokenizer.extractToken(expression.value)];
           if (!structDec) {
-            errors.emplace_back(CheckerErrorType::NO_SUCH_MEMBER_VARIABLE, expression.funcCall->name);
+            errors.emplace_back(CheckerErrorType::NO_SUCH_MEMBER_VARIABLE, expression.value);
             return {&badValue, false};
           }
           if (structDec->type != StructDecType::VAR) {
-            errors.emplace_back(CheckerErrorType::NOT_A_VARIABLE, expression.funcCall->name);
+            errors.emplace_back(CheckerErrorType::NOT_A_VARIABLE, expression.value);
             return {&badValue, false};
           }
           decPtr = memPool.makeGeneralDec();
@@ -551,12 +685,15 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
             return {&badValue, false};
           }
         }
+        if (decPtr->varDec->type.token.type == TokenType::REFERENCE) {
+          return {decPtr->varDec->type.next, true};
+        }
         return {&decPtr->varDec->type, true};
       }
       if (expression.value.type == TokenType::DECIMAL_NUMBER) {
         // need to get the actual number and see if it fits in a 32bit int, if not, unsigned, if not, 64bit
         // for now, just dump all numbers as ints
-        return {&intValue, false};
+        return {&int32Value, false};
       }
       if (expression.value.type == TokenType::NULL_PTR) {
         return {&nullptrValue, false};
@@ -567,14 +704,12 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
       if (expression.value.type == TokenType::STRING_LITERAL) {
         return {&stringValue, false};
       }
-      if (expression.value.type == TokenType::CHAR_LITERAL) {
-        return {&charValue, false};
-      }
-      return {&badValue, false};
+      return {&charValue, false};
     }
     
     case ExpressionType::FUNCTION_CALL: {
       GeneralDec *decPtr;
+      // member function
       if (structMap) {
         StructDecList *structDec = (*structMap)[tokenizer.extractToken(expression.funcCall->name)];
         if (!structDec) {
@@ -588,7 +723,9 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
         decPtr = memPool.makeGeneralDec();
         decPtr->type = GeneralDecType::FUNCTION;
         decPtr->funcDec = &structDec->funcDec;
-      } else {
+      }
+      // normal function call
+      else {
         decPtr = lookUp[tokenizer.extractToken(expression.funcCall->name)];
         if (!decPtr) {
           // dec does not exist
@@ -608,10 +745,14 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
       do {
         ResultingType resultingType = checkExpression(argList->curr);
         if (resultingType.type->token.type != TokenType::BAD_VALUE) {
-          if (!(paramList->curr.varDec->type == *resultingType.type)) {
+          if (!paramList->curr.varDec) {
+            if (resultingType.type->token.type != TokenType::VOID) {
+              errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, expression.funcCall->name, decPtr);
+            }
+          }
+          else if (!(paramList->curr.varDec->type == *resultingType.type)) {
             // types dont match
-            errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, &argList->curr, decPtr);
-            return {&decPtr->funcDec->returnType, false};
+            errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, expression.funcCall->name, decPtr);
           }
         }
         // type matches
@@ -620,6 +761,9 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
       } while (argList && paramList);
       if (argList || paramList) {
         errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, expression.funcCall->name, decPtr);
+      }
+      if (decPtr->funcDec->returnType.token.type == TokenType::REFERENCE) {
+        return {decPtr->funcDec->returnType.next, true};
       }
       return {&decPtr->funcDec->returnType, false};
     }
@@ -635,6 +779,10 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
     case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
       return {&badValue, false};
     }
+
+    case ExpressionType::NONE: {
+      return {&voidValue, false};
+    }
     
     default: {
       exit(1);
@@ -649,7 +797,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
  * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
  *  check if the emplaced error is 'void' and remove it if called for a function return type
 */
-bool Checker::checkType(TokenList& type) {
+bool Checker::checkType(const TokenList& type) {
   /**
    * Used to track the type info. 0 means we can have a ref, 0-2 means pointer, and 3 means an actual type was found
    * Can go forward, but cant go back. 
@@ -674,7 +822,7 @@ bool Checker::checkType(TokenList& type) {
   uint8_t typeType = 0;
 
   CheckerErrorType errorType = CheckerErrorType::NONE;
-  TokenList *list = &type;
+  const TokenList *list = &type;
   do {
     if (isBuiltInType(list->token.type)) {
       const TokenType tokenType = list->token.type;
@@ -685,19 +833,6 @@ bool Checker::checkType(TokenList& type) {
         }
         typeType = 2;
       }
-      else if (tokenType == TokenType::REFERENCE) {
-        if (typeType == 1) {
-          errorType = CheckerErrorType::CANNOT_REF_A_REF;
-          break;
-        } else if (typeType == 2) {
-          errorType = CheckerErrorType::CANNOT_PTR_A_REF;
-          break;
-        } else if (typeType == 3) {
-          errorType = CheckerErrorType::UNEXPECTED_TYPE;
-          break;
-        }
-        typeType = 1;
-      }
       else {
         if (typeType == 3) {
           errorType = CheckerErrorType::CANNOT_HAVE_MULTI_TYPE;
@@ -705,7 +840,21 @@ bool Checker::checkType(TokenList& type) {
         }
         typeType = 3;
       }
-    } else {
+    }
+    else if (list->token.type == TokenType::REFERENCE) {
+      if (typeType == 1) {
+        errorType = CheckerErrorType::CANNOT_REF_A_REF;
+        break;
+      } else if (typeType == 2) {
+        errorType = CheckerErrorType::CANNOT_PTR_A_REF;
+        break;
+      } else if (typeType == 3) {
+        errorType = CheckerErrorType::UNEXPECTED_TYPE;
+        break;
+      }
+      typeType = 1;
+    }
+    else {
       if (typeType == 3) {
         errorType = CheckerErrorType::CANNOT_HAVE_MULTI_TYPE;
         break;
@@ -730,36 +879,62 @@ bool Checker::checkType(TokenList& type) {
   return false;
 }
 
-bool Checker::checkStatement(Statement& statement) {
-  switch (statement.type) {
-    case StatementType::VARIABLE_DEC: {
+ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& expression) {
+  if (expression.binOp->rightSide.type == ExpressionType::VALUE) {
+    if (expression.binOp->rightSide.value.type != TokenType::IDENTIFIER) {
+      errors.emplace_back(CheckerErrorType::EXPECTED_IDENTIFIER, expression.binOp->rightSide.value);
+      return {&badValue, false};
     }
+  }
+  else if (expression.binOp->rightSide.type != ExpressionType::FUNCTION_CALL && expression.binOp->rightSide.type != ExpressionType::ARRAY_ACCESS) {
+    errors.emplace_back(CheckerErrorType::EXPECTED_IDENTIFIER, expression.binOp->rightSide.value);
+    return {&badValue, false};
+  }
+  auto structMap = &structsLookUp[tokenizer.extractToken(leftSide.type->token)];
+  if (!structMap) {
+    errors.emplace_back(CheckerErrorType::NOT_A_STRUCT, &expression.binOp->leftSide);
+    return {&badValue, false};
+  }
+  return checkExpression(expression.binOp->rightSide, structMap);
+}
 
-    case StatementType::KEYWORD: {
+bool checkAssignment(const ResultingType& leftSide, const ResultingType& rightSide) {
+  if (leftSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::IDENTIFIER
+    || leftSide.type->token.type == TokenType::VOID || rightSide.type->token.type == TokenType::VOID
+    || leftSide.type->token.type == TokenType::BAD_VALUE || rightSide.type->token.type == TokenType::BAD_VALUE) {
+    return false;
+  }
+  if (leftSide.type->token.type == TokenType::POINTER) {
+    if (rightSide.type->token.type != TokenType::POINTER) {
+      return true;
     }
-
-
-    default: break;
+    const TokenList* rType = rightSide.type;
+    const TokenList* lType = leftSide.type;
+    while (rType && lType) {
+      if (rType->token.type != lType->token.type) {
+        if (rType->token.type == TokenType::VOID) {
+          return true;
+        }
+        return false;
+      }
+      rType = rType->next;
+      lType = lType->next;
+    }
   }
   return true;
 }
 
 // only builtin types can be converted to bool, except for void.
-// skips the first token if its TokenType::REFERENCE
 bool canBeConvertedToBool(TokenList& type) {
-  TokenList *actual = &type;
-  if (type.next) {
-    if (type.next->token.type == TokenType::REFERENCE) {
-      // move to next;
-      actual = type.next;
-    }
+  return isBuiltInType(type.token.type) && type.token.type != TokenType::VOID;
+}
+
+TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {
+  if (typeA.token.type == TokenType::POINTER || typeB.token.type == TokenType::POINTER) {
+    return ptrValue;
   }
-  if (isBuiltInType(actual->token.type)) {
-    if (actual->token.type == TokenType::VOID) {
-      return false;
-    }
-    return true;
+  if (typeA.token.type > typeB.token.type) {
+    return typeA;
   }
-  // custom type
-  return false;
+  return typeB;
 }

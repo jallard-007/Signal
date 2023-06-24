@@ -726,6 +726,6 @@ void Tokenizer::movePastNewLine() {
   }
 }
 
-std::string Tokenizer::extractToken(Token &token) {
+std::string Tokenizer::extractToken(const Token &token) {
   return content.substr(token.position, token.length);
 }
