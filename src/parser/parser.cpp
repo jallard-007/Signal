@@ -856,12 +856,13 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
         else {
           if (binary) {
             expression.binOp->leftSide = rootExpression;
+            bottom = &rootExpression;
           } else {
             expression.unOp->operand = rootExpression;
+            bottom = &expression.unOp->operand;
           }
           // move the statement to the root
           rootExpression = expression;
-          bottom = &rootExpression;
         }
       }
     }

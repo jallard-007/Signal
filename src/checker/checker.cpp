@@ -76,13 +76,14 @@ std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file
     case CheckerErrorType::NO_SUCH_TEMPLATE: message += "No such template\n"; break;
     case CheckerErrorType::NO_SUCH_VARIABLE: message += "No such variable\n"; break;
     case CheckerErrorType::NOT_A_FUNCTION: message += "Not a function\n"; break;
-    case CheckerErrorType::NOT_A_STRUCT: message += "Not a type\n"; break;
+    case CheckerErrorType::NOT_A_STRUCT: message += "Not a struct\n"; break;
     case CheckerErrorType::NOT_A_TEMPLATE: message += "Not a template\n"; break;
     case CheckerErrorType::NOT_A_VARIABLE: message += "Not a variable\n"; break;
     case CheckerErrorType::TYPE_DOES_NOT_MATCH: message += "Type does not match\n"; break;
     case CheckerErrorType::UNEXPECTED_TYPE: message += "Unexpected type\n"; break;
     case CheckerErrorType::VOID_TYPE: message += "Void type not allowed\n"; break;
     case CheckerErrorType::WRONG_NUMBER_OF_ARGS: message += "Incorrect number of arguments\n"; break;
+    case CheckerErrorType::CANNOT_ASSIGN: message += "Cannot assign\n"; break;
     default: message += "Error of some kind, sorry bro\n"; break;
   }
   if (dec) {
@@ -564,7 +565,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
           }
           else {
             tkType = expression.binOp->rightSide.value.type;
-            if (tkType != TokenType::DECIMAL_NUMBER || tkType == TokenType::HEX_NUMBER || tkType == TokenType::BINARY_NUMBER) {
+            if (tkType != TokenType::DECIMAL_NUMBER && tkType != TokenType::HEX_NUMBER && tkType != TokenType::BINARY_NUMBER) {
               errors.emplace_back(CheckerErrorType::EXPECTING_NUMBER, &expression.binOp->rightSide);
             }
           }
@@ -586,6 +587,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
           errors.emplace_back(CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, expression.binOp->op);
           return {&badValue, false};
         }
+        leftSide.type = leftSide.type->next;
         return checkMemberAccess(leftSide, expression);
       }
 
@@ -628,6 +630,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
         ResultingType res = checkExpression(expression.unOp->operand);
         if (res.type->token.type != TokenType::POINTER) {
           errors.emplace_back(CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, expression.unOp->op);
+          return {&badValue, false};
         }
         return {res.type->next, true};
       }
@@ -890,12 +893,13 @@ ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& ex
     errors.emplace_back(CheckerErrorType::EXPECTED_IDENTIFIER, expression.binOp->rightSide.value);
     return {&badValue, false};
   }
-  auto structMap = &structsLookUp[tokenizer.extractToken(leftSide.type->token)];
-  if (!structMap) {
+  auto dec = lookUp[tokenizer.extractToken(leftSide.type->token)];
+  if (!dec || dec->type != GeneralDecType::STRUCT)  {
     errors.emplace_back(CheckerErrorType::NOT_A_STRUCT, &expression.binOp->leftSide);
     return {&badValue, false};
   }
-  return checkExpression(expression.binOp->rightSide, structMap);
+  auto& structMap = structsLookUp.at(tokenizer.extractToken(leftSide.type->token));
+  return checkExpression(expression.binOp->rightSide, &structMap);
 }
 
 bool checkAssignment(const ResultingType& leftSide, const ResultingType& rightSide) {

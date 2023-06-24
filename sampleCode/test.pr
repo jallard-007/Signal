@@ -1,12 +1,13 @@
 
 func test(i: structTest): int32 {
   currRegistration: structTest ptr = @i;
-  x: int32 = currRegistration.j;
+  x: int32 = currRegistration->i;
+  thing: structTest ptr ptr = @@i;
   return x;
 }
 
 struct structTest {
-i : int32 ;
+i : int64 ;
     func doSomethingElse(j : char): int32 {
         return i;
     }
