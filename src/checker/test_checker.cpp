@@ -38,14 +38,17 @@ TEST_CASE("checkType", "[checker]") {
     tokenList.token.position = 7;
     tokenList.token.type = TokenType::IDENTIFIER;
     CHECK(tc.checkType(tokenList));
+    tokenList.next = nullptr;
     TokenList nextType = tokenList;
     tokenList.next = &nextType;
     tokenList.token.type = TokenType::POINTER;
     CHECK(tc.checkType(tokenList));
+    nextType.next = nullptr;
     TokenList nextNextType = tokenList;
     tokenList.next = &nextNextType;
     tokenList.token.type = TokenType::REFERENCE;
     CHECK(tc.checkType(tokenList));
+    nextType.next = nullptr;
     TokenList nextNextNextType = tokenList;
     tokenList.next = &nextNextNextType;
     tokenList.token.type = TokenType::POINTER;
@@ -107,14 +110,14 @@ R"(
 func main(): int32 {
   obj: customType;
   obj.size = 10;
-  if (functionName(0, @customType)) {
+  if (functionName(0, obj)) {
     return 0;
   }
   return 1;
 }
 
 func functionName(param1: int32, param2: customType): bool {
-  if (customType.size < param1) {
+  if (param2.size < param1) {
     return false;
   }
   return true;

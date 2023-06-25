@@ -963,8 +963,7 @@ ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& ex
 }
 
 bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
-  if (leftSide.token.type == TokenType::IDENTIFIER || rightSide.token.type == TokenType::IDENTIFIER
-    || leftSide.token.type == TokenType::VOID || rightSide.token.type == TokenType::VOID
+  if (leftSide.token.type == TokenType::VOID || rightSide.token.type == TokenType::VOID
     || leftSide.token.type == TokenType::BAD_VALUE || rightSide.token.type == TokenType::BAD_VALUE) {
     return false;
   }
@@ -987,6 +986,15 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
       rType = rType->next;
       lType = lType->next;
     } while (rType && lType);
+  }
+  else if (leftSide.token.type == TokenType::IDENTIFIER || rightSide.token.type == TokenType::IDENTIFIER) {
+    if (leftSide.token.type != TokenType::IDENTIFIER || rightSide.token.type != TokenType::IDENTIFIER) {
+      return false;
+    }
+    if (leftSide.next->token.type == TokenType::DEC_PTR || rightSide.next->token.type == TokenType::DEC_PTR) {
+      return leftSide.next->next == rightSide.next->next;
+    }
+    return false;
   }
   return true;
 }
