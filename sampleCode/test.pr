@@ -1,9 +1,9 @@
 
-func test(i: structTest): int32 {
-  currRegistration: structTest ptr = @i;
-  x: int32 = currRegistration->i;
-  thing: structTest ptr ptr = @@i;
-  return x;
+func test(i: ListNode): ListNode ptr {
+  currRegistration: ListNode ptr = @i;
+  x: char = '3';
+  currRegistration = nullptr;
+  return reverseKGroup(currRegistration, x);
 }
 
 struct structTest {
@@ -11,4 +11,56 @@ i : int64 ;
     func doSomethingElse(j : char): int32 {
         return i;
     }
+}
+
+func reverseList(head: ListNode ptr): ListNode ptr {
+  prev: ListNode ptr = nullptr;
+  curr: ListNode ptr = head;
+  while (curr != nullptr) {
+    next: ListNode ptr = curr->next;
+    curr->next = prev;
+    prev = curr;
+    curr = next;
+  }
+  return prev;
+}
+
+func reverseKGroup(head: ListNode ptr, k: int32): ListNode ptr {
+  curr: ListNode ptr = head;
+  for (i: int32 = 0; i < k - 1; ++i) {
+    if (!curr) {
+      return head;
+    }
+    curr = curr->next;
+  }
+  next: ListNode ptr = curr->next;
+  curr->next = nullptr;
+  newHead: ListNode ptr = reverseList(head);
+  head->next = next;
+  curr = next;
+  while (curr) {
+    for (i: int32 = 0; i < k - 1; ++i) {
+      if (!curr) {
+        return newHead;
+      }
+      curr = curr->next;
+    }
+    if (!curr) {
+      return newHead;
+    }
+    next = curr->next;
+    curr->next = nullptr;
+    temp: ListNode ptr = head;
+    head = head->next;
+    temp->next = reverseList(head);
+    head->next = next;
+    curr = next;
+  }
+
+  return newHead;
+}
+
+struct ListNode {
+  val: int32;
+  next: ListNode ptr;
 }

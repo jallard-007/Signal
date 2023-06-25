@@ -8,12 +8,17 @@ void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
   }
   std::vector<TokenList *> r;
   for (TokenList *iter = this; iter; iter = iter->next) {
+    if (iter->token.type == TokenType::DEC_PTR) {
+      break;
+    }
     r.emplace_back(iter);
   }
-  for (int i = r.size() - 1; i > 0 ; --i) {
-    str += tk.extractToken(r[i]->token) + " ";
+  if (!r.empty()) {
+    for (size_t i = r.size() - 1; i > 0 ; --i) {
+      str += tk.extractToken(r[i]->token) + " ";
+    }
+    str += tk.extractToken(r.front()->token);
   }
-  str += tk.extractToken(r.front()->token);
 }
 
 void VariableDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {

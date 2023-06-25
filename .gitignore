@@ -13,3 +13,4 @@ gmon.out
 coverage
 sampleCode/benchmark.pr
 output.png
+.DS_Store

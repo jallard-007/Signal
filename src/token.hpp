@@ -126,7 +126,10 @@ enum class TokenType : uint8_t {
 
   // extra types used by parse to report errors
   TYPE,
-  OPERATOR
+  OPERATOR,
+
+  // extra types used by checker
+  DEC_PTR,
 };
 
 struct Token {

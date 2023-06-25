@@ -18,6 +18,7 @@ enum class CheckerErrorType: uint8_t {
   EXPECTED_IDENTIFIER,
   EXPECTING_TYPE,
   EXPECTING_NUMBER,
+  INCORRECT_RETURN_TYPE,
 
   // no such
   NO_SUCH_FUNCTION,
@@ -78,6 +79,7 @@ struct Checker {
   Program& program;
   Tokenizer& tokenizer;
   NodeMemPool &memPool;
+  static TokenList noneValue;
   static TokenList badValue;
   static TokenList boolValue;
   static TokenList int32Value;
@@ -97,17 +99,17 @@ struct Checker {
   void firstTopLevelScan();
   void secondTopLevelScan();
   void fullScan();
-  bool checkFunction(FunctionDec&);
+  void checkFunction(FunctionDec&);
   bool validateFunctionHeader(FunctionDec&);
   bool validateStructTopLevel(StructDecList&);
   
-  bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
-
+  void checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
+  bool checkLocalVarDec(VariableDec&, std::vector<std::string>&);
   ResultingType checkExpression(Expression&, std::map<std::string, StructDecList *>* structMap = nullptr);
   ResultingType checkMemberAccess(ResultingType&, Expression&);
-  bool checkType(const TokenList&);
+  bool checkType(TokenList&);
   TokenList& largestType(TokenList&, TokenList&);
 };
 
 bool canBeConvertedToBool(TokenList&);
-bool checkAssignment(const ResultingType&, const ResultingType&);
+bool checkAssignment(const TokenList&, const TokenList&);

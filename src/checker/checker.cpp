@@ -25,11 +25,12 @@ Token getTokenOfExpression(Expression& exp) {
       return getTokenOfExpression(*exp.wrapped);
     }
     default: {
-      return {999,999,TokenType::BAD_VALUE};
+      exit(1);
     }
   }
 }
 
+TokenList Checker::noneValue {Token{0,0,TokenType::NOTHING}};
 TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
 TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
 TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
@@ -84,6 +85,7 @@ std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file
     case CheckerErrorType::VOID_TYPE: message += "Void type not allowed\n"; break;
     case CheckerErrorType::WRONG_NUMBER_OF_ARGS: message += "Incorrect number of arguments\n"; break;
     case CheckerErrorType::CANNOT_ASSIGN: message += "Cannot assign\n"; break;
+    case CheckerErrorType::INCORRECT_RETURN_TYPE: message += "Incorrect return type\n"; break;
     default: message += "Error of some kind, sorry bro\n"; break;
   }
   if (dec) {
@@ -367,7 +369,7 @@ bool Checker::validateStructTopLevel(StructDecList& innerDecs) {
  * \param funcDec the function declaration to check
  * \returns true if the function is valid
  */
-bool Checker::checkFunction(FunctionDec& funcDec) {
+void Checker::checkFunction(FunctionDec& funcDec) {
   // validate parameter names
   std::vector<std::string> locals;
   if (funcDec.params.curr.type != StatementType::NOTHING) {
@@ -377,7 +379,7 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
       GeneralDec* &paramDec = lookUp[locals.back()];
       if (paramDec) {
         errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, list->curr.varDec->name, paramDec);
-        return false;
+        return;
       }
       // type already checked on second top level scan, just add it
       paramDec = memPool.makeGeneralDec();
@@ -387,13 +389,12 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
     }
   }
   bool requireReturn = funcDec.returnType.token.type != TokenType::VOID;
-  bool valid = checkScope(funcDec.body, locals, funcDec.returnType, requireReturn, false, false);
+  checkScope(funcDec.body, locals, funcDec.returnType, requireReturn, false, false);
   while (!locals.empty()) {
     // remove locals from table
     lookUp.erase(locals.back());
     locals.pop_back();
   }
-  return valid;
 }
 
 /**
@@ -401,12 +402,10 @@ bool Checker::checkFunction(FunctionDec& funcDec) {
  * \param locals name of all local variables allocated 
  * \param returnType the return type of the scope
  * \param isReturnRequired set to true if a return is required within this scope
- * \returns true if the scope is valid, false otherwise. (error type appended to errors)
 */
-bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
+void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
   const uint32_t marker = locals.size();
   StatementList* list = &scope.scopeStatements;
-  bool valid = true;
   bool wasReturned = true;
   do {
     switch (list->curr.type) {
@@ -414,34 +413,77 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
         switch (list->curr.controlFlow->type) {
           // ForLoop forLoop;
           case ControlFlowStatementType::FOR_LOOP: {
+            auto& forLoop = list->curr.controlFlow->forLoop;
+            if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
+              checkLocalVarDec(*forLoop.initialize.varDec, locals);
+            } else if (forLoop.initialize.type == StatementType::EXPRESSION) {
+              checkExpression(*forLoop.initialize.expression);
+            } else {
+              exit(1);
+            }
+            ResultingType res = checkExpression(forLoop.condition);
+            if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NOTHING && !canBeConvertedToBool(*res.type)) {
+              errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &forLoop.condition);
+            }
+            checkExpression(forLoop.iteration);
+            checkScope(forLoop.body, locals, returnType, false, isLoop, isSwitch);
+            if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
+              lookUp.erase(locals.back());
+              locals.pop_back();
+            }
             break;
           }
           case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
+            auto & cond = list->curr.controlFlow->conditional;
+            {
+              ResultingType res = checkExpression(cond.ifStatement.condition);
+              if (res.type->token.type != TokenType::BAD_VALUE && 
+              !canBeConvertedToBool(*res.type)) {
+                errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &cond.ifStatement.condition);
+              }
+            }
+            checkScope(cond.ifStatement.body, locals, returnType, false, isLoop, isSwitch);
+            for(ElifStatementList* elifList = cond.elifStatement; elifList; elifList = elifList->next) {
+              ResultingType res = checkExpression(elifList->elif.condition);
+              if (res.type->token.type != TokenType::BAD_VALUE && 
+              !canBeConvertedToBool(*res.type)) {
+                errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &cond.ifStatement.condition);
+              }
+              checkScope(elifList->elif.body, locals, returnType, false, isLoop, isSwitch);
+            }
+            if (cond.elseStatement) {
+              checkScope(*cond.elseStatement, locals, returnType, false, isLoop, isSwitch);
+            }
             break;
-
           }
           case ControlFlowStatementType::RETURN_STATEMENT: {
+            ResultingType res = checkExpression(list->curr.controlFlow->returnStatement.returnValue);
+            if (res.type->token.type == TokenType::NOTHING && returnType.token.type == TokenType::VOID) {
+              break; // ok
+            }
+            if (!checkAssignment(returnType, *res.type)) {
+              errors.emplace_back(CheckerErrorType::INCORRECT_RETURN_TYPE, &list->curr.controlFlow->returnStatement.returnValue);
+            }
             break;
-
           }
           case ControlFlowStatementType::SWITCH_STATEMENT: {
             break;
 
           }
           case ControlFlowStatementType::WHILE_LOOP: {
+            checkExpression(list->curr.controlFlow->whileLoop.statement.condition);
+            checkScope(list->curr.controlFlow->whileLoop.statement.body, locals, returnType, false, isLoop, isSwitch);
             break;
-
           }
           case ControlFlowStatementType::NONE: {
             break;
           }
         }
+        break;
       }
       
       case StatementType::EXPRESSION: {
-        if (checkExpression(*list->curr.expression).type->token.type == TokenType::BAD_VALUE) {
-          valid = false;
-        }
+        checkExpression(*list->curr.expression);
         break;
       }
       
@@ -449,14 +491,12 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
         if (list->curr.keyword.type == TokenType::CONTINUE) {
           if (!isLoop) {
             errors.emplace_back(CheckerErrorType::CANNOT_HAVE_CONTINUE_HERE, list->curr.keyword);
-            valid = false;
           }
           break;
         }
         else if (list->curr.keyword.type == TokenType::BREAK) {
           if (!isLoop && !isSwitch) {
             errors.emplace_back(CheckerErrorType::CANNOT_HAVE_BREAK_HERE, list->curr.keyword);
-            valid = false;
           }
           break;
         } else {
@@ -468,40 +508,18 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
       }
       
       case StatementType::SCOPE: {
-        if (!checkScope(*list->curr.scope, locals, returnType, false, isLoop, isSwitch)) {
-          valid = false;
-        }
+        checkScope(*list->curr.scope, locals, returnType, false, isLoop, isSwitch);
         break;
       }
 
       case StatementType::VARIABLE_DEC: {
-        // add local to table
-        GeneralDec*& dec = lookUp[tokenizer.extractToken(list->curr.varDec->name)];
-        if (dec) {
-          errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, list->curr.varDec->name, dec);
-          valid = false;
-          break;
+        if (!checkLocalVarDec(*list->curr.varDec, locals)) {
+          return;
         }
-        if (!checkType(list->curr.varDec->type)) {
-          valid = false;
-          break;
-        }
-        dec = memPool.makeGeneralDec();
-        dec->type = GeneralDecType::VARIABLE;
-        dec->varDec = list->curr.varDec;
-        if (dec->varDec->initialAssignment) {
-          ResultingType expressionType = checkExpression(*list->curr.varDec->initialAssignment);
-          if (expressionType.type->token.type == TokenType::BAD_VALUE) {
-            valid = false;
-          }
-          else {
-            ResultingType varType {&list->curr.varDec->type, true};
-            if (!checkAssignment(varType, expressionType)) {
-              errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN, list->curr.varDec->initialAssignment);
-              valid = false;
-            }
-          }
-        }
+        break;
+      }
+
+      case StatementType::NOTHING: {
         break;
       }
       
@@ -516,10 +534,38 @@ bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
     lookUp.erase(locals.back());
     locals.pop_back();
   }
-  if (isReturnRequired && !wasReturned) {
+  if (!wasReturned && isReturnRequired) {
+    errors.emplace_back(CheckerErrorType::NONE, memPool.makeTokenList()->token);
+  }
+  // need to check that a value was returned in all code paths
+}
+
+bool Checker::checkLocalVarDec(VariableDec& varDec, std::vector<std::string>& locals) {
+  // add local to table
+  locals.emplace_back(tokenizer.extractToken(varDec.name));
+  GeneralDec*& dec = lookUp[locals.back()];
+  if (dec) {
+    errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, varDec.name, dec);
     return false;
   }
-  return valid;
+  if (!checkType(varDec.type)) {
+    return false;
+  }
+  dec = memPool.makeGeneralDec();
+  dec->type = GeneralDecType::VARIABLE;
+  dec->varDec = &varDec;
+  if (dec->varDec->initialAssignment) {
+    ResultingType expressionType = checkExpression(*varDec.initialAssignment);
+    if (expressionType.type->token.type == TokenType::BAD_VALUE) {
+      return false;
+    }
+    ResultingType varType {&varDec.type, true};
+    if (!checkAssignment(*varType.type, *expressionType.type)) {
+      errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN, varDec.initialAssignment);
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -593,10 +639,13 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
 
       ResultingType rightSide = checkExpression(expression.binOp->rightSide);
       if (isAssignment(expression.binOp->op.type)) {
+        if (leftSide.type->token.type == TokenType::BAD_VALUE || rightSide.type->token.type == TokenType::BAD_VALUE) {
+          return {&badValue, false};
+        }
         if (!leftSide.isLValue) {
           errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN_TO_TEMPORARY, &expression.binOp->leftSide);
         }
-        else if (!checkAssignment(leftSide, rightSide)) {
+        else if (!checkAssignment(*leftSide.type, *rightSide.type)) {
           errors.emplace_back(CheckerErrorType::CANNOT_ASSIGN, &expression);
         }
         return {leftSide.type, true};
@@ -753,9 +802,13 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
               errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, expression.funcCall->name, decPtr);
             }
           }
-          else if (!(paramList->curr.varDec->type == *resultingType.type)) {
+          else if (argList->curr.type == ExpressionType::NONE) {
+            argList = nullptr;
+            break;
+          }
+          else if (!checkAssignment(paramList->curr.varDec->type, *resultingType.type)) {
             // types dont match
-            errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, expression.funcCall->name, decPtr);
+            errors.emplace_back(CheckerErrorType::TYPE_DOES_NOT_MATCH, &argList->curr, decPtr);
           }
         }
         // type matches
@@ -784,7 +837,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
     }
 
     case ExpressionType::NONE: {
-      return {&voidValue, false};
+      return {&noneValue, false};
     }
     
     default: {
@@ -800,7 +853,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
  * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
  *  check if the emplaced error is 'void' and remove it if called for a function return type
 */
-bool Checker::checkType(const TokenList& type) {
+bool Checker::checkType(TokenList& type) {
   /**
    * Used to track the type info. 0 means we can have a ref, 0-2 means pointer, and 3 means an actual type was found
    * Can go forward, but cant go back. 
@@ -825,7 +878,7 @@ bool Checker::checkType(const TokenList& type) {
   uint8_t typeType = 0;
 
   CheckerErrorType errorType = CheckerErrorType::NONE;
-  const TokenList *list = &type;
+  TokenList *list = &type;
   do {
     if (isBuiltInType(list->token.type)) {
       const TokenType tokenType = list->token.type;
@@ -871,7 +924,14 @@ bool Checker::checkType(const TokenList& type) {
         errors.emplace_back(CheckerErrorType::EXPECTING_TYPE, list->token, typeDec);
         return false;
       }
-      typeType = 3;
+      if (list->next) {
+        errorType = CheckerErrorType::CANNOT_HAVE_MULTI_TYPE;
+        break;
+      }
+      list->next = memPool.makeTokenList();
+      list->next->token.type = TokenType::DEC_PTR;
+      list->next->next = (TokenList *)&typeDec;
+      return true;
     }
     list = list->next;
   } while (list);
@@ -902,28 +962,31 @@ ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& ex
   return checkExpression(expression.binOp->rightSide, &structMap);
 }
 
-bool checkAssignment(const ResultingType& leftSide, const ResultingType& rightSide) {
-  if (leftSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::IDENTIFIER
-    || leftSide.type->token.type == TokenType::VOID || rightSide.type->token.type == TokenType::VOID
-    || leftSide.type->token.type == TokenType::BAD_VALUE || rightSide.type->token.type == TokenType::BAD_VALUE) {
+bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
+  if (leftSide.token.type == TokenType::IDENTIFIER || rightSide.token.type == TokenType::IDENTIFIER
+    || leftSide.token.type == TokenType::VOID || rightSide.token.type == TokenType::VOID
+    || leftSide.token.type == TokenType::BAD_VALUE || rightSide.token.type == TokenType::BAD_VALUE) {
     return false;
   }
-  if (leftSide.type->token.type == TokenType::POINTER) {
-    if (rightSide.type->token.type != TokenType::POINTER) {
-      return true;
+  if (leftSide.token.type == TokenType::POINTER) {
+    if (rightSide.token.type != TokenType::POINTER) {
+      return rightSide.token.type == TokenType::NULL_PTR;
     }
-    const TokenList* rType = rightSide.type;
-    const TokenList* lType = leftSide.type;
-    while (rType && lType) {
+    const TokenList* rType = &rightSide;
+    const TokenList* lType = &leftSide;
+    do {
       if (rType->token.type != lType->token.type) {
-        if (rType->token.type == TokenType::VOID) {
+        if (rType->token.type == TokenType::VOID || lType->token.type == TokenType::VOID) {
           return true;
         }
         return false;
       }
+      if (rType->token.type == TokenType::DEC_PTR) {
+        return rType->next == lType->next;
+      }
       rType = rType->next;
       lType = lType->next;
-    }
+    } while (rType && lType);
   }
   return true;
 }
