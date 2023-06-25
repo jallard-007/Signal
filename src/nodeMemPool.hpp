@@ -29,6 +29,7 @@ class NodeMemPool {
   MemPool<WhileLoop> whileLoops;
   MemPool<SwitchStatement> switchStatements;
   MemPool<SwitchScopeStatementList> switchScopeStatementLists;
+  MemPool<TemplateCreation> templateCreations;
 
 public:
   void reset() {
@@ -57,6 +58,7 @@ public:
     whileLoops.reset();
     switchStatements.reset();
     switchScopeStatementLists.reset();
+    templateCreations.reset();
   }
 
   UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
@@ -84,8 +86,7 @@ public:
   WhileLoop* makeWhileLoop() {return whileLoops.get();}
   SwitchStatement* makeSwitchStatement() {return switchStatements.get();}
   SwitchScopeStatementList* makeSwitchScopeStatementList() {return switchScopeStatementLists.get();}
-
-
+  TemplateCreation* makeTemplateCreation() {return templateCreations.get();}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
@@ -112,4 +113,5 @@ public:
   void release(WhileLoop* ptr) { whileLoops.release(ptr);}
   void release(SwitchStatement* ptr) { switchStatements.release(ptr);}
   void release(SwitchScopeStatementList* ptr) { switchScopeStatementLists.release(ptr);}
+  void release(TemplateCreation* ptr) { templateCreations.release(ptr);}
 };

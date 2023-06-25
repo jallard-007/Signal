@@ -287,11 +287,15 @@ void Checker::secondTopLevelScan() {
         // check that the number of types match and that the types exist
         TokenList *tempList = &dec->tempDec->templateTypes, *createList = &list->curr.tempCreate->templateTypes;
         for (;tempList && createList; tempList = tempList->next, createList = createList->next) {
-          GeneralDec *templateType = lookUp[tokenizer.extractToken(createList->token)];
-          if (!templateType) {
-            errors.emplace_back(CheckerErrorType::NO_SUCH_TYPE, createList->token);
-            list->curr.isValid = false;
-            break;
+          if (createList->token.type == TokenType::IDENTIFIER) {
+            GeneralDec *templateType = lookUp[tokenizer.extractToken(createList->token)];
+            if (!templateType) {
+              errors.emplace_back(CheckerErrorType::NO_SUCH_TYPE, createList->token);
+              list->curr.isValid = false;
+              tempList = nullptr;
+              createList = nullptr;
+              break;
+            }
           }
         }
         if (tempList || createList) {
@@ -306,7 +310,6 @@ void Checker::secondTopLevelScan() {
         break;
         // have to deep copy the template declaration, replace all occurrences of templated types with the actual
       }
-
       default: break;
     }
 

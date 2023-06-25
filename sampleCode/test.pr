@@ -13,6 +13,14 @@ i : int64 ;
     }
 }
 
+template [T] func sampleTemplate(): T {
+ thing: T;
+ return thing;
+}
+
+
+create sampleTemplate [int] as ksldmnfmsd;
+
 func reverseList(head: ListNode ptr): ListNode ptr {
   prev: ListNode ptr = nullptr;
   curr: ListNode ptr = head;

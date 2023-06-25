@@ -132,6 +132,62 @@ bool Parser::parse() {
         return false;
       }
     }
+    else if (token.type == TokenType::CREATE) {
+      tokenizer.consumePeek();
+      list->curr.type = GeneralDecType::TEMPLATE_CREATE;
+      list->curr.tempCreate = memPool.makeTemplateCreation();
+      token = tokenizer.tokenizeNext();
+      if (token.type != TokenType::IDENTIFIER) {
+        expected.emplace_back(ExpectedType::TOKEN, token, TokenType::IDENTIFIER);
+        return false;
+      }
+      list->curr.tempCreate->templateName = token;
+      if (tokenizer.tokenizeNext().type != TokenType::OPEN_BRACKET) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACKET);
+        return false;
+      }
+      token = tokenizer.tokenizeNext();
+      if (token.type != TokenType::IDENTIFIER && !isBuiltInType(token.type)) {
+        expected.emplace_back(ExpectedType::TOKEN, token, TokenType::TYPE);
+        return false;
+      }
+      list->curr.tempCreate->templateTypes.token = token;
+      TokenList *tkprev = &list->curr.tempCreate->templateTypes;
+      tkprev->next = memPool.makeTokenList();
+      TokenList *tkList = tkprev->next;
+      while (tokenizer.peekNext().type == TokenType::COMMA) {
+        tokenizer.consumePeek();
+        token = tokenizer.tokenizeNext();
+        if (token.type != TokenType::IDENTIFIER && !isBuiltInType(token.type)) {
+          expected.emplace_back(ExpectedType::TOKEN, token, TokenType::TYPE);
+          return false;
+        }
+        tkprev = tkList;
+        tkList->token = token;
+        tkList->next = memPool.makeTokenList();
+        tkList = tkList->next;
+      }
+      tkprev->next = nullptr;
+      memPool.release(tkList);
+      if (tokenizer.tokenizeNext().type != TokenType::CLOSE_BRACKET) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACKET);
+        return false;
+      }
+      if (tokenizer.tokenizeNext().type != TokenType::AS) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::AS);
+        return false;
+      }
+      token = tokenizer.tokenizeNext();
+      if (token.type != TokenType::IDENTIFIER) {
+        expected.emplace_back(ExpectedType::TOKEN, token, TokenType::IDENTIFIER);
+        return false;
+      }
+      list->curr.tempCreate->typeName = token;
+      if (tokenizer.tokenizeNext().type != TokenType::SEMICOLON) {
+        expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON);
+        return false;
+      }
+    }
     else {
       unexpected.emplace_back(token);
       return false;

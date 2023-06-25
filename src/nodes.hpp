@@ -386,7 +386,8 @@ struct TemplateCreation {
   TemplateDec *templateDec{nullptr};
   TokenList templateTypes{};
   Token typeName;
-  TemplateCreation() = delete;
+  TemplateCreation() = default;
+  TemplateCreation(const TemplateCreation&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
 };
