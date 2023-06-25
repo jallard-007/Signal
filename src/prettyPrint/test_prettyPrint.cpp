@@ -50,6 +50,14 @@ R"(func getType(type: Type ref): Token {
   }
   else {
   }
+  switch x {
+    case 2
+    case 3
+    case 4 {
+    }
+    default {
+    }
+  }
 }
 )";
   Tokenizer tokenizer{"./src/prettyPrint/test_prettyPrint.cpp",  str};

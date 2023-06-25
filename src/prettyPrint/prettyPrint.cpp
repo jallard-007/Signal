@@ -334,14 +334,25 @@ void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t inde
 }
 
 void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
-  if (isCaseStatement) {
-    str += typeToString.at(TokenType::CASE);
-    caseStatement.condition.prettyPrint(tk, str);
-    caseStatement.body.prettyPrint(tk, str, indentation);
-  } else {
-    str += typeToString.at(TokenType::DEFAULT);
-    defaultStatement.prettyPrint(tk, str, indentation);
+  str += "{\n";
+  indentation += indentationSize;
+  for (SwitchScopeStatementList *list = this; list; list = list->next) {
+    str += std::string(indentation, ' ');
+    if (list->caseExpression) {
+      str += typeToString.at(TokenType::CASE);
+      list->caseExpression->prettyPrint(tk, str);
+    } else {
+      str += typeToString.at(TokenType::DEFAULT);
+    }
+    if (list->caseBody) {
+      str += ' ';
+      list->caseBody->prettyPrint(tk, str, indentation);
+    } else {
+      str += '\n';
+    }
   }
+  indentation -= indentationSize;
+  str += std::string(indentation, ' ') + "}\n";
 }
 
 void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {

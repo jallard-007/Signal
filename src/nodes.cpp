@@ -49,20 +49,6 @@ FunctionCall::FunctionCall(const Token& tk): name{tk} {}
 
 ReturnStatement::ReturnStatement(const Token& tk): token{tk} {}
 
-SwitchScopeStatementList::SwitchScopeStatementList(): caseStatement{} {}
-void SwitchScopeStatementList::operator=(const SwitchScopeStatementList& ref) {
-  isCaseStatement = ref.isCaseStatement;
-  if (isCaseStatement) {
-    caseStatement = ref.caseStatement;
-  } else {
-    defaultStatement = ref.defaultStatement;
-  }
-  next = ref.next;
-}
-SwitchScopeStatementList::SwitchScopeStatementList(const SwitchScopeStatementList& ref) {
-  operator=(ref);
-}
-
 ForLoop::ForLoop(const ForLoop &ref):  body{ref.body}, initialize{ref.initialize}, condition{ref.condition}, iteration{ref.iteration} {}
 
 ControlFlowStatement::ControlFlowStatement(): forLoop{}, type{ControlFlowStatementType::NONE} {}

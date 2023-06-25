@@ -740,3 +740,13 @@ TEST_CASE("For Loop", "[parser]") {
   CHECK(parser.expected.empty());
   CHECK(parser.unexpected.empty());
 }
+
+TEST_CASE("Switch Statement", "[parser]") {
+  const std::string str = "switch x { case 3 case 4 {} default {} } ";
+  Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+  Parser parser{tokenizer, memPool};
+  Statement statement;
+  parser.parseStatement(statement);
+  CHECK(parser.expected.empty());
+  CHECK(parser.unexpected.empty());
+}

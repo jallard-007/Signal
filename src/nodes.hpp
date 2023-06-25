@@ -234,15 +234,10 @@ struct ReturnStatement {
 };
 
 struct SwitchScopeStatementList {
-  union {
-    IfStatement caseStatement;
-    Scope defaultStatement;
-  };
+  Expression *caseExpression{nullptr};
+  Scope *caseBody{nullptr};
   SwitchScopeStatementList *next{nullptr};
-  bool isCaseStatement{true};
-  SwitchScopeStatementList();
-  SwitchScopeStatementList(const SwitchScopeStatementList&);
-  void operator=(const SwitchScopeStatementList&);
+  SwitchScopeStatementList() = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   SwitchScopeStatementList deepCopy(NodeMemPool&);
 };

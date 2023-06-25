@@ -67,6 +67,7 @@ struct Parser {
   bool parseTemplate(TemplateDec&);
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
+  ParseStatementErrorType parseExpressionBeforeScope(Expression&);
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);

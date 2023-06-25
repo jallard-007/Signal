@@ -339,6 +339,7 @@ bool Parser::parseTemplate(TemplateDec& dec) {
 /**
  * parses a scope. the first open brace should be consumed before calling this function
  * consumes the final close brace, unless there was an error
+ * \returns one of ParseStatementErrorType::REPORTED and ParseStatementErrorType::NONE
 */
 ParseStatementErrorType Parser::parseScope(StatementList& statementList) {
   StatementList* prev = nullptr;
@@ -370,12 +371,11 @@ ParseStatementErrorType Parser::parseScope(StatementList& statementList) {
 /**
  * parses a single statement within a scope
  * consumes the whole statement, unless there was an error
+ * \returns one of ParseStatementErrorType::REPORTED and ParseStatementErrorType::NONE
 */
 ParseStatementErrorType Parser::parseStatement(Statement &statement) {
   Token token = tokenizer.peekNext();
-
-  // varDec or expression
-  if (token.type == TokenType::IDENTIFIER) {
+  if (token.type == TokenType::IDENTIFIER) { // varDec or expression
     tokenizer.consumePeek();
     if (parseIdentifierStatement(statement, token) != ParseStatementErrorType::NONE) {
       return ParseStatementErrorType::REPORTED;
@@ -387,8 +387,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     tokenizer.consumePeek();
     return ParseStatementErrorType::NONE;
   }
-
-  // control flow
   else if (isControlFlow(token.type)) {
     statement.type = StatementType::CONTROL_FLOW;
     statement.controlFlow = memPool.makeControlFlowStatement();
@@ -401,7 +399,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         return ParseStatementErrorType::REPORTED;
       }
 
-      // elifs
       ElifStatementList **curr = &cond.elifStatement;
       while (tokenizer.peekNext().type == TokenType::ELIF) {
         tokenizer.consumePeek();
@@ -422,14 +419,11 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
 
         cond.elseStatement = memPool.makeScope();
         ParseStatementErrorType errorType = parseScope(cond.elseStatement->scopeStatements);
-        // DUP CODE. parsing scope
         if (errorType != ParseStatementErrorType::NONE) {
           return ParseStatementErrorType::REPORTED;
         }
-        // END DUP
       }
     }
-  
     else if (token.type == TokenType::WHILE) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::WHILE_LOOP;
@@ -438,16 +432,16 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         return ParseStatementErrorType::REPORTED;
       }
     }
-    
     else if (token.type == TokenType::RETURN) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::RETURN_STATEMENT;
       statement.controlFlow->returnStatement = memPool.makeReturnStatement();
+      auto& returnValue = statement.controlFlow->returnStatement->returnValue;
       if (tokenizer.peekNext().type == TokenType::OPEN_BRACKET) {
         tokenizer.consumePeek();
-        statement.controlFlow->returnStatement->returnValue.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
-        statement.controlFlow->returnStatement->returnValue.arrayOrStruct = memPool.makeArrayOrStruct();
-        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*statement.controlFlow->returnStatement->returnValue.arrayOrStruct);
+        returnValue.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
+        returnValue.arrayOrStruct = memPool.makeArrayOrStruct();
+        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*returnValue.arrayOrStruct);
         if (tokenizer.peekNext().type != TokenType::CLOSE_BRACKET) {
           expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET);
           return ParseStatementErrorType::REPORTED;
@@ -458,7 +452,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         }
       }
       else if (tokenizer.peeked.type != TokenType::SEMICOLON) {
-        ParseExpressionErrorType errorType = parseExpression(statement.controlFlow->returnStatement->returnValue);
+        ParseExpressionErrorType errorType = parseExpression(returnValue);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
             expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
@@ -474,8 +468,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       }
       tokenizer.consumePeek();
     }
-    
-    // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
     else if (token.type == TokenType::FOR) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::FOR_LOOP;
@@ -573,10 +565,60 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         return ParseStatementErrorType::REPORTED;
       }
     }
+    else if (token.type == TokenType::SWITCH) {
+      tokenizer.consumePeek();
+      statement.controlFlow->type = ControlFlowStatementType::SWITCH_STATEMENT;
+      auto& switchStatement = statement.controlFlow->switchStatement;
+      switchStatement = memPool.makeSwitchStatement();
+      if (parseExpressionBeforeScope(switchStatement->switched) != ParseStatementErrorType::NONE) {
+        return ParseStatementErrorType::REPORTED;
+      }
+      for (SwitchScopeStatementList *list = &switchStatement->body, *prev = nullptr;; list = list->next) {
+        Token next = tokenizer.peekNext();
+        if (next.type == TokenType::CASE) {
+          tokenizer.consumePeek();
+          list->caseExpression = memPool.makeExpression();
+          if (parseExpressionBeforeScope(*list->caseExpression) != ParseStatementErrorType::NONE) {
+            if (expected.back().expectedType != ExpectedType::TOKEN && expected.back().expectedTokenType != TokenType::OPEN_BRACE) {
+              return ParseStatementErrorType::REPORTED;
+            }
+            expected.pop_back();
+          } else {
+            list->caseBody = memPool.makeScope();
+            parseScope(list->caseBody->scopeStatements);
+          }
+        }
+        else if (next.type == TokenType::DEFAULT) {
+          tokenizer.consumePeek();
+          if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
+            expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::CLOSE_BRACE);
+            return ParseStatementErrorType::REPORTED;
+          }
+          // consume open brace
+          tokenizer.consumePeek();
+          list->caseBody = memPool.makeScope();
+          if (parseScope(list->caseBody->scopeStatements) != ParseStatementErrorType::NONE) {
+            return ParseStatementErrorType::REPORTED;
+          }
+        }
+        else if (next.type == TokenType::CLOSE_BRACE) {
+          if (prev) {
+            prev->next = nullptr;
+            memPool.release(list);
+          }
+          tokenizer.consumePeek();
+          break;
+        }
+        else {
+          unexpected.emplace_back(next);
+          return ParseStatementErrorType::REPORTED;
+        }
+        prev = list;
+        list->next = memPool.makeSwitchScopeStatementList();
+      }
+    }
   }
-
-  // scope
-  else if (token.type == TokenType::OPEN_BRACE) {
+  else if (token.type == TokenType::OPEN_BRACE) { // scope
     tokenizer.consumePeek();
     statement.type = StatementType::SCOPE;
     statement.scope = memPool.makeScope();
@@ -585,7 +627,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       return ParseStatementErrorType::REPORTED;
     }
   }
-
   else if (token.type == TokenType::BREAK || token.type == TokenType::CONTINUE) {
     tokenizer.consumePeek();
     statement.type = StatementType::KEYWORD;
@@ -596,14 +637,11 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     }
     tokenizer.consumePeek();
   }
-  // unexpected token
-  else if (notFirstOfExpression(token.type)) {
+  else if (notFirstOfExpression(token.type)) { // unexpected token
     unexpected.emplace_back(token);
     return ParseStatementErrorType::REPORTED;
   }
-
-  // expression
-  else {
+  else { // expression
     statement.type = StatementType::EXPRESSION;
     statement.expression = memPool.makeExpression();
     ParseExpressionErrorType errorType = parseExpression(*statement.expression);
@@ -628,6 +666,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
 
 /**
  * consume the colon after the variable name before calling this function
+ * \returns one of ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION, ParseStatementErrorType::REPORTED, and ParseStatementErrorType::NONE
 */
 ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
   ParseTypeErrorType typeErrorType = getType(varDec.type);
@@ -704,30 +743,32 @@ ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, T
  * \note this include if, elif, and while statements
 */
 ParseStatementErrorType Parser::parseIfStatement(IfStatement& condStatement) {
-  {
-    ParseExpressionErrorType errorType = parseExpression(condStatement.condition);
-    if (errorType != ParseExpressionErrorType::NONE) {
-      if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-        expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::OPERATOR);
-      } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-        expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
-      }
-      return ParseStatementErrorType::REPORTED;
-    }
-    if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
-      expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACE);
-      return ParseStatementErrorType::REPORTED;
-    }
-    // consume open brace
-    tokenizer.consumePeek();
+  if (parseExpressionBeforeScope(condStatement.condition) != ParseStatementErrorType::NONE) {
+    return ParseStatementErrorType::REPORTED;
   }
-  
   ParseStatementErrorType errorType = parseScope(condStatement.body.scopeStatements);
-  // DUP CODE. parsing scope
   if (errorType != ParseStatementErrorType::NONE) {
     return ParseStatementErrorType::REPORTED;
   }
-  // END DUP
+  return ParseStatementErrorType::NONE;
+}
+
+ParseStatementErrorType Parser::parseExpressionBeforeScope(Expression& expression) {
+  ParseExpressionErrorType errorType = parseExpression(expression);
+  if (errorType != ParseExpressionErrorType::NONE) {
+    if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+      expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::OPERATOR);
+    } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+      expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
+    }
+    return ParseStatementErrorType::REPORTED;
+  }
+  if (tokenizer.peekNext().type != TokenType::OPEN_BRACE) {
+    expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_BRACE);
+    return ParseStatementErrorType::REPORTED;
+  }
+  // consume open brace
+  tokenizer.consumePeek();
   return ParseStatementErrorType::NONE;
 }
 
