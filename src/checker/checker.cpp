@@ -86,6 +86,8 @@ std::string CheckerError::getErrorMessage(Tokenizer& tk, const std::string& file
     case CheckerErrorType::WRONG_NUMBER_OF_ARGS: message += "Incorrect number of arguments\n"; break;
     case CheckerErrorType::CANNOT_ASSIGN: message += "Cannot assign\n"; break;
     case CheckerErrorType::INCORRECT_RETURN_TYPE: message += "Incorrect return type\n"; break;
+    case CheckerErrorType::NOT_ALL_CODE_PATHS_RETURN: message += "Not all code paths return a value\n"; break;
+    case CheckerErrorType::EMPTY_STRUCT: message += "Empty struct\n"; break;
     default: message += "Error of some kind, sorry bro\n"; break;
   }
   if (dec) {
@@ -152,25 +154,28 @@ void Checker::firstTopLevelScan() {
         } else {
           decPtr = &list->curr;
           auto& structDecLookUp = structsLookUp[structName];
+          if (list->curr.structDec->decs.type == StructDecType::NONE) {
+            errors.emplace_back(CheckerErrorType::EMPTY_STRUCT, list->curr.structDec->name);
+            break;
+          }
           for (StructDecList* inner = &list->curr.structDec->decs; inner; inner = inner->next) {
             StructDecList** innerStructDecPtr;
             Token tk;
             if (inner->type == StructDecType::VAR) {
-              tk = inner->varDec.name;
-              innerStructDecPtr = &structDecLookUp[tokenizer.extractToken(inner->varDec.name)];
+              tk = inner->varDec->name;
+              innerStructDecPtr = &structDecLookUp[tokenizer.extractToken(inner->varDec->name)];
             } else {
-              // inner->type == StructDecType::FUNC
-              tk = inner->funcDec.name;
-              innerStructDecPtr = &structDecLookUp[tokenizer.extractToken(inner->funcDec.name)];
+              tk = inner->funcDec->name;
+              innerStructDecPtr = &structDecLookUp[tokenizer.extractToken(inner->funcDec->name)];
             }
             if (*innerStructDecPtr) {
               GeneralDec *errorDec = memPool.makeGeneralDec();
               if ((*innerStructDecPtr)->type == StructDecType::FUNC) {
                 errorDec->type = GeneralDecType::FUNCTION;
-                errorDec->funcDec = &(*innerStructDecPtr)->funcDec;
+                errorDec->funcDec = (*innerStructDecPtr)->funcDec;
               } else {
                 errorDec->type = GeneralDecType::VARIABLE;
-                errorDec->varDec = &(*innerStructDecPtr)->varDec;
+                errorDec->varDec = (*innerStructDecPtr)->varDec;
               }
               errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, tk, errorDec);
             } else {
@@ -345,17 +350,19 @@ bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
 }
 
 bool Checker::validateStructTopLevel(StructDecList& innerDecs) {
+  if (innerDecs.type == StructDecType::NONE) {
+    return false;
+  }
   bool isValid = true;
   for (StructDecList *inner = &innerDecs; inner; inner = inner->next) {
     if (inner->type == StructDecType::VAR) {
-      inner->isValid = checkType(inner->varDec.type);
+      inner->isValid = checkType(inner->varDec->type);
       if (!inner->isValid) {
         isValid = false;
       }
     }
-    // inner.decType == DecType::FUNC
     else {
-      inner->isValid = validateFunctionHeader(inner->funcDec);
+      inner->isValid = validateFunctionHeader(*inner->funcDec);
       if (!inner->isValid) {
         isValid = false;
       }
@@ -389,7 +396,9 @@ void Checker::checkFunction(FunctionDec& funcDec) {
     }
   }
   bool requireReturn = funcDec.returnType.token.type != TokenType::VOID;
-  checkScope(funcDec.body, locals, funcDec.returnType, requireReturn, false, false);
+  if (!checkScope(funcDec.body, locals, funcDec.returnType, false, false) && requireReturn) {
+    errors.emplace_back(CheckerErrorType::NOT_ALL_CODE_PATHS_RETURN, funcDec.name);
+  }
   while (!locals.empty()) {
     // remove locals from table
     lookUp.erase(locals.back());
@@ -402,18 +411,19 @@ void Checker::checkFunction(FunctionDec& funcDec) {
  * \param locals name of all local variables allocated 
  * \param returnType the return type of the scope
  * \param isReturnRequired set to true if a return is required within this scope
+ * \returns true if all code paths return a value
 */
-void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isReturnRequired, bool isLoop, bool isSwitch) {
+bool Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenList& returnType, bool isLoop, bool isSwitch) {
   const uint32_t marker = locals.size();
   StatementList* list = &scope.scopeStatements;
-  bool wasReturned = true;
+  bool wasReturned = false;
   do {
     switch (list->curr.type) {
       case StatementType::CONTROL_FLOW: {
         switch (list->curr.controlFlow->type) {
           // ForLoop forLoop;
           case ControlFlowStatementType::FOR_LOOP: {
-            auto& forLoop = list->curr.controlFlow->forLoop;
+            auto& forLoop = *list->curr.controlFlow->forLoop;
             if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
               checkLocalVarDec(*forLoop.initialize.varDec, locals);
             } else if (forLoop.initialize.type == StatementType::EXPRESSION) {
@@ -426,7 +436,7 @@ void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
               errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &forLoop.condition);
             }
             checkExpression(forLoop.iteration);
-            checkScope(forLoop.body, locals, returnType, false, isLoop, isSwitch);
+            checkScope(forLoop.body, locals, returnType, isLoop, isSwitch);
             if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
               lookUp.erase(locals.back());
               locals.pop_back();
@@ -434,7 +444,7 @@ void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
             break;
           }
           case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
-            auto & cond = list->curr.controlFlow->conditional;
+            auto & cond = *list->curr.controlFlow->conditional;
             {
               ResultingType res = checkExpression(cond.ifStatement.condition);
               if (res.type->token.type != TokenType::BAD_VALUE && 
@@ -442,37 +452,37 @@ void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
                 errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &cond.ifStatement.condition);
               }
             }
-            checkScope(cond.ifStatement.body, locals, returnType, false, isLoop, isSwitch);
+            checkScope(cond.ifStatement.body, locals, returnType, isLoop, isSwitch);
             for(ElifStatementList* elifList = cond.elifStatement; elifList; elifList = elifList->next) {
               ResultingType res = checkExpression(elifList->elif.condition);
               if (res.type->token.type != TokenType::BAD_VALUE && 
               !canBeConvertedToBool(*res.type)) {
                 errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, &cond.ifStatement.condition);
               }
-              checkScope(elifList->elif.body, locals, returnType, false, isLoop, isSwitch);
+              checkScope(elifList->elif.body, locals, returnType, isLoop, isSwitch);
             }
             if (cond.elseStatement) {
-              checkScope(*cond.elseStatement, locals, returnType, false, isLoop, isSwitch);
+              checkScope(*cond.elseStatement, locals, returnType, isLoop, isSwitch);
             }
             break;
           }
           case ControlFlowStatementType::RETURN_STATEMENT: {
-            ResultingType res = checkExpression(list->curr.controlFlow->returnStatement.returnValue);
+            wasReturned = true;
+            ResultingType res = checkExpression(list->curr.controlFlow->returnStatement->returnValue);
             if (res.type->token.type == TokenType::NOTHING && returnType.token.type == TokenType::VOID) {
               break; // ok
             }
             if (!checkAssignment(returnType, *res.type)) {
-              errors.emplace_back(CheckerErrorType::INCORRECT_RETURN_TYPE, &list->curr.controlFlow->returnStatement.returnValue);
+              errors.emplace_back(CheckerErrorType::INCORRECT_RETURN_TYPE, &list->curr.controlFlow->returnStatement->returnValue);
             }
             break;
           }
           case ControlFlowStatementType::SWITCH_STATEMENT: {
             break;
-
           }
           case ControlFlowStatementType::WHILE_LOOP: {
-            checkExpression(list->curr.controlFlow->whileLoop.statement.condition);
-            checkScope(list->curr.controlFlow->whileLoop.statement.body, locals, returnType, false, isLoop, isSwitch);
+            checkExpression(list->curr.controlFlow->whileLoop->statement.condition);
+            checkScope(list->curr.controlFlow->whileLoop->statement.body, locals, returnType, isLoop, isSwitch);
             break;
           }
           case ControlFlowStatementType::NONE: {
@@ -508,23 +518,17 @@ void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
       }
       
       case StatementType::SCOPE: {
-        checkScope(*list->curr.scope, locals, returnType, false, isLoop, isSwitch);
+        checkScope(*list->curr.scope, locals, returnType, isLoop, isSwitch);
         break;
       }
 
       case StatementType::VARIABLE_DEC: {
-        if (!checkLocalVarDec(*list->curr.varDec, locals)) {
-          return;
-        }
+        checkLocalVarDec(*list->curr.varDec, locals);
         break;
       }
 
       case StatementType::NOTHING: {
         break;
-      }
-      
-      default: {
-        exit(1);
       }
     }
     list = list->next;
@@ -534,10 +538,7 @@ void Checker::checkScope(Scope& scope, std::vector<std::string>& locals, TokenLi
     lookUp.erase(locals.back());
     locals.pop_back();
   }
-  if (!wasReturned && isReturnRequired) {
-    errors.emplace_back(CheckerErrorType::NONE, memPool.makeTokenList()->token);
-  }
-  // need to check that a value was returned in all code paths
+  return wasReturned;
 }
 
 bool Checker::checkLocalVarDec(VariableDec& varDec, std::vector<std::string>& locals) {
@@ -725,7 +726,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
           }
           decPtr = memPool.makeGeneralDec();
           decPtr->type = GeneralDecType::VARIABLE;
-          decPtr->varDec = &structDec->varDec;
+          decPtr->varDec = structDec->varDec;
         } else {
           decPtr = lookUp[tokenizer.extractToken(expression.value)];
           if (!decPtr) {
@@ -774,7 +775,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
         }
         decPtr = memPool.makeGeneralDec();
         decPtr->type = GeneralDecType::FUNCTION;
-        decPtr->funcDec = &structDec->funcDec;
+        decPtr->funcDec = structDec->funcDec;
       }
       // normal function call
       else {

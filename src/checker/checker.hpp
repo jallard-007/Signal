@@ -19,6 +19,8 @@ enum class CheckerErrorType: uint8_t {
   EXPECTING_TYPE,
   EXPECTING_NUMBER,
   INCORRECT_RETURN_TYPE,
+  NOT_ALL_CODE_PATHS_RETURN,
+  EMPTY_STRUCT,
 
   // no such
   NO_SUCH_FUNCTION,
@@ -102,8 +104,7 @@ struct Checker {
   void checkFunction(FunctionDec&);
   bool validateFunctionHeader(FunctionDec&);
   bool validateStructTopLevel(StructDecList&);
-  
-  void checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool, bool);
+  bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool);
   bool checkLocalVarDec(VariableDec&, std::vector<std::string>&);
   ResultingType checkExpression(Expression&, std::map<std::string, StructDecList *>* structMap = nullptr);
   ResultingType checkMemberAccess(ResultingType&, Expression&);

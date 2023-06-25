@@ -206,9 +206,9 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
   for (StructDecList* list = &decs; list; list = list->next) {
     str += std::string(indentation, ' ');
     if (list->type == StructDecType::FUNC) {
-      list->funcDec.prettyPrint(tk, str, indentation);
+      list->funcDec->prettyPrint(tk, str, indentation);
     } else if (list->type == StructDecType::VAR) {
-      list->varDec.prettyPrint(tk, str);
+      list->varDec->prettyPrint(tk, str);
       str += ";\n";
     } 
   }
@@ -289,11 +289,11 @@ void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
     return;
   }
   switch (type) {
-    case ControlFlowStatementType::CONDITIONAL_STATEMENT: conditional.prettyPrint(tk, str, indentation); break;
-    case ControlFlowStatementType::FOR_LOOP: forLoop.prettyPrint(tk, str, indentation); break;
-    case ControlFlowStatementType::RETURN_STATEMENT: returnStatement.prettyPrint(tk, str); break;
-    case ControlFlowStatementType::SWITCH_STATEMENT: switchStatement.prettyPrint(tk, str, indentation); break;
-    case ControlFlowStatementType::WHILE_LOOP: whileLoop.prettyPrint(tk, str, indentation); break;
+    case ControlFlowStatementType::CONDITIONAL_STATEMENT: conditional->prettyPrint(tk, str, indentation); break;
+    case ControlFlowStatementType::FOR_LOOP: forLoop->prettyPrint(tk, str, indentation); break;
+    case ControlFlowStatementType::RETURN_STATEMENT: returnStatement->prettyPrint(tk, str); break;
+    case ControlFlowStatementType::SWITCH_STATEMENT: switchStatement->prettyPrint(tk, str, indentation); break;
+    case ControlFlowStatementType::WHILE_LOOP: whileLoop->prettyPrint(tk, str, indentation); break;
     case ControlFlowStatementType::NONE: break;
     default: str += "{not yet implemented in pretty printer}"; break;
   }
@@ -328,8 +328,20 @@ void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
 
 void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::SWITCH);
-  str += '(' + tk.extractToken(switched) + ") ";
+  switched.prettyPrint(tk, str);
+  str += ' ';
   body.prettyPrint(tk, str, indentation);
+}
+
+void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+  if (isCaseStatement) {
+    str += typeToString.at(TokenType::CASE);
+    caseStatement.condition.prettyPrint(tk, str);
+    caseStatement.body.prettyPrint(tk, str, indentation);
+  } else {
+    str += typeToString.at(TokenType::DEFAULT);
+    defaultStatement.prettyPrint(tk, str, indentation);
+  }
 }
 
 void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {

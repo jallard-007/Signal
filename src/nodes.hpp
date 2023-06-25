@@ -2,35 +2,9 @@
 
 #include "tokenizer/tokenizer.hpp"
 
+typedef class NodeMemPool NodeMemPool;
+
 bool notFirstOfExpression(TokenType);
-
-struct Unexpected {
-  Token token;
-  Unexpected() = delete;
-  explicit Unexpected(const Token&);
-  std::string getErrorMessage(Tokenizer&, const std::string&);
-};
-
-enum class ExpectedType : uint8_t {
-  NOTHING,
-  EXPRESSION,
-  TOKEN,
-  FUNCTION_OR_STRUCT_DEC,
-  OPERATOR_OR_CLOSE_BRACKET,
-  OPERATOR_OR_CLOSE_PAREN,
-  OPERATOR_OR_CLOSE_PAREN_OR_COMMA,
-  OPERATOR_OR_SEMICOLON,
-};
-
-struct Expected {
-  Token tokenWhereExpected;
-  TokenType expectedTokenType;
-  ExpectedType expectedType;
-  Expected() = delete;
-  Expected(ExpectedType, const Token&);
-  Expected(ExpectedType, const Token&, TokenType);
-  std::string getErrorMessage(Tokenizer&, const std::string&);
-};
 
 typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
@@ -65,13 +39,14 @@ struct Expression {
   Expression(const Expression&);
   void operator=(const Expression&);
   void prettyPrint(Tokenizer&, std::string&);
+  Expression deepCopy(NodeMemPool&);
 };
 
 struct ExpressionList {
   Expression curr;
   ExpressionList *next;
   ExpressionList();
-  ExpressionList(const ExpressionList&) = default;
+  ExpressionList deepCopy(NodeMemPool&);
 };
 
 typedef struct ControlFlowStatement ControlFlowStatement;
@@ -101,6 +76,8 @@ struct Statement {
   Statement(const Statement&);
   void operator=(const Statement&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  Statement deepCopy(NodeMemPool&);
+
 };
 
 // typeList: typeQualifier identifier indirectionTypeList
@@ -118,6 +95,7 @@ struct TokenList {
   void operator=(const TokenList&);
   void prettyPrint(Tokenizer&, std::string&);
   bool operator==(const TokenList&) const;
+  TokenList deepCopy(NodeMemPool&);
 };
 
 // varDec:= simpleVarDec initialization
@@ -132,6 +110,7 @@ struct VariableDec {
   VariableDec& operator=(const VariableDec&) = default;
   void prettyPrint(Tokenizer&, std::string&);
   void prettyPrintDefinition(Tokenizer&, std::string&);
+  VariableDec deepCopy(NodeMemPool&);
 };
 
 // statementList:= statement statementList | nothing
@@ -141,6 +120,7 @@ struct StatementList {
   StatementList() = default;
   StatementList(const StatementList &) = default;
   void operator=(const StatementList &);
+  StatementList deepCopy(NodeMemPool&);
 };
 
 // scope:= { statementList }
@@ -150,6 +130,7 @@ struct Scope {
   Scope(const Scope &) = default;
   void operator=(const Scope &);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  Scope deepCopy(NodeMemPool&);
 };
 
 // EXPRESSIONS
@@ -162,6 +143,7 @@ struct ArrayAccess {
   explicit ArrayAccess(const Token&);
   ArrayAccess(const ArrayAccess&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  ArrayAccess *deepCopy(NodeMemPool&);
 };
 
 // binOp:= expression binOpOperator expression
@@ -173,6 +155,7 @@ struct BinOp {
   explicit BinOp(const Token&);
   BinOp(const BinOp&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  BinOp *deepCopy(NodeMemPool&);
 };
 
 // unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
@@ -183,6 +166,7 @@ struct UnOp {
   explicit UnOp(const Token&);
   UnOp(const UnOp&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  UnOp *deepCopy(NodeMemPool&);
 };
 
 // functionCall:= identifier(expressionList)
@@ -193,6 +177,7 @@ struct FunctionCall {
   explicit FunctionCall(const Token &);
   FunctionCall(const FunctionCall&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  FunctionCall *deepCopy(NodeMemPool&);
 };
 
 // arrayOrStructLiteral:= [ expressionList ]
@@ -201,6 +186,7 @@ struct ArrayOrStructLiteral {
   ArrayOrStructLiteral() = default;
   ArrayOrStructLiteral(const ArrayOrStructLiteral&) = default;
   void prettyPrint(Tokenizer&, std::string&);
+  ArrayOrStructLiteral *deepCopy(NodeMemPool&);
 };
 
 // CONDITIONAL STATEMENTS
@@ -211,7 +197,9 @@ struct IfStatement {
   Expression condition;
   IfStatement() = default;
   IfStatement(const IfStatement&) = default;
+  IfStatement& operator=(const IfStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  IfStatement deepCopy(NodeMemPool&);
 };
 
 // elifStatementList:= elifStatement elifStatementList | nothing
@@ -220,6 +208,7 @@ struct ElifStatementList {
   ElifStatementList *next{nullptr};
   ElifStatementList() = default;
   ElifStatementList(const ElifStatementList&) = default;
+  ElifStatementList *deepCopy(NodeMemPool&);
 };
 
 // conditionalStatement:= ifStatement
@@ -231,29 +220,40 @@ struct ConditionalStatement {
   Scope *elseStatement{nullptr};
   ConditionalStatement(const ConditionalStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  ConditionalStatement *deepCopy(NodeMemPool&);
 };
 
 // returnStatement:= return expression;
 struct ReturnStatement {
   Expression returnValue{};
-  Token token;
-  ReturnStatement() = delete;
+  Token token{};
+  ReturnStatement() = default;
   explicit ReturnStatement(const Token&);
   void prettyPrint(Tokenizer&, std::string&);
+  ReturnStatement *deepCopy(NodeMemPool&);
 };
 
-struct SwitchScope {
-  int i;
+struct SwitchScopeStatementList {
+  union {
+    IfStatement caseStatement;
+    Scope defaultStatement;
+  };
+  SwitchScopeStatementList *next{nullptr};
+  bool isCaseStatement{true};
+  SwitchScopeStatementList();
+  SwitchScopeStatementList(const SwitchScopeStatementList&);
+  void operator=(const SwitchScopeStatementList&);
+  void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  SwitchScopeStatementList deepCopy(NodeMemPool&);
 };
 
 // switchStatement:=  switch (identifier) switchScope
 struct SwitchStatement {
-  Scope body{};
-  Token token;
-  Token switched{0,0,TokenType::NOTHING};
-  SwitchStatement() = delete;
-  explicit SwitchStatement(const Token&);
+  SwitchScopeStatementList body{};
+  Expression switched{};
+  SwitchStatement() = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  SwitchStatement *deepCopy(NodeMemPool&);
 };
 
 // LOOPS
@@ -264,6 +264,7 @@ struct WhileLoop {
   WhileLoop() = default;
   WhileLoop(const WhileLoop&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  WhileLoop *deepCopy(NodeMemPool&);
 };
 
 // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
@@ -275,9 +276,8 @@ struct ForLoop {
   ForLoop() = default;
   ForLoop(const ForLoop &);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  ForLoop *deepCopy(NodeMemPool&);
 };
-
-
 
 enum class ControlFlowStatementType: uint8_t {
   NONE,
@@ -291,21 +291,17 @@ enum class ControlFlowStatementType: uint8_t {
 // forLoop | whileLoop | conditionalStatement | returnStatement | switchStatement
 struct ControlFlowStatement {
   union {
-    ForLoop forLoop;
-    WhileLoop whileLoop;
-    ConditionalStatement conditional;
-    ReturnStatement returnStatement;
-    SwitchStatement switchStatement;
+    ForLoop *forLoop;
+    WhileLoop *whileLoop;
+    ConditionalStatement *conditional;
+    ReturnStatement *returnStatement;
+    SwitchStatement *switchStatement;
   };
   ControlFlowStatementType type;
   ControlFlowStatement();
-  ControlFlowStatement(const ForLoop& val);
-  ControlFlowStatement(const WhileLoop& val);
-  ControlFlowStatement(const ConditionalStatement& val);
-  ControlFlowStatement(const ReturnStatement& val);
-  ControlFlowStatement(const SwitchStatement& val);
 
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
+  ControlFlowStatement *deepCopy(NodeMemPool&);
 };
 
 // STATEMENTS
@@ -324,8 +320,8 @@ struct FunctionDec {
   void operator=(const FunctionDec&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
+  FunctionDec *deepCopy(NodeMemPool&);
 };
-
 
 enum class StructDecType: uint8_t {
   NONE,
@@ -336,15 +332,16 @@ enum class StructDecType: uint8_t {
 // structDecList:= varDec ; decList | functionDec decList | nothing
 struct StructDecList {
   union {
-    VariableDec varDec;
-    FunctionDec funcDec;
+    VariableDec *varDec;
+    FunctionDec *funcDec;
   };
   StructDecList *next{nullptr};
   StructDecType type{StructDecType::NONE};
   bool isValid{false};
   StructDecList();
   StructDecList(const StructDecList&);
-
+  void operator=(const StructDecList&);
+  StructDecList deepCopy(NodeMemPool&);
 };
 
 // structDec:= struct identifier { structDecList }
@@ -356,7 +353,7 @@ struct StructDec {
   StructDec(const StructDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
-
+  StructDec *deepCopy(NodeMemPool&);
 };
 
 // enumDec:= enum identifier { identifierList }
@@ -370,6 +367,7 @@ struct EnumDec {
 };
 
 
+typedef struct GeneralDec GeneralDec;
 
 // templateDec:= template [ identifierList ] structDec
 //                                          | functionDec
@@ -384,7 +382,7 @@ struct TemplateDec {
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
-
+  GeneralDec *deepCopy(NodeMemPool&, Token);
 };
 
 //templateCreation:= create identifier [ identifierList ] as identifier ;
@@ -396,7 +394,6 @@ struct TemplateCreation {
   TemplateCreation() = delete;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
-
 };
 
 enum class GeneralDecType: uint8_t {
@@ -424,6 +421,7 @@ struct GeneralDec {
   GeneralDec();
   void prettyPrint(Tokenizer&, std::string&);
   void prettyPrintDefinition(Tokenizer&, std::string&);
+  GeneralDec *deepCopy(NodeMemPool&);
 };
 
 // globalDecList:= globalDec globalDecList | nothing
@@ -432,6 +430,7 @@ struct GeneralDecList {
   GeneralDecList *next{nullptr};
   GeneralDecList() = default;
   void prettyPrint(Tokenizer&, std::string&);
+  GeneralDec *deepCopy(NodeMemPool&);
 };
 
 // program:= globalDecList
@@ -440,3 +439,4 @@ struct Program {
   Program() = default;
   void prettyPrint(Tokenizer&, std::string&);
 };
+

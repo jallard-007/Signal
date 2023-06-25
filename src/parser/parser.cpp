@@ -1,5 +1,34 @@
 #include "parser.hpp"
 
+Unexpected::Unexpected(const Token& tk): token{tk} {}
+std::string Unexpected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  TokenPositionInfo posInfo = tk.getTokenPositionInfo(token);
+  std::string message = file + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
+  return message + "Unexpected Token: " + tk.extractToken(token) + "\n\n";
+}
+
+Expected::Expected(ExpectedType exType, const Token& tk): tokenWhereExpected{tk}, expectedTokenType{TokenType::NOTHING}, expectedType{exType} {}
+Expected::Expected(ExpectedType exType, const Token& tk, TokenType tkType): tokenWhereExpected{tk}, expectedTokenType{tkType}, expectedType{exType} {}
+std::string Expected::getErrorMessage(Tokenizer& tk, const std::string& file) {
+  TokenPositionInfo posInfo = tk.getTokenPositionInfo(tokenWhereExpected);
+  std::string message = file + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
+  if (expectedType == ExpectedType::EXPRESSION) {
+    return message + "Expected Expression\n\n";
+  }
+  if (expectedType == ExpectedType::TOKEN) {
+    return message + "Expected Token: " + typeToString.at(expectedTokenType) + "\n\n";
+  }
+  return message + "\n\n";
+}
+
+Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
+Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
+Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
+void Expression::operator=(const Expression&ref) {
+  binOp = ref.binOp;
+  type = ref.type;
+}
+
 // TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
 uint8_t operatorPrecedence [83]{};
 __attribute__((constructor))
@@ -213,8 +242,8 @@ bool Parser::parseStruct(StructDec& dec) {
       if (tokenizer.peekNext().type == TokenType::COLON) {
         tokenizer.consumePeek();
         list->type = StructDecType::VAR;
-        list->varDec.name = token;
-        ParseStatementErrorType errorType = parseVariableDec(list->varDec);
+        list->varDec = memPool.makeVariableDec(VariableDec{token});
+        ParseStatementErrorType errorType = parseVariableDec(*list->varDec);
         if (errorType != ParseStatementErrorType::NONE) {
           if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
@@ -235,7 +264,8 @@ bool Parser::parseStruct(StructDec& dec) {
     else if (token.type == TokenType::FUNC) {
       tokenizer.consumePeek();
       list->type = StructDecType::FUNC;
-      if (!parseFunction(list->funcDec)) {
+      list->funcDec = memPool.makeFunctionDec();
+      if (!parseFunction(*list->funcDec)) {
         return false;
       }
     }
@@ -365,7 +395,8 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     if (token.type == TokenType::IF) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::CONDITIONAL_STATEMENT;
-      ConditionalStatement& cond = statement.controlFlow->conditional;
+      statement.controlFlow->conditional = memPool.makeConditionalStatement();
+      ConditionalStatement& cond = *statement.controlFlow->conditional;
       if (parseIfStatement(cond.ifStatement) == ParseStatementErrorType::REPORTED) {
         return ParseStatementErrorType::REPORTED;
       }
@@ -402,7 +433,8 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     else if (token.type == TokenType::WHILE) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::WHILE_LOOP;
-      if (parseIfStatement(statement.controlFlow->whileLoop.statement) == ParseStatementErrorType::REPORTED) {
+      statement.controlFlow->whileLoop = memPool.makeWhileLoop();
+      if (parseIfStatement(statement.controlFlow->whileLoop->statement) == ParseStatementErrorType::REPORTED) {
         return ParseStatementErrorType::REPORTED;
       }
     }
@@ -410,11 +442,12 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     else if (token.type == TokenType::RETURN) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::RETURN_STATEMENT;
+      statement.controlFlow->returnStatement = memPool.makeReturnStatement();
       if (tokenizer.peekNext().type == TokenType::OPEN_BRACKET) {
         tokenizer.consumePeek();
-        statement.controlFlow->returnStatement.returnValue.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
-        statement.controlFlow->returnStatement.returnValue.arrayOrStruct = memPool.makeArrayOrStruct();
-        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*statement.controlFlow->returnStatement.returnValue.arrayOrStruct);
+        statement.controlFlow->returnStatement->returnValue.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
+        statement.controlFlow->returnStatement->returnValue.arrayOrStruct = memPool.makeArrayOrStruct();
+        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*statement.controlFlow->returnStatement->returnValue.arrayOrStruct);
         if (tokenizer.peekNext().type != TokenType::CLOSE_BRACKET) {
           expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET);
           return ParseStatementErrorType::REPORTED;
@@ -425,7 +458,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         }
       }
       else if (tokenizer.peeked.type != TokenType::SEMICOLON) {
-        ParseExpressionErrorType errorType = parseExpression(statement.controlFlow->returnStatement.returnValue);
+        ParseExpressionErrorType errorType = parseExpression(statement.controlFlow->returnStatement->returnValue);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
             expected.emplace_back(ExpectedType::EXPRESSION, errorToken);
@@ -446,6 +479,8 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     else if (token.type == TokenType::FOR) {
       tokenizer.consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::FOR_LOOP;
+      statement.controlFlow->forLoop = memPool.makeForLoop();
+
       auto& forLoop = statement.controlFlow->forLoop;
       if (tokenizer.peekNext().type != TokenType::OPEN_PAREN) {
         expected.emplace_back(ExpectedType::TOKEN, tokenizer.peeked, TokenType::OPEN_PAREN);
@@ -459,7 +494,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       if (next.type == TokenType::IDENTIFIER) {
         // consume identifier
         tokenizer.consumePeek();
-        ParseStatementErrorType errorType = parseIdentifierStatement(forLoop.initialize, next);
+        ParseStatementErrorType errorType = parseIdentifierStatement(forLoop->initialize, next);
         if (errorType != ParseStatementErrorType::NONE) {
           if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
@@ -473,9 +508,9 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
           return ParseStatementErrorType::REPORTED;
         }
       } else if (next.type != TokenType::SEMICOLON) {
-        forLoop.initialize.type = StatementType::EXPRESSION;
-        forLoop.initialize.expression = memPool.makeExpression();
-        ParseExpressionErrorType errorType = parseExpression(*forLoop.initialize.expression);
+        forLoop->initialize.type = StatementType::EXPRESSION;
+        forLoop->initialize.expression = memPool.makeExpression();
+        ParseExpressionErrorType errorType = parseExpression(*forLoop->initialize.expression);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
@@ -493,7 +528,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
 
       // parse condition statement
       if (tokenizer.peekNext().type != TokenType::SEMICOLON) {
-        ParseExpressionErrorType errorType = parseExpression(forLoop.condition);
+        ParseExpressionErrorType errorType = parseExpression(forLoop->condition);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON);
@@ -511,7 +546,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
 
       // parse iteration statement
       if (tokenizer.peekNext().type != TokenType::CLOSE_PAREN) {
-        ParseExpressionErrorType errorType = parseExpression(forLoop.iteration);
+        ParseExpressionErrorType errorType = parseExpression(forLoop->iteration);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
             expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN);
@@ -533,7 +568,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         return ParseStatementErrorType::REPORTED;
       }
       tokenizer.consumePeek();
-      ParseStatementErrorType errorType = parseScope(forLoop.body.scopeStatements);
+      ParseStatementErrorType errorType = parseScope(forLoop->body.scopeStatements);
       if (errorType != ParseStatementErrorType::NONE) {
         return ParseStatementErrorType::REPORTED;
       }

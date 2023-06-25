@@ -3,6 +3,34 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../nodeMemPool.hpp"
 
+struct Unexpected {
+  Token token;
+  Unexpected() = delete;
+  explicit Unexpected(const Token&);
+  std::string getErrorMessage(Tokenizer&, const std::string&);
+};
+
+enum class ExpectedType : uint8_t {
+  NOTHING,
+  EXPRESSION,
+  TOKEN,
+  FUNCTION_OR_STRUCT_DEC,
+  OPERATOR_OR_CLOSE_BRACKET,
+  OPERATOR_OR_CLOSE_PAREN,
+  OPERATOR_OR_CLOSE_PAREN_OR_COMMA,
+  OPERATOR_OR_SEMICOLON,
+};
+
+struct Expected {
+  Token tokenWhereExpected;
+  TokenType expectedTokenType;
+  ExpectedType expectedType;
+  Expected() = delete;
+  Expected(ExpectedType, const Token&);
+  Expected(ExpectedType, const Token&, TokenType);
+  std::string getErrorMessage(Tokenizer&, const std::string&);
+};
+
 enum class ParseExpressionErrorType: uint8_t {
   NONE,
   REPORTED,

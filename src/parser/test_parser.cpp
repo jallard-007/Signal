@@ -691,9 +691,9 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(statement.type == StatementType::CONTROL_FLOW);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
-    CHECK(statement.controlFlow->conditional.ifStatement.condition.type == ExpressionType::VALUE);
-    CHECK(statement.controlFlow->conditional.elifStatement == nullptr);
-    CHECK(statement.controlFlow->conditional.elseStatement == nullptr);
+    CHECK(statement.controlFlow->conditional->ifStatement.condition.type == ExpressionType::VALUE);
+    CHECK(statement.controlFlow->conditional->elifStatement == nullptr);
+    CHECK(statement.controlFlow->conditional->elseStatement == nullptr);
   }
 
   {
@@ -707,8 +707,8 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(statement.type == StatementType::CONTROL_FLOW);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::RETURN_STATEMENT);
-    CHECK(statement.controlFlow->returnStatement.returnValue.type == ExpressionType::ARRAY_OR_STRUCT_LITERAL);
-    REQUIRE(statement.controlFlow->returnStatement.returnValue.arrAccess);
+    CHECK(statement.controlFlow->returnStatement->returnValue.type == ExpressionType::ARRAY_OR_STRUCT_LITERAL);
+    REQUIRE(statement.controlFlow->returnStatement->returnValue.arrAccess);
   }
 
   {
@@ -723,11 +723,11 @@ TEST_CASE("Keywords", "[parser]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     auto& forLoop = statement.controlFlow->forLoop;
-    CHECK(forLoop.initialize.type == StatementType::VARIABLE_DEC);
-    CHECK(forLoop.condition.type == ExpressionType::BINARY_OP);
-    CHECK(forLoop.iteration.type == ExpressionType::UNARY_OP);
-    CHECK(forLoop.body.scopeStatements.curr.type == StatementType::EXPRESSION);
-    CHECK(forLoop.body.scopeStatements.next == nullptr);
+    CHECK(forLoop->initialize.type == StatementType::VARIABLE_DEC);
+    CHECK(forLoop->condition.type == ExpressionType::BINARY_OP);
+    CHECK(forLoop->iteration.type == ExpressionType::UNARY_OP);
+    CHECK(forLoop->body.scopeStatements.curr.type == StatementType::EXPRESSION);
+    CHECK(forLoop->body.scopeStatements.next == nullptr);
   }
 }
 

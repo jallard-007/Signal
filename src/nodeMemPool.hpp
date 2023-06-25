@@ -23,6 +23,12 @@ class NodeMemPool {
   MemPool<FunctionDec> functionDecs;
   MemPool<StructDec> structDecs;
   MemPool<TemplateDec> templateDecs;
+  MemPool<ConditionalStatement> conditionalStatements;
+  MemPool<ReturnStatement> returnStatements;
+  MemPool<ForLoop> forLoops;
+  MemPool<WhileLoop> whileLoops;
+  MemPool<SwitchStatement> switchStatements;
+  MemPool<SwitchScopeStatementList> switchScopeStatementLists;
 
 public:
   void reset() {
@@ -45,6 +51,12 @@ public:
     functionDecs.reset();
     structDecs.reset();
     templateDecs.reset();
+    conditionalStatements.reset();
+    returnStatements.reset();
+    forLoops.reset();
+    whileLoops.reset();
+    switchStatements.reset();
+    switchScopeStatementLists.reset();
   }
 
   UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
@@ -66,6 +78,14 @@ public:
   FunctionDec* makeFunctionDec() {return functionDecs.get();}
   StructDec* makeStructDec() {return structDecs.get();}
   TemplateDec* makeTemplateDec() {return templateDecs.get();}
+  ConditionalStatement* makeConditionalStatement() {return conditionalStatements.get();}
+  ReturnStatement* makeReturnStatement() {return returnStatements.get();}
+  ForLoop* makeForLoop() {return forLoops.get();}
+  WhileLoop* makeWhileLoop() {return whileLoops.get();}
+  SwitchStatement* makeSwitchStatement() {return switchStatements.get();}
+  SwitchScopeStatementList* makeSwitchScopeStatementList() {return switchScopeStatementLists.get();}
+
+
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
@@ -86,4 +106,10 @@ public:
   void release(FunctionDec* ptr) { functionDecs.release(ptr);}
   void release(StructDec* ptr) { structDecs.release(ptr);}
   void release(TemplateDec* ptr) { templateDecs.release(ptr);}
+  void release(ConditionalStatement* ptr) { conditionalStatements.release(ptr);}
+  void release(ReturnStatement* ptr) { returnStatements.release(ptr);}
+  void release(ForLoop* ptr) {forLoops.release(ptr);}
+  void release(WhileLoop* ptr) { whileLoops.release(ptr);}
+  void release(SwitchStatement* ptr) { switchStatements.release(ptr);}
+  void release(SwitchScopeStatementList* ptr) { switchScopeStatementLists.release(ptr);}
 };
