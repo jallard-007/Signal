@@ -388,8 +388,13 @@ struct TemplateCreation {
   Token typeName;
   TemplateCreation() = default;
   TemplateCreation(const TemplateCreation&) = default;
-  void prettyPrint(Tokenizer&, std::string&, uint32_t);
-  void prettyPrintDefinition(Tokenizer&, std::string&);
+  void prettyPrint(Tokenizer&, std::string&);
+};
+
+struct IncludeDec {
+  Token file;
+  IncludeDec() = default;
+  void prettyPrint(Tokenizer&, std::string&);
 };
 
 enum class GeneralDecType: uint8_t {
@@ -400,6 +405,7 @@ enum class GeneralDecType: uint8_t {
   ENUM,
   TEMPLATE,
   TEMPLATE_CREATE,
+  INCLUDE_DEC,
 };
 
 // globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
@@ -411,12 +417,14 @@ struct GeneralDec {
     EnumDec *enumDec;
     TemplateDec *tempDec;
     TemplateCreation *tempCreate;
+    IncludeDec *includeDec;
   };
+  uint32_t tokenizerIndex{0};
   GeneralDecType type{GeneralDecType::NOTHING};
   bool isValid{true};
   GeneralDec();
-  void prettyPrint(Tokenizer&, std::string&);
-  void prettyPrintDefinition(Tokenizer&, std::string&);
+  void prettyPrint(std::vector<Tokenizer>&, std::string&);
+  void prettyPrintDefinition(std::vector<Tokenizer>&, std::string&);
   GeneralDec *deepCopy(NodeMemPool&);
 };
 
@@ -425,7 +433,7 @@ struct GeneralDecList {
   GeneralDec curr{};
   GeneralDecList *next{nullptr};
   GeneralDecList() = default;
-  void prettyPrint(Tokenizer&, std::string&);
+  void prettyPrint(std::vector<Tokenizer>&, std::string&);
   GeneralDec *deepCopy(NodeMemPool&);
 };
 
@@ -433,6 +441,6 @@ struct GeneralDecList {
 struct Program {
   GeneralDecList decs{};
   Program() = default;
-  void prettyPrint(Tokenizer&, std::string&);
+  void prettyPrint(std::vector<Tokenizer>&, std::string&);
 };
 

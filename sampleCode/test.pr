@@ -1,3 +1,4 @@
+include "test1.pr"
 
 func test(i: ListNode): ListNode ptr {
   currRegistration: ListNode ptr = @i;
@@ -18,8 +19,6 @@ template [T] func sampleTemplate(): T {
  return thing;
 }
 
-
-create sampleTemplate [int] as ksldmnfmsd;
 
 func reverseList(head: ListNode ptr): ListNode ptr {
   prev: ListNode ptr = nullptr;
@@ -68,7 +67,3 @@ func reverseKGroup(head: ListNode ptr, k: int32): ListNode ptr {
   return newHead;
 }
 
-struct ListNode {
-  val: int32;
-  next: ListNode ptr;
-}

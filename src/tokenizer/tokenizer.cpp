@@ -3,16 +3,23 @@
 
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
 
-Tokenizer::Tokenizer(const std::string& filePath, const std::string& fileContent):
-  badTokens{}, newlinePositions{}, filePath{filePath}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, error{0, 0, TokenType::NOTHING}, size{(uint32_t)fileContent.length()}
+Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
+  newlinePositions{}, filePath{std::move(filePath)}, content{std::move(fileContent)}, peeked{0, 0, TokenType::NOTHING}, size{(uint32_t)content.length()}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
   }
   newlinePositions.reserve(fileContent.size() / 40);
   newlinePositions.emplace_back(0);
-  position = 0;
-  prevType = TokenType::NOTHING;
+}
+Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
+  newlinePositions{}, filePath{std::move(filePath)}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}, size{(uint32_t)content.length()}
+{
+  if (fileContent.length() > UINT32_MAX) {
+    exit(1);
+  }
+  newlinePositions.reserve(fileContent.size() / 40);
+  newlinePositions.emplace_back(0);
 }
 
 // does binary search on the newline list to find the line number
@@ -80,6 +87,10 @@ Token Tokenizer::tokenizeNext() {
   moveToNextNonWhiteSpaceChar();
   const uint32_t tokenStartPos = position;
   char c = content[position];
+  if (c < 0) {
+    std::cerr << "Error: Non-ASCII character encountered: value = [" << (uint8_t)c << "]\n";
+    exit(1);
+  }
   TokenType type = numToType[(uint8_t)c];
   switch (type) {
     case TokenType::IDENTIFIER: {
@@ -458,14 +469,18 @@ Token Tokenizer::tokenizeNext() {
 
     case TokenType::STRING_LITERAL: {
       if (!movePastLiteral('"')) {
-        badTokens.emplace_back(position, 0, TokenType::STRING_LITERAL);
+        TokenPositionInfo posInfo = getTokenPositionInfo({position, 0, TokenType::STRING_LITERAL});
+        std::cerr << filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << "\nUnclosed string literal\n";
+        exit(1);
       }
       break;
     }
 
     case TokenType::CHAR_LITERAL: {
       if (!movePastLiteral('\'')) {
-        badTokens.emplace_back(position, 0, TokenType::CHAR_LITERAL);
+        TokenPositionInfo posInfo = getTokenPositionInfo({position, 0, TokenType::CHAR_LITERAL});
+        std::cerr << filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << "\nUnclosed character literal\n";
+        exit(1);
       }
       // TODO: validate content of character. escaped characters :(
       // maybe do this during type checking?
@@ -703,7 +718,7 @@ bool Tokenizer::movePastLiteral(char delimiter) {
   for (++position; position < size; ++position) {
     const char c = content[position];
     if (c == '\n') {
-      ++position;
+      newlinePositions.emplace_back(++position);
       return false;
     }
     if (c == delimiter && !(prev == '\\' && prevPrev != '\\')) {
@@ -719,8 +734,7 @@ bool Tokenizer::movePastLiteral(char delimiter) {
 void Tokenizer::movePastNewLine() {
   for (; position < size; ++position) {
     if (content[position] == '\n') {
-      newlinePositions.emplace_back(position);
-      ++position;
+      newlinePositions.emplace_back(++position);
       return;
     }
   }

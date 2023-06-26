@@ -6,12 +6,13 @@ NodeMemPool mem3;
 
 TEST_CASE("scanTopLevel", "[checker]") {
   const std::string str = "func funcName(): int {other: char; }var : int;struct thing {  var : int;}";
-  Tokenizer tk{R"(./src/checker/test_checker.cpp)", str};
-  Parser pr{tk, mem3};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/checker/test_checker.cpp", str);
+  Parser pr{tks.back(), mem3};
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk, mem3};
+  Checker tc{pr.program, tks, mem3};
   tc.firstTopLevelScan();
   CHECK(tc.errors.empty());
   CHECK(tc.lookUp["funcName"]);
@@ -25,34 +26,35 @@ TEST_CASE("scanTopLevel", "[checker]") {
 
 TEST_CASE("checkType", "[checker]") {
   const std::string str = "struct other { } struct thing { var : another; } func another(): int {} ";
-  Tokenizer tk{R"(./src/checker/test_checker.cpp)", str};
-  Parser pr{tk, mem3};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/checker/test_checker.cpp", str);
+  Parser pr{tks.back(), mem3};
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk, mem3};
+  Checker tc{pr.program, tks, mem3};
   tc.firstTopLevelScan();
   {
     TokenList tokenList;
     tokenList.token.length = 5;
     tokenList.token.position = 7;
     tokenList.token.type = TokenType::IDENTIFIER;
-    CHECK(tc.checkType(tokenList));
+    CHECK(tc.checkType(tks.back(),tokenList));
     tokenList.next = nullptr;
     TokenList nextType = tokenList;
     tokenList.next = &nextType;
     tokenList.token.type = TokenType::POINTER;
-    CHECK(tc.checkType(tokenList));
+    CHECK(tc.checkType(tks.back(),tokenList));
     nextType.next = nullptr;
     TokenList nextNextType = tokenList;
     tokenList.next = &nextNextType;
     tokenList.token.type = TokenType::REFERENCE;
-    CHECK(tc.checkType(tokenList));
+    CHECK(tc.checkType(tks.back(),tokenList));
     nextType.next = nullptr;
     TokenList nextNextNextType = tokenList;
     tokenList.next = &nextNextNextType;
     tokenList.token.type = TokenType::POINTER;
-    CHECK_FALSE(tc.checkType(tokenList));
+    CHECK_FALSE(tc.checkType(tks.back(),tokenList));
   }
 
   {
@@ -60,7 +62,7 @@ TEST_CASE("checkType", "[checker]") {
     notAType.token.length = 7;
     notAType.token.position = 38;
     notAType.token.type = TokenType::IDENTIFIER;
-    CHECK_FALSE(tc.checkType(notAType));
+    CHECK_FALSE(tc.checkType(tks.back(), notAType));
   }
 }
 
@@ -91,12 +93,13 @@ struct customType {
 }
 
 )";
-  Tokenizer tk{R"(./src/checker/test_checker.cpp)", str};
-  Parser pr{tk, mem3};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/checker/test_checker.cpp", str);
+  Parser pr{tks.back(), mem3};
   pr.parse();
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk, mem3};
+  Checker tc{pr.program, tks, mem3};
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
   CHECK(tc.errors.empty());
@@ -130,12 +133,13 @@ struct customType {
 }
 
 )";
-  Tokenizer tk{R"(./src/checker/test_checker.cpp)", str};
-  Parser pr{tk, mem3};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/checker/test_checker.cpp", str);
+  Parser pr{tks.back(), mem3};
   pr.parse();
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tk, mem3};
+  Checker tc{pr.program, tks, mem3};
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
   tc.fullScan();

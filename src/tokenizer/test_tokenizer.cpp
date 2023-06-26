@@ -140,8 +140,8 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    std::vector<Token> tokens;
    {
-   const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
+   std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", std::move(str)};
    tokens.clear();
    tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 14);
@@ -155,8 +155,8 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    }
 
    {
-   const std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  str};
+   std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", std::move(str)};
    tokens.clear();
    tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 4);

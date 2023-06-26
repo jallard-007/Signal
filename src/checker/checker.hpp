@@ -59,13 +59,14 @@ enum class CheckerErrorType: uint8_t {
 struct CheckerError {
   Token token{0,0,TokenType::NOTHING};
   GeneralDec *dec;
+  uint32_t tkIndex;
   CheckerErrorType type;
   CheckerError() = delete;
-  CheckerError(CheckerErrorType, Token );
-  CheckerError(CheckerErrorType, Token , GeneralDec*);
-  CheckerError(CheckerErrorType, Expression *);
-  CheckerError(CheckerErrorType, Expression *, GeneralDec*);
-  std::string getErrorMessage(Tokenizer&, const std::string&);
+  CheckerError(CheckerErrorType, uint32_t, Token );
+  CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
+  CheckerError(CheckerErrorType, uint32_t, Expression*);
+  CheckerError(CheckerErrorType, uint32_t, Expression*, GeneralDec*);
+  std::string getErrorMessage(std::vector<Tokenizer>&);
 };
 
 struct ResultingType {
@@ -79,7 +80,7 @@ struct Checker {
   std::map<std::string, GeneralDec *> lookUp;
   std::vector<CheckerError> errors;
   Program& program;
-  Tokenizer& tokenizer;
+  std::vector<Tokenizer>& tokenizers;
   NodeMemPool &memPool;
   static TokenList noneValue;
   static TokenList badValue;
@@ -96,19 +97,19 @@ struct Checker {
   static TokenList nullptrValue;
   static TokenList voidValue;
 
-  Checker(Program&, Tokenizer&, NodeMemPool &);
+  Checker(Program&, std::vector<Tokenizer>&, NodeMemPool&);
   bool check();
   void firstTopLevelScan();
   void secondTopLevelScan();
   void fullScan();
-  void checkFunction(FunctionDec&);
-  bool validateFunctionHeader(FunctionDec&);
-  bool validateStructTopLevel(StructDecList&);
-  bool checkScope(Scope&, std::vector<std::string>&, TokenList&, bool, bool);
-  bool checkLocalVarDec(VariableDec&, std::vector<std::string>&);
-  ResultingType checkExpression(Expression&, std::map<std::string, StructDecList *>* structMap = nullptr);
-  ResultingType checkMemberAccess(ResultingType&, Expression&);
-  bool checkType(TokenList&);
+  void checkFunction(Tokenizer&, FunctionDec&);
+  bool validateFunctionHeader(Tokenizer&, FunctionDec&);
+  bool validateStructTopLevel(Tokenizer&, StructDecList&);
+  bool checkScope(Tokenizer&, Scope&, TokenList&, bool, bool);
+  bool checkLocalVarDec(Tokenizer&, VariableDec&, std::vector<std::string>&);
+  ResultingType checkExpression(Tokenizer&, Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
+  ResultingType checkMemberAccess(Tokenizer&, ResultingType&, Expression&);
+  bool checkType(Tokenizer&, TokenList&);
   TokenList& largestType(TokenList&, TokenList&);
 };
 

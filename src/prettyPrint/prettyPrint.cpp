@@ -151,10 +151,11 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
   str += std::string(indentation, ' ') + "}\n";
 }
 
-void GeneralDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string& str) {
   if (type == GeneralDecType::NOTHING) {
     return;
   }
+  Tokenizer& tk = tks[tokenizerIndex];
   switch (type) {
     case GeneralDecType::FUNCTION:
       funcDec->prettyPrintDefinition(tk, str); break;
@@ -164,14 +165,19 @@ void GeneralDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
       tempDec->prettyPrintDefinition(tk, str); break;
     case GeneralDecType::STRUCT:
       structDec->prettyPrintDefinition(tk, str); break;
+    case GeneralDecType::TEMPLATE_CREATE:
+      tempCreate->prettyPrint(tk, str); break;
+    case GeneralDecType::INCLUDE_DEC:
+      includeDec->prettyPrint(tk, str); break;
     default: break;
   }
 }
 
-void GeneralDec::prettyPrint(Tokenizer& tk, std::string& str) {
+void GeneralDec::prettyPrint(std::vector<Tokenizer>& tks, std::string& str) {
   if (type == GeneralDecType::NOTHING) {
     return;
   }
+  Tokenizer& tk = tks[tokenizerIndex];
   switch (type) {
     case GeneralDecType::FUNCTION:
       funcDec->prettyPrint(tk, str, 0); break;
@@ -187,7 +193,7 @@ void GeneralDec::prettyPrint(Tokenizer& tk, std::string& str) {
   }
 }
 
-void GeneralDecList::prettyPrint(Tokenizer& tk, std::string& str) {
+void GeneralDecList::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
   GeneralDecList*list = this;
   for (; list->next; list = list->next) {
     list->curr.prettyPrint(tk, str);
@@ -252,7 +258,7 @@ void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
   }
 }
 
-void Program::prettyPrint(Tokenizer& tk, std::string& str) {
+void Program::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
   decs.prettyPrint(tk, str);
 }
 
@@ -377,4 +383,20 @@ void ConditionalStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
     str += std::string(indentation, ' ') + typeToString.at(TokenType::ELSE);
     elseStatement->prettyPrint(tk, str, indentation);
   }
+}
+
+void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) {
+  str += typeToString.at(TokenType::INCLUDE) + ' ' + tk.extractToken(file);
+}
+
+void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
+  str += typeToString.at(TokenType::CREATE) + " [";
+  if (templateTypes.token.type != TokenType::NOTHING) {
+    str += tk.extractToken(templateTypes.token);
+    TokenList * list = templateTypes.next;
+    while (list) {
+      str += ", " + tk.extractToken(list->token);
+    }
+  }
+  str += "] " + typeToString.at(TokenType::AS) + tk.extractToken(templateName) + ";\n";
 }

@@ -12,19 +12,19 @@ struct TokenPositionInfo{
 };
 
 struct Tokenizer {
-  std::vector<Token> badTokens;
   std::vector<uint32_t> newlinePositions;
-  const std::string& filePath;
-  const std::string& content;
+  const std::string filePath;
+  const std::string content;
   Token peeked;
-  Token error;
   const uint32_t size;
-  uint32_t position;
-  TokenType prevType;
+  uint32_t position{0};
+  uint32_t tokenizerIndex{0};
+  TokenType prevType{TokenType::NOTHING};
 
   Tokenizer() = delete;
 
-  explicit Tokenizer(const std::string&, const std::string&);
+  explicit Tokenizer(std::string&&, std::string&&);
+  explicit Tokenizer(std::string&&, const std::string&);
 
   void tokenizeAll(std::vector<Token>&);
   Token tokenizeNext();

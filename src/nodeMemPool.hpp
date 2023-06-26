@@ -30,6 +30,7 @@ class NodeMemPool {
   MemPool<SwitchStatement> switchStatements;
   MemPool<SwitchScopeStatementList> switchScopeStatementLists;
   MemPool<TemplateCreation> templateCreations;
+  MemPool<IncludeDec> includeDecs;
 
 public:
   void reset() {
@@ -59,6 +60,7 @@ public:
     switchStatements.reset();
     switchScopeStatementLists.reset();
     templateCreations.reset();
+    includeDecs.reset();
   }
 
   UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
@@ -87,6 +89,7 @@ public:
   SwitchStatement* makeSwitchStatement() {return switchStatements.get();}
   SwitchScopeStatementList* makeSwitchScopeStatementList() {return switchScopeStatementLists.get();}
   TemplateCreation* makeTemplateCreation() {return templateCreations.get();}
+  IncludeDec* makeIncludeDec() {return includeDecs.get();}
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
@@ -114,4 +117,5 @@ public:
   void release(SwitchStatement* ptr) { switchStatements.release(ptr);}
   void release(SwitchScopeStatementList* ptr) { switchScopeStatementLists.release(ptr);}
   void release(TemplateCreation* ptr) { templateCreations.release(ptr);}
+  void release(IncludeDec* ptr) { includeDecs.release(ptr);}
 };

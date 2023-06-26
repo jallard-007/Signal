@@ -31,13 +31,14 @@ R"(func getType(type: Type ref): Token {
   return tp;
 }
 )";
-  Tokenizer tokenizer{"./src/prettyPrint/test_prettyPrint.cpp",  str};
-  Parser parser{tokenizer, memPool2};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
+  Parser parser{tks.back(), memPool2};
   REQUIRE(parser.parse());
   REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());
   std::string output;
-  parser.program.prettyPrint(tokenizer, output);
+  parser.program.prettyPrint(tks, output);
   CHECK(str == output);
 }
 
@@ -60,12 +61,13 @@ R"(func getType(type: Type ref): Token {
   }
 }
 )";
-  Tokenizer tokenizer{"./src/prettyPrint/test_prettyPrint.cpp",  str};
-  Parser parser{tokenizer, memPool2};
+  std::vector<Tokenizer> tks;
+  tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp",  str);
+  Parser parser{tks.back(), memPool2};
   parser.parse();
   REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());
   std::string output;
-  parser.program.prettyPrint(tokenizer, output);
+  parser.program.prettyPrint(tks, output);
   CHECK(str == output);
 }

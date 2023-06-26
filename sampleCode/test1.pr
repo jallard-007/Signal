@@ -1,0 +1,4 @@
+struct ListNode {
+  val: int32;
+  next: ListNode ptr;
+}
