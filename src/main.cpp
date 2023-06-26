@@ -96,10 +96,16 @@ int main(int argc, char **argv) {
       for (auto& directory: splittedPath) {
         if (directory == "..") {
           // move up one directory
-          currentFileDirectory.pop_back();
-        } else if (directory == ".") { 
-          // do nothing
-        } else {
+          if (currentFileDirectory.empty()) {
+            currentFileDirectory.emplace_back("..");
+          } else if (currentFileDirectory.back() == "..") {
+            currentFileDirectory.emplace_back("..");
+          } else if (currentFileDirectory.back() == ".") {
+            currentFileDirectory.back() += '.';
+          } else {
+            currentFileDirectory.pop_back();
+          }
+        } else if (directory != ".") { 
           currentFileDirectory.emplace_back(directory);
         }
       }
