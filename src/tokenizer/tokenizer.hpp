@@ -16,7 +16,6 @@ struct Tokenizer {
   const std::string filePath;
   const std::string content;
   Token peeked;
-  const uint32_t size;
   uint32_t position{0};
   uint32_t tokenizerIndex{0};
   TokenType prevType{TokenType::NOTHING};
@@ -30,13 +29,14 @@ struct Tokenizer {
   Token tokenizeNext();
   Token peekNext();
   void consumePeek();
+  std::string extractToken(const Token&);
+  TokenPositionInfo getTokenPositionInfo(const Token&);
 
+private:
   void moveToNextNonWhiteSpaceChar();
   void movePastIdentifier();
   void movePastNumber();
   void movePastHexNumber();
   bool movePastLiteral(char);
   void movePastNewLine();
-  std::string extractToken(const Token&);
-  TokenPositionInfo getTokenPositionInfo(const Token&);
 };

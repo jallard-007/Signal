@@ -3,6 +3,9 @@
 #include "nodes.hpp"
 #include "memPool.hpp"
 
+/**
+ * Memory pool for all nodes that require dynamic allocations
+*/
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps{500};

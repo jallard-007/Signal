@@ -2,10 +2,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <list>
 #include "./parser/parser.hpp"
 #include "./checker/checker.hpp"
-#include <time.h>
 
 bool openAndReadFile(const std::string& file, std::string& buffer) {
   std::ifstream t(file);
@@ -35,26 +33,39 @@ void splitFilePath(const std::string& filePath, std::vector<std::string>& split)
   split.push_back(filePath.substr(last));
 }
 
+/**
+ * General design and details:
+ * - Every parsed file has it's own Tokenizer. When an 'include' declaration is encountered, a new Tokenizer is created
+ * for the included file and swapped into the Parser object. This allows for good error message details
+ * since position and file information can easily be extracted even during the Checker phase.
+ * 
+ * - The file path is stored in the Tokenizer object. Paths are kept minimized by spliting paths
+ * and removing or adding directories only when required from 'include's
+*/
 int main(int argc, char **argv) {
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;
   }
+  // try to open the cl argument
   std::string mainFile = argv[1];
   std::cout << "Filepath: " << mainFile << '\n';
-  clock_t begin = clock();
   std::string buffer;
   if (!openAndReadFile(mainFile, buffer)) {
     return 1;
   }
+
+  // split the relative file path by directory
+  // we split by directory so that when we encounter an "include", we can easily alter the path to keep it minimal
   std::vector<std::string> currentFileDirectory;
   splitFilePath(mainFile, currentFileDirectory);
-  currentFileDirectory.pop_back();
+  currentFileDirectory.pop_back(); // pop the filename off
+
   std::vector<Tokenizer> tokenizers;
-  tokenizers.emplace_back(std::move(mainFile), std::move(buffer));
-  uint32_t tokenizerIndex = 0;
+  tokenizers.emplace_back(std::move(mainFile), std::move(buffer)); // create a tokenizer for the main file
   NodeMemPool mem;
   Parser parser{tokenizers[0], mem};
+  uint32_t tokenizerIndex = 0;
   while (true) {
     GeneralDec* dec = parser.parseNext();
     if (!dec) {
@@ -63,8 +74,7 @@ int main(int argc, char **argv) {
     }
     dec->tokenizerIndex = tokenizerIndex;
     if (dec->type == GeneralDecType::NOTHING) {
-      mem.release(dec);
-      // end of file for current tokenizer, so find next valid tokenizer, swap, and continue parsing
+      // end of file for current tokenizer. find next valid tokenizer, swap, and continue parsing
       if (tokenizerIndex == 0) {
         // no more tokenizers
         break;
@@ -72,6 +82,7 @@ int main(int argc, char **argv) {
       while (tokenizerIndex > 0) {
         if (tokenizers[--tokenizerIndex].peekNext().type != TokenType::END_OF_FILE) {
           parser.swapTokenizer(tokenizers[tokenizerIndex]);
+          currentFileDirectory.clear();
           splitFilePath(tokenizers[tokenizerIndex].filePath, currentFileDirectory);
           currentFileDirectory.pop_back();
           break;
@@ -109,8 +120,8 @@ int main(int argc, char **argv) {
           currentFileDirectory.emplace_back(directory);
         }
       }
-      const char* const delim = "/";
       // join the vector of strings into one string
+      const char* const delim = "/";
       std::ostringstream imploded;
       std::copy(currentFileDirectory.begin(), currentFileDirectory.end(), std::ostream_iterator<std::string>(imploded, delim));
       // remove the filename from the file path
@@ -149,8 +160,8 @@ int main(int argc, char **argv) {
   checker.check();
   if (!checker.errors.empty()) {
     int i = 0;
-    for (auto enx : checker.errors) {
-      std::cout << enx.getErrorMessage(tokenizers);
+    for (auto& error : checker.errors) {
+      std::cerr << error.getErrorMessage(tokenizers);
       if (++i >= 20) {
         std::cout << "max errors reached\n";
         return 1;
@@ -158,10 +169,7 @@ int main(int argc, char **argv) {
     }
     return 1;
   }
-  clock_t end = clock();
   std::cout << "No errors found\n";
-  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-  std::cout << time_spent << '\n';
   return 0;
 }
 
