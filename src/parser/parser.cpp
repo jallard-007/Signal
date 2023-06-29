@@ -23,8 +23,6 @@ std::string Expected::getErrorMessage(std::vector<Tokenizer>& tks) {
   return message + "\n\n";
 }
 
-
-
 // TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
 uint8_t operatorPrecedence [83]{};
 __attribute__((constructor))
@@ -406,7 +404,7 @@ bool Parser::parseTemplate(TemplateDec& dec) {
     dec.isStruct = false;
     return parseFunction(dec.funcDec);
   } else {
-    expected.emplace_back(ExpectedType::FUNCTION_OR_STRUCT_DEC, token, tokenizer->tokenizerIndex);
+    unexpected.emplace_back(token, tokenizer->tokenizerIndex);
     return false;
   }
 }
@@ -1031,7 +1029,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
         ParseExpressionErrorType errorType = parseExpression(*expression.wrapped);
         if (errorType != ParseExpressionErrorType::NONE) {
           if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_PAREN, errorToken, tokenizer->tokenizerIndex);
+            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
           } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
             expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
           }
@@ -1053,7 +1051,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
           ParseExpressionErrorType errorType = getExpressions(expression.funcCall->args, TokenType::CLOSE_PAREN);
           if (errorType != ParseExpressionErrorType::NONE) {
             if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-              expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_PAREN_OR_COMMA, errorToken, tokenizer->tokenizerIndex);
+              expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
             } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
               expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
             }
@@ -1076,7 +1074,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
           ParseExpressionErrorType errorType = parseExpression(expression.arrAccess->offset);
           if (errorType != ParseExpressionErrorType::NONE) {
             if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-              expected.emplace_back(ExpectedType::OPERATOR_OR_CLOSE_BRACKET, errorToken, tokenizer->tokenizerIndex);
+              expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
             } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
               expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
             }

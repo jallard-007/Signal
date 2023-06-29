@@ -332,7 +332,6 @@ struct StructDecList {
   };
   StructDecList *next{nullptr};
   StructDecType type{StructDecType::NONE};
-  bool isValid{false};
   StructDecList();
   StructDecList(const StructDecList&);
   StructDecList& operator=(const StructDecList&);
@@ -343,6 +342,8 @@ struct StructDecList {
 struct StructDec {
   StructDecList decs{};
   Token name{0,0,TokenType::NOTHING};
+  bool checked{false};
+  bool hasCycle{false};
   StructDec() = default;
   explicit StructDec(const Token&);
   StructDec(const StructDec&) = default;
@@ -421,7 +422,6 @@ struct GeneralDec {
   };
   uint32_t tokenizerIndex{0};
   GeneralDecType type{GeneralDecType::NOTHING};
-  bool isValid{true};
   GeneralDec();
   void prettyPrint(std::vector<Tokenizer>&, std::string&);
   void prettyPrintDefinition(std::vector<Tokenizer>&, std::string&);

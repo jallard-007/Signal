@@ -7,7 +7,6 @@ A compiler for my custom language
 Uses CMake as a build tool and Catch2 for testing
 
 TODO:
-- Cycle detection in structs
 - Extensive testing of Parser and Checker
 
 Potential future tasks:

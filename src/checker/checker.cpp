@@ -57,8 +57,6 @@ CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Expression *
 
 std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) {
   auto& tk = tokenizers[tkIndex];
-  std::cout << tk.extractToken(token) << '\n';
-
   TokenPositionInfo posInfo = tk.getTokenPositionInfo(token);
   std::string message = tk.filePath + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
   switch (type) {
@@ -90,6 +88,7 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) {
     case CheckerErrorType::INCORRECT_RETURN_TYPE: message += "Incorrect return type\n"; break;
     case CheckerErrorType::NOT_ALL_CODE_PATHS_RETURN: message += "Not all code paths return a value\n"; break;
     case CheckerErrorType::EMPTY_STRUCT: message += "Empty struct\n"; break;
+    case CheckerErrorType::STRUCT_CYCLE: message += "Struct cycle detected. Size of struct is not finite\n"; break;
     default: message += "Error of some kind, sorry bro\n"; break;
   }
   if (dec) {
@@ -113,6 +112,18 @@ bool Checker::check() {
     return false;
   }
   secondTopLevelScan();
+  if (!errors.empty()) {
+    return false;
+  }
+  std::vector<StructDec *> chain;
+  for (GeneralDecList *list = &program.decs; list; list = list->next) {
+    if (list->curr.type != GeneralDecType::STRUCT) {
+      continue;
+    }
+    if (!list->curr.structDec->checked) {
+      checkForStructCycles(list->curr, chain);
+    }
+  }
   if (!errors.empty()) {
     return false;
   }
@@ -230,15 +241,15 @@ void Checker::secondTopLevelScan() {
     Tokenizer& tk = tokenizers[list->curr.tokenizerIndex];
     switch (list->curr.type) {
       case GeneralDecType::FUNCTION: {
-        list->curr.isValid = validateFunctionHeader(tk, *list->curr.funcDec);
+        validateFunctionHeader(tk, *list->curr.funcDec);
         break;
       }
       case GeneralDecType::VARIABLE: {
-        list->curr.isValid = checkType(tk, list->curr.varDec->type);
+        checkType(tk, list->curr.varDec->type);
         break;
       }
       case GeneralDecType::STRUCT: {
-        list->curr.isValid = validateStructTopLevel(tk, list->curr.tempDec->structDec.decs);
+        validateStructTopLevel(tk, list->curr.tempDec->structDec);
         break;
       }
       case GeneralDecType::TEMPLATE: {
@@ -246,12 +257,13 @@ void Checker::secondTopLevelScan() {
         std::vector<std::string> templateTypes;
         TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
         // add templated types to global lookup
+        bool errorFound = false;
         do {
           templateTypes.push_back(tk.extractToken(templateIdentifiers->token));
           GeneralDec *&tempTypeDec = lookUp[templateTypes.back()];
           if (tempTypeDec) {
             errors.emplace_back(CheckerErrorType::NAME_ALREADY_IN_USE, tk.tokenizerIndex, templateIdentifiers->token, tempTypeDec);
-            list->curr.isValid = false;
+            errorFound = true;
             break;
           }
           tempTypeDec = memPool.makeGeneralDec();
@@ -259,13 +271,13 @@ void Checker::secondTopLevelScan() {
           templateIdentifiers = templateIdentifiers->next;
         } while (templateIdentifiers);
         // validate top level types
-        if (!list->curr.isValid) {
+        if (errorFound) {
           break;
         }
         if (list->curr.tempDec->isStruct) {
-          list->curr.isValid = validateStructTopLevel(tk, list->curr.tempDec->structDec.decs);
+          validateStructTopLevel(tk, list->curr.tempDec->structDec);
         } else {
-          list->curr.isValid = validateFunctionHeader(tk, list->curr.tempDec->funcDec);
+          validateFunctionHeader(tk, list->curr.tempDec->funcDec);
         }
         // remove templated types
         while (!templateTypes.empty()) {
@@ -281,11 +293,9 @@ void Checker::secondTopLevelScan() {
         GeneralDec* dec = lookUp[tk.extractToken(list->curr.tempCreate->templateName)];
         if (!dec) {
           errors.emplace_back(CheckerErrorType::NO_SUCH_TEMPLATE, tk.tokenizerIndex, list->curr.tempCreate->templateName);
-          list->curr.isValid = false;
           break;
         } else if (dec->type != GeneralDecType::TEMPLATE) {
           errors.emplace_back(CheckerErrorType::NOT_A_TEMPLATE, tk.tokenizerIndex, list->curr.tempCreate->templateName, dec);
-          list->curr.isValid = false;
           break;
         }
         // check that the number of types match and that the types exist
@@ -295,7 +305,6 @@ void Checker::secondTopLevelScan() {
             GeneralDec *templateType = lookUp[tk.extractToken(createList->token)];
             if (!templateType) {
               errors.emplace_back(CheckerErrorType::NO_SUCH_TYPE, tk.tokenizerIndex, createList->token);
-              list->curr.isValid = false;
               tempList = nullptr;
               createList = nullptr;
               break;
@@ -308,7 +317,6 @@ void Checker::secondTopLevelScan() {
           } else {
             errors.emplace_back(CheckerErrorType::WRONG_NUMBER_OF_ARGS, tk.tokenizerIndex, list->curr.tempCreate->templateTypes.token, dec);
           }
-          list->curr.isValid = false;
           break;
         }
         break;
@@ -333,7 +341,6 @@ void Checker::fullScan() {
     }
   }
 }
-
 bool Checker::validateFunctionHeader(Tokenizer& tk, FunctionDec &funcDec) {
   bool valid = true;
   // check return type
@@ -357,27 +364,51 @@ bool Checker::validateFunctionHeader(Tokenizer& tk, FunctionDec &funcDec) {
   return valid;
 }
 
-bool Checker::validateStructTopLevel(Tokenizer& tk, StructDecList& innerDecs) {
-  if (innerDecs.type == StructDecType::NONE) {
-    return false;
+void Checker::checkForStructCycles(GeneralDec &generalDec, std::vector<StructDec *>& structChain) {
+  structChain.emplace_back(generalDec.structDec);
+  // get the tokenizer for this declaration
+  Tokenizer &tk = tokenizers[generalDec.tokenizerIndex];
+  for (StructDecList *list = &generalDec.structDec->decs; list; list = list->next) {
+    if (list->type != StructDecType::VAR) {
+      continue;
+    }
+    // check for cycle
+    TokenList* tokenList = &list->varDec->type;
+    if (tokenList->token.type == TokenType::REFERENCE) {
+      tokenList = tokenList->next;
+    }
+    if (tokenList->token.type != TokenType::IDENTIFIER) {
+      continue;
+    }
+    GeneralDec *dec = lookUp[tk.extractToken(tokenList->token)];
+    if (dec->structDec->checked) {
+      continue; // dec already checked
+    }
+    for (StructDec *chainLink : structChain) {
+      if (chainLink == dec->structDec) {
+        // cycle found
+        errors.emplace_back(CheckerErrorType::STRUCT_CYCLE, generalDec.tokenizerIndex, tokenList->token, dec);
+        chainLink->hasCycle = true;
+        break;
+      }
+    }
+    if (!dec->structDec->hasCycle) {
+      checkForStructCycles(*dec, structChain);
+    }
   }
-  bool isValid = true;
-  for (StructDecList *inner = &innerDecs; inner; inner = inner->next) {
+  generalDec.structDec->checked = true;
+  structChain.pop_back();
+}
+
+void Checker::validateStructTopLevel(Tokenizer& tk, StructDec& structDec) {
+  for (StructDecList *inner = &structDec.decs; inner; inner = inner->next) {
     if (inner->type == StructDecType::VAR) {
-      inner->isValid = checkType(tk, inner->varDec->type);
-      if (!inner->isValid) {
-        isValid = false;
-      }
+      checkType(tk, inner->varDec->type);
     }
-    // if (inner->type == StructDecType::FUNC)
-    else  {
-      inner->isValid = validateFunctionHeader(tk, *inner->funcDec);
-      if (!inner->isValid) {
-        isValid = false;
-      }
+    else if (inner->type == StructDecType::FUNC) {
+      validateFunctionHeader(tk, *inner->funcDec);
     }
   }
-  return isValid;
 }
 
 /**
@@ -860,7 +891,7 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
  * Validates a type
  * \param type the type to check
  * \returns true if the type is a valid type, false otherwise (adds the error to errors)
- * \note in  tk,the case of the type being just 'void', will return false even though it is valid for function return types.
+ * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
  *  check if the emplaced error is 'void' and remove it if called for a function return type
 */
 bool Checker::checkType(Tokenizer& tk, TokenList& type) {

@@ -15,11 +15,6 @@ enum class ExpectedType : uint8_t {
   NOTHING,
   EXPRESSION,
   TOKEN,
-  FUNCTION_OR_STRUCT_DEC,
-  OPERATOR_OR_CLOSE_BRACKET,
-  OPERATOR_OR_CLOSE_PAREN,
-  OPERATOR_OR_CLOSE_PAREN_OR_COMMA,
-  OPERATOR_OR_SEMICOLON,
 };
 
 struct Expected {
@@ -43,7 +38,6 @@ enum class ParseExpressionErrorType: uint8_t {
 enum class ParseStatementErrorType: uint8_t {
   NONE,
   REPORTED,
-  NOT_STATEMENT,
   EXPRESSION_AFTER_EXPRESSION,
   NOT_EXPRESSION,
 };

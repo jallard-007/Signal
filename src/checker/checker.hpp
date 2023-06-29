@@ -11,16 +11,14 @@ enum class CheckerErrorType: uint8_t {
   NAME_ALREADY_IN_USE,
   VOID_TYPE,
   TYPE_DOES_NOT_MATCH,
-  EXPECTING_N_ARGS,
   UNEXPECTED_TYPE,
-  LOSING_PRECISION,
-  ASSIGNING_NON_PTR_TO_PTR,
   EXPECTED_IDENTIFIER,
   EXPECTING_TYPE,
   EXPECTING_NUMBER,
   INCORRECT_RETURN_TYPE,
   NOT_ALL_CODE_PATHS_RETURN,
   EMPTY_STRUCT,
+  STRUCT_CYCLE,
 
   // no such
   NO_SUCH_FUNCTION,
@@ -104,7 +102,8 @@ struct Checker {
   void fullScan();
   void checkFunction(Tokenizer&, FunctionDec&);
   bool validateFunctionHeader(Tokenizer&, FunctionDec&);
-  bool validateStructTopLevel(Tokenizer&, StructDecList&);
+  void validateStructTopLevel(Tokenizer&, StructDec&);
+  void checkForStructCycles(GeneralDec&, std::vector<StructDec *>&);
   bool checkScope(Tokenizer&, Scope&, TokenList&, bool, bool);
   bool checkLocalVarDec(Tokenizer&, VariableDec&, std::vector<std::string>&);
   ResultingType checkExpression(Tokenizer&, Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);

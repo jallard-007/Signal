@@ -8,10 +8,10 @@ func test(i: ListNode): ListNode ptr {
 }
 
 struct structTest {
-i : int64 ;
-    func doSomethingElse(j : char): int32 {
-        return i;
-    }
+  i : int64;
+  func doSomethingElse(j : char): int32 {
+    return i;
+  }
 }
 
 template [T] func sampleTemplate(): T {

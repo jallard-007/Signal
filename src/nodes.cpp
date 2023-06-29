@@ -54,7 +54,7 @@ FunctionDec::FunctionDec(const Token& token): name{token} {}
 StructDec::StructDec(const Token& token): name{token} {}
 
 StructDecList::StructDecList(): funcDec{} {}
-StructDecList::StructDecList(const StructDecList& ref): next{ref.next}, type{ref.type}, isValid{ref.isValid} {
+StructDecList::StructDecList(const StructDecList& ref): next{ref.next}, type{ref.type} {
   if (type == StructDecType::VAR) {
     varDec = ref.varDec;
   } else if (type == StructDecType::FUNC) {
@@ -64,7 +64,6 @@ StructDecList::StructDecList(const StructDecList& ref): next{ref.next}, type{ref
 StructDecList& StructDecList::operator=(const StructDecList& other) {
   next = other.next;
   type = other.type;
-  isValid = other.isValid;
   varDec = other.varDec;
   return *this;
 }
