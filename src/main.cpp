@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <iterator>
 #include "./parser/parser.hpp"
 #include "./checker/checker.hpp"
 

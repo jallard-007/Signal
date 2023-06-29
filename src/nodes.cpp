@@ -12,32 +12,30 @@ bool notFirstOfExpression(TokenType type) {
     type != TokenType::HEX_NUMBER;
 }
 
+Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
+Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
+Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
+Expression& Expression::operator=(const Expression&ref) {
+  binOp = ref.binOp;
+  type = ref.type;
+  return *this;
+}
+
 ExpressionList::ExpressionList(): curr{}, next{nullptr} {}
 
 Statement::Statement(): expression{}, type{StatementType::NOTHING} {}
 Statement::Statement(const Statement& ref): expression{ref.expression}, type{ref.type} {}
-void Statement::operator=(const Statement& ref) {
+Statement& Statement::operator=(const Statement& ref) {
   expression = ref.expression;
   type = ref.type;
+  return *this;
 }
 
 TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
 TokenList::TokenList(const Token& tk, TokenList* next): token{tk}, next{next} {}
-void TokenList::operator=(const TokenList& ref) {
-  token = ref.token;
-  next = ref.next;
-}
 
 VariableDec::VariableDec(const Token& tk): name{tk} {}
 
-void StatementList::operator=(const StatementList &ref) {
-  curr = ref.curr;
-  next = ref.next;
-}
-
-void Scope::operator=(const Scope &ref) {
-  scopeStatements = ref.scopeStatements;
-}
 
 ArrayAccess::ArrayAccess(const Token& tk): array{tk} {}
 
@@ -49,17 +47,9 @@ FunctionCall::FunctionCall(const Token& tk): name{tk} {}
 
 ReturnStatement::ReturnStatement(const Token& tk): token{tk} {}
 
-ForLoop::ForLoop(const ForLoop &ref):  body{ref.body}, initialize{ref.initialize}, condition{ref.condition}, iteration{ref.iteration} {}
-
 ControlFlowStatement::ControlFlowStatement(): forLoop{}, type{ControlFlowStatementType::NONE} {}
 
-FunctionDec::FunctionDec(const Token& token): name{token} {};
-void FunctionDec::operator=(const FunctionDec &ref) {
-  name = ref.name;
-  params = ref.params;
-  returnType = ref.returnType;
-  body = ref.body;
-}
+FunctionDec::FunctionDec(const Token& token): name{token} {}
 
 StructDec::StructDec(const Token& token): name{token} {}
 
@@ -71,15 +61,12 @@ StructDecList::StructDecList(const StructDecList& ref): next{ref.next}, type{ref
     funcDec = ref.funcDec;
   }
 }
-void StructDecList::operator=(const StructDecList& other) {
+StructDecList& StructDecList::operator=(const StructDecList& other) {
   next = other.next;
   type = other.type;
   isValid = other.isValid;
-  if (type == StructDecType::VAR) {
-    varDec = other.varDec;
-  } else if (type == StructDecType::FUNC) {
-    funcDec = other.funcDec;
-  }
+  varDec = other.varDec;
+  return *this;
 }
 
 EnumDec::EnumDec(const Token&tk): name{tk} {}

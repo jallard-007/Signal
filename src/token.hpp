@@ -374,4 +374,3 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::TYPE, "type"},
   };
 
-#define MIN_CHARS_TO_DISAMBIG 9 // length of longest keyword + 1 (currently 'template' at 8)

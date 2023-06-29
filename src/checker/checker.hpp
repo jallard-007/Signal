@@ -110,7 +110,7 @@ struct Checker {
   ResultingType checkExpression(Tokenizer&, Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
   ResultingType checkMemberAccess(Tokenizer&, ResultingType&, Expression&);
   bool checkType(Tokenizer&, TokenList&);
-  TokenList& largestType(TokenList&, TokenList&);
+  static TokenList& largestType(TokenList&, TokenList&);
 };
 
 bool canBeConvertedToBool(TokenList&);

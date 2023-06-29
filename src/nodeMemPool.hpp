@@ -8,7 +8,7 @@
 */
 class NodeMemPool {
   MemPool<UnOp> unOps;
-  MemPool<BinOp> binOps{500};
+  MemPool<BinOp> binOps;
   MemPool<GeneralDec> decs;
   MemPool<GeneralDecList> decLists;
   MemPool<VariableDec> varDecs;

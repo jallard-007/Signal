@@ -23,13 +23,7 @@ std::string Expected::getErrorMessage(std::vector<Tokenizer>& tks) {
   return message + "\n\n";
 }
 
-Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
-Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
-Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
-void Expression::operator=(const Expression&ref) {
-  binOp = ref.binOp;
-  type = ref.type;
-}
+
 
 // TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
 uint8_t operatorPrecedence [83]{};
@@ -167,9 +161,9 @@ GeneralDec* Parser::parseNext() {
       return nullptr;
     }
     globalList->curr.tempCreate->templateTypes.token = token;
-    TokenList *tkprev = &globalList->curr.tempCreate->templateTypes;
-    tkprev->next = memPool.makeTokenList();
-    TokenList *tkList = tkprev->next;
+    TokenList *tokenPrev = &globalList->curr.tempCreate->templateTypes;
+    tokenPrev->next = memPool.makeTokenList();
+    TokenList *tkList = tokenPrev->next;
     while (tokenizer->peekNext().type == TokenType::COMMA) {
       tokenizer->consumePeek();
       token = tokenizer->tokenizeNext();
@@ -177,12 +171,12 @@ GeneralDec* Parser::parseNext() {
         expected.emplace_back(ExpectedType::TOKEN, token, TokenType::TYPE, tokenizer->tokenizerIndex);
         return nullptr;
       }
-      tkprev = tkList;
+      tokenPrev = tkList;
       tkList->token = token;
       tkList->next = memPool.makeTokenList();
       tkList = tkList->next;
     }
-    tkprev->next = nullptr;
+    tokenPrev->next = nullptr;
     memPool.release(tkList);
     if (tokenizer->tokenizeNext().type != TokenType::CLOSE_BRACKET) {
       expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);

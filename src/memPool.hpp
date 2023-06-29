@@ -10,14 +10,10 @@
 */
 template<typename T>
 struct MemPool {
-  // index of last array that was used
-  uint32_t j;
-  // how many arrays have been allocated
-  uint32_t n;
-  // number of slots available for arrays to be allocated
-  uint32_t mainArraySize;
-  // number of units available per array
-  const uint32_t arraySize;
+  uint32_t j; // index of last array that was used
+  uint32_t n; // how many arrays have been allocated
+  uint32_t mainArraySize; // number of slots available for arrays to be allocated
+  const uint32_t arraySize; // number of units available per array
   struct Obj {
     union {
       T val;
@@ -27,7 +23,7 @@ struct MemPool {
   Obj *freeObj;
   Obj **mem;
 
-  MemPool(uint32_t arraySize = 50): j{0}, n{0}, mainArraySize{10}, arraySize{arraySize} {
+  MemPool(uint32_t arraySize = 500): j{0}, n{0}, mainArraySize{10}, arraySize{arraySize} {
     mem = (Obj**)malloc(sizeof (Obj*) * mainArraySize);
     mem[0] = (Obj*)malloc(sizeof (Obj) * (arraySize));
     initializeList(mem[0]);

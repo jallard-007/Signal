@@ -396,6 +396,7 @@ void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
     TokenList * list = templateTypes.next;
     while (list) {
       str += ", " + tk.extractToken(list->token);
+      list = list->next;
     }
   }
   str += "] " + typeToString.at(TokenType::AS) + tk.extractToken(templateName) + ";\n";

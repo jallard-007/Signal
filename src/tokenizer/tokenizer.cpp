@@ -412,6 +412,7 @@ Token Tokenizer::tokenizeNext() {
             END_OF_IDENTIFIER(TokenType::WHILE)
           }
           movePastIdentifier();
+          break;
         }
         default: {
           movePastIdentifier();

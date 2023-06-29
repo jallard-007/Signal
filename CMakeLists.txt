@@ -9,6 +9,7 @@ target_link_libraries(parser PRIVATE tokenizer)
 add_library(prettyPrint STATIC ./src/prettyPrint/prettyPrint.cpp)
 target_link_libraries(prettyPrint PRIVATE parser)
 add_library(checker STATIC ./src/checker/checker.cpp)
+target_link_libraries(checker PRIVATE prettyPrint)
 
 set_target_properties(tokenizer parser prettyPrint checker PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
 

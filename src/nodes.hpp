@@ -37,7 +37,7 @@ struct Expression {
   Expression();
   explicit Expression(Token);
   Expression(const Expression&);
-  void operator=(const Expression&);
+  Expression& operator=(const Expression&);
   void prettyPrint(Tokenizer&, std::string&);
   Expression deepCopy(NodeMemPool&);
 };
@@ -74,7 +74,7 @@ struct Statement {
   StatementType type;
   Statement();
   Statement(const Statement&);
-  void operator=(const Statement&);
+  Statement& operator=(const Statement&);
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   Statement deepCopy(NodeMemPool&);
 
@@ -92,7 +92,7 @@ struct TokenList {
   TokenList(const Token&);
   TokenList(const Token&, TokenList*);
   TokenList(const TokenList&) = default;
-  void operator=(const TokenList&);
+  TokenList& operator=(const TokenList&) = default;
   void prettyPrint(Tokenizer&, std::string&);
   bool operator==(const TokenList&) const;
   TokenList deepCopy(NodeMemPool&);
@@ -119,7 +119,7 @@ struct StatementList {
   StatementList *next{nullptr};
   StatementList() = default;
   StatementList(const StatementList &) = default;
-  void operator=(const StatementList &);
+  StatementList& operator=(const StatementList &) = default;
   StatementList deepCopy(NodeMemPool&);
 };
 
@@ -128,7 +128,7 @@ struct Scope {
   StatementList scopeStatements{};
   Scope() = default;
   Scope(const Scope &) = default;
-  void operator=(const Scope &);
+  Scope& operator=(const Scope &) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   Scope deepCopy(NodeMemPool&);
 };
@@ -269,7 +269,7 @@ struct ForLoop {
   Expression condition{};
   Expression iteration{};
   ForLoop() = default;
-  ForLoop(const ForLoop &);
+  ForLoop(const ForLoop &) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   ForLoop *deepCopy(NodeMemPool&);
 };
@@ -312,7 +312,7 @@ struct FunctionDec {
   FunctionDec() = default;
   explicit FunctionDec(const Token&);
   FunctionDec(const FunctionDec&) = default;
-  void operator=(const FunctionDec&);
+  FunctionDec& operator=(const FunctionDec&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   void prettyPrintDefinition(Tokenizer&, std::string&);
   FunctionDec *deepCopy(NodeMemPool&);
@@ -335,7 +335,7 @@ struct StructDecList {
   bool isValid{false};
   StructDecList();
   StructDecList(const StructDecList&);
-  void operator=(const StructDecList&);
+  StructDecList& operator=(const StructDecList&);
   StructDecList deepCopy(NodeMemPool&);
 };
 
