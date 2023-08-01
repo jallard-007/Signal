@@ -56,6 +56,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  std::map<std::string, bool> includedFiles;
+  includedFiles.emplace(mainFile, true);
+
   // split the relative file path by directory
   // we split by directory so that when we encounter an "include", we can easily alter the path to keep it minimal
   std::vector<std::string> currentFileDirectory;
@@ -103,6 +106,7 @@ int main(int argc, char **argv) {
         std::cerr << tk.filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << '\n';
         return 1;
       }
+
       std::vector<std::string> splittedPath;
       splitFilePath(includedFileName, splittedPath);
       for (auto& directory: splittedPath) {
@@ -132,15 +136,20 @@ int main(int argc, char **argv) {
         // remove the trailing /
         relativePath.pop_back();
       }
-      if (!openAndReadFile(relativePath, buffer)) {
-        TokenPositionInfo posInfo = tk.getTokenPositionInfo(dec->includeDec->file);
-        std::cerr << tk.filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << '\n';
-        return 1;
+
+      // has the file already been included?
+      if (!includedFiles[includedFileName]) {
+        includedFiles[includedFileName] = true;
+        if (!openAndReadFile(relativePath, buffer)) {
+          TokenPositionInfo posInfo = tk.getTokenPositionInfo(dec->includeDec->file);
+          std::cerr << tk.filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << '\n';
+          return 1;
+        }
+        tokenizers.emplace_back(std::move(relativePath), std::move(buffer));
+        tokenizerIndex = tokenizers.size() - 1;
+        tokenizers.back().tokenizerIndex = tokenizerIndex;
+        parser.swapTokenizer(tokenizers.back());
       }
-      tokenizers.emplace_back(std::move(relativePath), std::move(buffer));
-      tokenizerIndex = tokenizers.size() - 1;
-      tokenizers.back().tokenizerIndex = tokenizerIndex;
-      parser.swapTokenizer(tokenizers.back());
     }
   }
   if (parser.globalPrev) {
@@ -173,15 +182,3 @@ int main(int argc, char **argv) {
   std::cout << "No errors found\n";
   return 0;
 }
-
-// void wtf() {
-//   const char * str = "(first: int, second: double, third: customType ^^)";
-//   Tokenizer tokenizer{str};
-//   std::cout << tokenizer.content << '\n';
-//   std::vector<std::string> params;
-//   std::string st = tokenizer.extractToken({1, TokenType::IDENTIFIER});
-//   params.emplace_back(st);
-//   st = tokenizer.extractToken({13, TokenType::IDENTIFIER});
-//   params.emplace_back(st);
-//   std::cout << tokenizer.content << '\n';
-// }

@@ -14,3 +14,5 @@ coverage
 sampleCode/benchmark.pr
 output.png
 .DS_Store
+a.out
+asm
