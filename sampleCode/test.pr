@@ -33,6 +33,8 @@ func reverseList(head: ListNode ptr): ListNode ptr {
 }
 
 func reverseKGroup(head: ListNode ptr, k: int32): ListNode ptr {
+  str: char ptr = "thing";
+  str2: char ptr = "hello" + str;
   curr: ListNode ptr = head;
   for (i: int32 = 0; i < k - 1; ++i) {
     if (!curr) {

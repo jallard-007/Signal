@@ -178,6 +178,7 @@ ControlFlowStatement* ControlFlowStatement::deepCopy(NodeMemPool& mem) {
   copy->type = type;
   switch (type) {
     case ControlFlowStatementType::CONDITIONAL_STATEMENT: copy->conditional = conditional->deepCopy(mem); break;
+    case ControlFlowStatementType::EXIT_STATEMENT:
     case ControlFlowStatementType::RETURN_STATEMENT: copy->returnStatement = returnStatement->deepCopy(mem); break;
     case ControlFlowStatementType::FOR_LOOP: copy->forLoop = forLoop->deepCopy(mem); break;
     case ControlFlowStatementType::SWITCH_STATEMENT: copy->switchStatement = switchStatement->deepCopy(mem); break;
@@ -289,7 +290,7 @@ WhileLoop* WhileLoop::deepCopy(NodeMemPool& mem) {
 }
 
 ArrayAccess* ArrayAccess::deepCopy(NodeMemPool& mem) {
-  ArrayAccess* copy = mem.makeArrayAccess(ArrayAccess{array});
+  ArrayAccess* copy = mem.makeArrayAccess(ArrayAccess{array.value});
   copy->offset = offset.deepCopy(mem);
   return copy;
 }

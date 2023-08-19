@@ -4,7 +4,7 @@
 Token getTokenOfExpression(Expression& exp) {
   switch (exp.type) {
     case ExpressionType::ARRAY_ACCESS: {
-      return exp.arrAccess->array;
+      return getTokenOfExpression(exp.arrAccess->array);
     }
     case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
       return getTokenOfExpression(exp.arrayOrStruct->values.curr);
@@ -39,7 +39,7 @@ TokenList Checker::uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
 TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
 TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
 TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
-TokenList Checker::stringValue {Token{0,0,TokenType::POINTER}, &Checker::charValue};
+TokenList Checker::stringValue {Token{0,0,TokenType::STRING_TYPE}};
 TokenList Checker::floatValue {Token{0,0,TokenType::FLOAT_TYPE}};
 TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
 TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
@@ -86,7 +86,9 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) {
     case CheckerErrorType::WRONG_NUMBER_OF_ARGS: message += "Incorrect number of arguments\n"; break;
     case CheckerErrorType::CANNOT_ASSIGN: message += "Cannot assign\n"; break;
     case CheckerErrorType::INCORRECT_RETURN_TYPE: message += "Incorrect return type\n"; break;
+    case CheckerErrorType::INVALID_EXIT_TYPE: message += "Invalid exit type\n"; break;
     case CheckerErrorType::NOT_ALL_CODE_PATHS_RETURN: message += "Not all code paths return a value\n"; break;
+    case CheckerErrorType::OPERATION_NOT_DEFINED: message += "Operation not defined for these operands\n"; break;
     case CheckerErrorType::EMPTY_STRUCT: message += "Empty struct\n"; break;
     case CheckerErrorType::STRUCT_CYCLE: message += "Struct cycle detected. Size of struct is not finite\n"; break;
     default: message += "Error of some kind, sorry bro\n"; break;
@@ -517,6 +519,17 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
             }
             break;
           }
+          case ControlFlowStatementType::EXIT_STATEMENT: {
+            wasReturned = true;
+            ResultingType res = checkExpression(tk, list->curr.controlFlow->returnStatement->returnValue);
+            if (res.type->token.type == TokenType::NOTHING && returnType.token.type == TokenType::VOID) {
+              break; // ok
+            }
+            if (!checkAssignment(int64Value, *res.type)) {
+              errors.emplace_back(CheckerErrorType::INVALID_EXIT_TYPE, tk.tokenizerIndex, &list->curr.controlFlow->returnStatement->returnValue);
+            }
+            break;
+          }
           case ControlFlowStatementType::SWITCH_STATEMENT: {
             break;
           }
@@ -633,11 +646,19 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
       }
       
       if (isLogicalOp(expression.binOp->op.type)) {
-        if (leftSide.type->token.type == TokenType::IDENTIFIER || leftSide.type->token.type == TokenType::VOID) {
+        if (
+          leftSide.type->token.type == TokenType::IDENTIFIER
+          || leftSide.type->token.type == TokenType::VOID
+          || leftSide.type->token.type == TokenType::STRING_TYPE
+        ) {
           errors.emplace_back(CheckerErrorType::CANNOT_COMPARE_TYPE, tk.tokenizerIndex, &expression.binOp->leftSide);
         }
         ResultingType rightSide = checkExpression(tk, expression.binOp->leftSide);
-        if (rightSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::VOID) {
+        if (
+          rightSide.type->token.type == TokenType::IDENTIFIER
+          || rightSide.type->token.type == TokenType::VOID
+          || rightSide.type->token.type == TokenType::STRING_TYPE
+        ) {
           errors.emplace_back(CheckerErrorType::CANNOT_COMPARE_TYPE, tk.tokenizerIndex, &expression.binOp->rightSide);
         }
         return {&boolValue, false};
@@ -700,7 +721,10 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
         return {leftSide.type, false};
       }
 
-      if (leftSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::IDENTIFIER) {
+      if (
+        leftSide.type->token.type == TokenType::IDENTIFIER || rightSide.type->token.type == TokenType::IDENTIFIER ||
+        leftSide.type->token.type == TokenType::STRING_TYPE || rightSide.type->token.type == TokenType::STRING_TYPE
+      ) {
         errors.emplace_back(CheckerErrorType::OPERATION_NOT_DEFINED, tk.tokenizerIndex, &expression);
         return {&badValue, false};
       }
@@ -866,7 +890,15 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
     }
     
     case ExpressionType::ARRAY_ACCESS: {
-      return {&badValue, false};
+      ResultingType arrayType = checkExpression(tk, expression.arrAccess->array);
+      if (arrayType.type->token.type != TokenType::POINTER) {
+        errors.emplace_back(CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, tk.tokenizerIndex, &expression);
+        return {&badValue, false};
+      }
+      if (!arrayType.type->next) {
+        return {&badValue, false};
+      }
+      return {arrayType.type->next, true};
     }
     
     case ExpressionType::WRAPPED: {
@@ -1010,6 +1042,9 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
   }
   if (leftSide.token.type == TokenType::POINTER) {
     if (rightSide.token.type != TokenType::POINTER) {
+      if (leftSide.next->token.type == TokenType::CHAR_TYPE && rightSide.token.type == TokenType::STRING_TYPE) {
+        return true;
+      }
       return rightSide.token.type == TokenType::NULL_PTR;
     }
     const TokenList* rType = &rightSide;
@@ -1037,12 +1072,13 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
     }
     return false;
   }
+  if (rightSide.token.type == TokenType::STRING_TYPE) return false;
   return true;
 }
 
 // only builtin types can be converted to bool, except for void.
 bool canBeConvertedToBool(TokenList& type) {
-  return isBuiltInType(type.token.type) && type.token.type != TokenType::VOID;
+  return isBuiltInType(type.token.type) && type.token.type != TokenType::VOID && type.token.type != TokenType::STRING_TYPE;
 }
 
 TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {

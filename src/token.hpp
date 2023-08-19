@@ -33,6 +33,7 @@ enum class TokenType : uint8_t {
   FOR,
   SWITCH, //
   RETURN,
+  EXIT,
   WHILE,
   ENUM,
   FUNC,
@@ -110,6 +111,7 @@ enum class TokenType : uint8_t {
   // types
   BOOL,
   CHAR_TYPE,
+  STRING_TYPE,
   INT8_TYPE,
   UINT8_TYPE,
   INT16_TYPE,
@@ -124,7 +126,7 @@ enum class TokenType : uint8_t {
   VOID,
   REFERENCE,
 
-  // extra types used by parse to report errors
+  // extra types used by parser to report errors
   TYPE,
   OPERATOR,
 

@@ -84,7 +84,7 @@ void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {
 }
 
 void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str) {
-  str += tk.extractToken(array) + '[';
+  str += tk.extractToken(array.value) + '[';
   offset.prettyPrint(tk, str);
   str += ']';
 }

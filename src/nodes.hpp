@@ -138,7 +138,7 @@ struct Scope {
 // arrayAccess:= identifier [ expression ]
 struct ArrayAccess {
   Expression offset{};
-  Token array;
+  Expression array;
   ArrayAccess() = delete;
   explicit ArrayAccess(const Token&);
   ArrayAccess(const ArrayAccess&) = default;
@@ -280,6 +280,7 @@ enum class ControlFlowStatementType: uint8_t {
   WHILE_LOOP,
   CONDITIONAL_STATEMENT,
   RETURN_STATEMENT,
+  EXIT_STATEMENT,
   SWITCH_STATEMENT,
 };
 

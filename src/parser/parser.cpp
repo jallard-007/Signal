@@ -23,8 +23,8 @@ std::string Expected::getErrorMessage(std::vector<Tokenizer>& tks) {
   return message + "\n\n";
 }
 
-// TokenType::NEGATIVE is the "largest" operator token type with an enum value of 82, hence size 83
-uint8_t operatorPrecedence [83]{};
+// TokenType::NEGATIVE is the "largest" operator token type with an enum value of 83, hence size 84
+uint8_t operatorPrecedence [84]{};
 __attribute__((constructor))
 void initializeOperatorPrecedence() {
   operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
@@ -689,6 +689,26 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         prev = list;
         list->next = memPool.makeSwitchScopeStatementList();
       }
+    }
+    else if (token.type == TokenType::EXIT) {
+      tokenizer->consumePeek();
+      statement.controlFlow->type = ControlFlowStatementType::EXIT_STATEMENT;
+      statement.controlFlow->returnStatement = memPool.makeReturnStatement();
+      auto& exitValue = statement.controlFlow->returnStatement->returnValue;
+      ParseExpressionErrorType errorType = parseExpression(exitValue);
+      if (errorType != ParseExpressionErrorType::NONE) {
+        if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
+          expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
+        } else if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
+          expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
+        }
+        return ParseStatementErrorType::REPORTED;
+      }
+      if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer->peekNext(), TokenType::SEMICOLON, tokenizer->tokenizerIndex);
+        return ParseStatementErrorType::REPORTED;
+      }
+      tokenizer->consumePeek();
     }
   }
   else if (token.type == TokenType::OPEN_BRACE) { // scope

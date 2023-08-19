@@ -199,14 +199,18 @@ Token Tokenizer::tokenizeNext() {
               END_OF_IDENTIFIER(TokenType::ENUM)
             }
           }
-          else if (
-            content[position] == 'x' &&
-            content[++position] == 't' &&
-            content[++position] == 'e' &&
-            content[++position] == 'r' &&
-            content[++position] == 'n'
-          ) {
-            END_OF_IDENTIFIER(TokenType::EXTERN)
+          else if (content[position] == 'x') {
+            if (content[++position] == 't') {
+              if (
+                content[++position] == 'e' &&
+                content[++position] == 'r' &&
+                content[++position] == 'n'
+              ) {
+                END_OF_IDENTIFIER(TokenType::EXTERN)
+              }
+            } else if (content[position] == 'i' && content[++position] == 't') {
+                END_OF_IDENTIFIER(TokenType::EXIT)
+            }
           }
           movePastIdentifier();
           break;

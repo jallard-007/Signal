@@ -140,7 +140,7 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   auto& arg1 = argsList.curr;
   REQUIRE(arg1.type == ExpressionType::ARRAY_ACCESS);
   REQUIRE(arg1.arrAccess);
-  CHECK(tokenizer.extractToken(arg1.arrAccess->array) == "arg1");
+  CHECK(tokenizer.extractToken(arg1.arrAccess->array.value) == "arg1");
 
   REQUIRE(arg1.arrAccess->offset.type == ExpressionType::FUNCTION_CALL);
   auto& arg1_arg1 = arg1.arrAccess->offset.funcCall;
