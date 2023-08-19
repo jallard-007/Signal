@@ -40,7 +40,6 @@ TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
 TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
 TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
 TokenList Checker::stringValue {Token{0,0,TokenType::STRING_TYPE}};
-TokenList Checker::floatValue {Token{0,0,TokenType::FLOAT_TYPE}};
 TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
 TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
 TokenList Checker::ptrValue {Token{0,0,TokenType::POINTER}, &Checker::voidValue};

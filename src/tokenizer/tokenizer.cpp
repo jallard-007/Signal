@@ -236,14 +236,6 @@ Token Tokenizer::tokenizeNext() {
               END_OF_IDENTIFIER(TokenType::FUNC)
             }
           }
-          else if (
-            content[position] == 'l' &&
-            content[++position] == 'o' &&
-            content[++position] == 'a' &&
-            content[++position] == 't'
-          ) {
-            END_OF_IDENTIFIER(TokenType::FLOAT_TYPE)
-          }
           movePastIdentifier();
           break;
         }

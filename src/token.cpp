@@ -233,7 +233,6 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::ENUM, "enum "},
   {TokenType::FOR, "for "},
   {TokenType::FUNC, "func "},
-  {TokenType::FLOAT_TYPE, "float"},
   {TokenType::IF, "if "},
   {TokenType::INT8_TYPE, "int8"},
   {TokenType::INT16_TYPE, "int16"},

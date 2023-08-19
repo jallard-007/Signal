@@ -121,7 +121,6 @@ enum class TokenType : uint8_t {
   INT64_TYPE,
   UINT64_TYPE,
   POINTER,
-  FLOAT_TYPE,
   DOUBLE_TYPE,
   VOID,
   REFERENCE,
