@@ -1,9 +1,8 @@
 #include <iostream>
 #include "interpreter.hpp"
-#include "../bytecodeDesign.hpp"
 
 Interpreter::Interpreter(
-  unsigned char *programInstructions,
+  unsigned char const *programInstructions,
   uint64_t startInstructionIndex,
   uint64_t stackSize
 ): program{programInstructions}, ip{startInstructionIndex} {
@@ -24,25 +23,30 @@ int64_t Interpreter::runProgram() {
 }
 
 #define arithmeticOp_B(operator) \
-  registers[program[ip++]] = (uint8_t)(registers[program[ip++]] operator registers[program[ip++]])
+  registers[program[ip]] = (uint8_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
+  ip += 3
 
 #define arithmeticOp_W(operator) \
-  registers[program[ip++]] = (uint16_t)(registers[program[ip++]] operator registers[program[ip++]])
+  registers[program[ip]] = (uint16_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
+  ip += 3
 
 #define arithmeticOp_D(operator) \
-  registers[program[ip++]] = (uint32_t)(registers[program[ip++]] operator registers[program[ip++]])
+  registers[program[ip]] = (uint32_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
+  ip += 3
 
 #define arithmeticOp_Q(operator) \
-  registers[program[ip++]] = registers[program[ip++]] operator registers[program[ip++]]
+  registers[program[ip]] = registers[program[ip+1]] operator registers[program[ip+2]]; \
+  ip += 3
 
-#define arithmeticOp_F(operator)  \
+#define arithmeticOp_F(operator) \
   uint64_t dest = program[ip++]; \
-  const double temp = *(double *)&registers[program[ip++]] operator *(double *)&registers[program[ip++]];  \
+  const double temp = *(double *)&registers[program[ip]] operator *(double *)&registers[program[ip+1]]; \
+  ip += 2; \
   registers[dest] = *(uint64_t *)&temp
 
 void Interpreter::executeNextInstruction() {
-  OpCode c;
-  switch (c) {
+  OpCode op = (OpCode)program[ip++];
+  switch (op) {
     case OpCode::EXIT: {
       exitCode = 1;
       running = false;
@@ -51,36 +55,64 @@ void Interpreter::executeNextInstruction() {
     case OpCode::CALL: {
       break;
     }
+    case OpCode::CMP: {
+      int64_t res = (int64_t)registers[program[ip]] - (int64_t)registers[program[ip+1]];
+      ip += 2;
+      if (res == 0) {
+        z = true;
+        p = false;
+      } else if (res > 0) {
+        z = false;
+        p = true;
+      } else {
+        z = false;
+        p = false;
+      }
+    }
+    case OpCode::SET_Z: {
+      registers[program[ip++]] = z;
+    }
+    case OpCode::SET_P: {
+      registers[program[ip++]] = p;
+    }
     case OpCode::LOAD_B: {
-      registers[program[ip++]] = *(uint8_t*)registers[program[ip++]];
+      registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::LOAD_W: {
-      registers[program[ip++]] = *(uint16_t*)registers[program[ip++]];
+      registers[program[ip]] = *(uint16_t*)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::LOAD_D: {
-      registers[program[ip++]] = *(uint32_t*)registers[program[ip++]];
+      registers[program[ip]] = *(uint32_t*)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::LOAD_Q: {
-      registers[program[ip++]] = *(uint64_t*)registers[program[ip++]];
+      registers[program[ip]] = *(uint64_t*)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::STORE_B: {
-      *(uint8_t*)registers[program[ip++]] = (uint8_t)registers[program[ip++]];
+      *(uint8_t*)registers[program[ip]] = (uint8_t)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::STORE_W: {
-      *(uint16_t*)registers[program[ip++]] = (uint16_t)registers[program[ip++]];
+      *(uint16_t*)registers[program[ip]] = (uint16_t)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::STORE_D: {
-      *(uint32_t*)registers[program[ip++]] = (uint32_t)registers[program[ip++]];
+      *(uint32_t*)registers[program[ip]] = (uint32_t)registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::STORE_Q: {
-      *(uint64_t*)registers[program[ip++]] = registers[program[ip++]];
+      *(uint64_t*)registers[program[ip]] = registers[program[ip+1]];
+      ip += 2;
       break;
     }
     case OpCode::JUMP: {
@@ -112,26 +144,28 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCode::MOVE: {
-      registers[program[ip++]] = registers[program[ip++]];
-      break;
-    }
-    case OpCode::MOVE_B: {
-      registers[program[ip++]] = program[ip++];
-      break;
-    }
-    case OpCode::MOVE_W: {
-      registers[program[ip++]] = *(uint16_t *)(program + ip);
+      registers[program[ip]] = registers[program[ip+1]];
       ip += 2;
       break;
     }
+    case OpCode::MOVE_B: {
+      registers[program[ip]] = program[ip+1];
+      ip += 2;
+      break;
+    }
+    case OpCode::MOVE_W: {
+      registers[program[ip]] = *(uint16_t *)(program + ip + 1);
+      ip += 3;
+      break;
+    }
     case OpCode::MOVE_D: {
-      registers[program[ip++]] = *(uint32_t *)(program + ip);
-      ip += 4;
+      registers[program[ip]] = *(uint32_t *)(program + ip + 1);
+      ip += 5;
       break;
     }
     case OpCode::MOVE_Q: {
-      registers[program[ip++]] = *(uint64_t *)(program + ip);
-      ip += 8;
+      registers[program[ip]] = *(uint64_t *)(program + ip + 1);
+      ip += 9;
       break;
     }
     case OpCode::PUSH_B: {
@@ -349,7 +383,7 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     default: {
-      std::cerr << "Runtime Error: Invalid OpCode [" << (uint8_t)c << "]\n";
+      std::cerr << "Runtime Error: Invalid OpCode [" << (uint32_t)op << "]\n";
       exit(1);
     }
   }

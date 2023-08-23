@@ -1,7 +1,15 @@
 
 enum class OpCode: unsigned char {
   EXIT, // EXIT src | exits the program with the code in src
-  CALL, // call a function such as malloc, free, print, etc.
+  CALL, // call a built in function such as malloc, free, print, etc.
+
+  // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
+  CMP,
+
+  // set register to the value of the flag
+  SET_Z,
+  SET_P,
+
   // LOAD dest, src | loads data from memory at the address src and places it in dest
   LOAD_B,
   LOAD_W,
@@ -100,6 +108,8 @@ enum class OpCode: unsigned char {
 
   EXIT,
   CALL,
+  FLAGS_U,
+  FLAGS_S,
   LOAD_B,
   LOAD_W,
   LOAD_D,
