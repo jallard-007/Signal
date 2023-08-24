@@ -45,17 +45,61 @@ int64_t Interpreter::runProgram() {
   registers[dest] = *(uint64_t *)&temp
 
 void Interpreter::executeNextInstruction() {
-  OpCode op = (OpCode)program[ip++];
+  OpCodes op = (OpCodes)program[ip++];
   switch (op) {
-    case OpCode::EXIT: {
+    case OpCodes::NOP: {
+      break;
+    }
+    case OpCodes::EXIT: {
       exitCode = 1;
       running = false;
       break;
     }
-    case OpCode::CALL: {
+    case OpCodes::CALL: {
+      BuiltInFunctions func = (BuiltInFunctions)program[ip++];
+      switch (func) {
+        case BuiltInFunctions::ALLOCATE: {
+          registers[10] = (uint64_t)malloc(registers[11]);
+          ip += 2;
+          break;
+        }
+        case BuiltInFunctions::REALLOCATE: {
+          registers[10] = (uint64_t)realloc((void *)registers[11], registers[12]);
+          ip += 2;
+          break;
+        }
+        case BuiltInFunctions::DEALLOCATE: {
+          free((void *)registers[11]);
+          break;
+        }
+        case BuiltInFunctions::PRINT_STRING: {
+          std::cout << (char *)registers[11];
+          break;
+        }
+        case BuiltInFunctions::PRINT_CHAR: {
+          std::cout << (char)registers[11];
+          break;
+        }
+        case BuiltInFunctions::PRINT_SIGNED: {
+          std::cout << (int64_t)registers[11];
+          break;
+        }
+        case BuiltInFunctions::PRINT_UNSIGNED: {
+          std::cout << registers[11];
+          break;
+        }
+        case BuiltInFunctions::PRINT_HEX: {
+          std::cout << (void *)registers[11];
+          break;
+        }
+        default: {
+          std::cerr << "Runtime Error: Invalid Function Code [" << (uint32_t)func << "]\n";
+          exit(1);
+        }
+      }
       break;
     }
-    case OpCode::CMP: {
+    case OpCodes::CMP: {
       int64_t res = (int64_t)registers[program[ip]] - (int64_t)registers[program[ip+1]];
       ip += 2;
       if (res == 0) {
@@ -68,317 +112,320 @@ void Interpreter::executeNextInstruction() {
         z = false;
         p = false;
       }
+      break;
     }
-    case OpCode::SET_Z: {
+    case OpCodes::SET_Z: {
       registers[program[ip++]] = z;
+      break;
     }
-    case OpCode::SET_P: {
+    case OpCodes::SET_P: {
       registers[program[ip++]] = p;
+      break;
     }
-    case OpCode::LOAD_B: {
+    case OpCodes::LOAD_B: {
       registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::LOAD_W: {
+    case OpCodes::LOAD_W: {
       registers[program[ip]] = *(uint16_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::LOAD_D: {
+    case OpCodes::LOAD_D: {
       registers[program[ip]] = *(uint32_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::LOAD_Q: {
+    case OpCodes::LOAD_Q: {
       registers[program[ip]] = *(uint64_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::STORE_B: {
+    case OpCodes::STORE_B: {
       *(uint8_t*)registers[program[ip]] = (uint8_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::STORE_W: {
+    case OpCodes::STORE_W: {
       *(uint16_t*)registers[program[ip]] = (uint16_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::STORE_D: {
+    case OpCodes::STORE_D: {
       *(uint32_t*)registers[program[ip]] = (uint32_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::STORE_Q: {
+    case OpCodes::STORE_Q: {
       *(uint64_t*)registers[program[ip]] = registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::JUMP: {
+    case OpCodes::JUMP: {
       ip = *(uint64_t *)(program + ip);
       break;
     }
-    case OpCode::JUMP_Z: {
+    case OpCodes::JUMP_Z: {
       if (z) {
         ip = *(uint64_t *)(program + ip);
       }
       break;
     }
-    case OpCode::JUMP_NZ: {
+    case OpCodes::JUMP_NZ: {
       if (!z) {
         ip = *(uint64_t *)(program + ip);
       }
       break;
     }
-    case OpCode::JUMP_P: {
+    case OpCodes::JUMP_P: {
       if (p) {
         ip = *(uint64_t *)(program + ip);
       }
       break;
     }
-    case OpCode::JUMP_N: {
-      if (!p) {
+    case OpCodes::JUMP_N: {
+      if (!p && !z) {
         ip = *(uint64_t *)(program + ip);
       }
       break;
     }
-    case OpCode::MOVE: {
+    case OpCodes::MOVE: {
       registers[program[ip]] = registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCode::MOVE_B: {
+    case OpCodes::MOVE_B: {
       registers[program[ip]] = program[ip+1];
       ip += 2;
       break;
     }
-    case OpCode::MOVE_W: {
+    case OpCodes::MOVE_W: {
       registers[program[ip]] = *(uint16_t *)(program + ip + 1);
       ip += 3;
       break;
     }
-    case OpCode::MOVE_D: {
+    case OpCodes::MOVE_D: {
       registers[program[ip]] = *(uint32_t *)(program + ip + 1);
       ip += 5;
       break;
     }
-    case OpCode::MOVE_Q: {
+    case OpCodes::MOVE_Q: {
       registers[program[ip]] = *(uint64_t *)(program + ip + 1);
       ip += 9;
       break;
     }
-    case OpCode::PUSH_B: {
+    case OpCodes::PUSH_B: {
       stack[sp++] = registers[program[ip++]];
       break;
     }
-    case OpCode::PUSH_W: {
+    case OpCodes::PUSH_W: {
       *(uint16_t *)(stack + sp) = registers[program[ip++]];
       sp += 2;
       break;
     }
-    case OpCode::PUSH_D: {
+    case OpCodes::PUSH_D: {
       *(uint32_t *)(stack + sp) = registers[program[ip++]];
       sp += 4;
       break;
     }
-    case OpCode::PUSH_Q: {
+    case OpCodes::PUSH_Q: {
       *(uint64_t *)(stack + sp) = registers[program[ip++]];
       sp += 8;
       break;
     }
-    case OpCode::POP_B: {
+    case OpCodes::POP_B: {
       registers[program[ip++]] = stack[sp--];
       break;
     }
-    case OpCode::POP_W: {
+    case OpCodes::POP_W: {
       registers[program[ip++]] = *(uint16_t *)(stack + sp);
       sp -= 2;
       break;
     }
-    case OpCode::POP_D: {
+    case OpCodes::POP_D: {
       registers[program[ip++]] = *(uint32_t *)(stack + sp);
       sp -= 4;
       break;
     }
-    case OpCode::POP_Q: {
+    case OpCodes::POP_Q: {
       registers[program[ip++]] = *(uint64_t *)(stack + sp);
       sp -= 8;
       break;
     }
-    case OpCode::ADD_B: {
+    case OpCodes::ADD_B: {
       arithmeticOp_B(+);
       break;
     }
-    case OpCode::ADD_W: {
+    case OpCodes::ADD_W: {
       arithmeticOp_W(+);
       break;
     }
-    case OpCode::ADD_D: {
+    case OpCodes::ADD_D: {
       arithmeticOp_D(+);
       break;
     }
-    case OpCode::ADD_Q: {
+    case OpCodes::ADD_Q: {
       arithmeticOp_Q(+);
       break;
     }
-    case OpCode::SUB_B: {
+    case OpCodes::SUB_B: {
       arithmeticOp_B(-);
       break;
     }
-    case OpCode::SUB_W: {
+    case OpCodes::SUB_W: {
       arithmeticOp_W(-);
       break;
     }
-    case OpCode::SUB_D: {
+    case OpCodes::SUB_D: {
       arithmeticOp_D(-);
       break;
     }
-    case OpCode::SUB_Q: {
+    case OpCodes::SUB_Q: {
       arithmeticOp_Q(-);
       break;
     }
-    case OpCode::MUL_B: {
+    case OpCodes::MUL_B: {
       arithmeticOp_B(*);
       break;
     }
-    case OpCode::MUL_W: {
+    case OpCodes::MUL_W: {
       arithmeticOp_W(*);
       break;
     }
-    case OpCode::MUL_D: {
+    case OpCodes::MUL_D: {
       arithmeticOp_D(*);
       break;
     }
-    case OpCode::MUL_Q: {
+    case OpCodes::MUL_Q: {
       arithmeticOp_Q(*);
       break;
     }
-    case OpCode::DIV_B: {
+    case OpCodes::DIV_B: {
       arithmeticOp_B(/);
       break;
     }
-    case OpCode::DIV_W: {
+    case OpCodes::DIV_W: {
       arithmeticOp_W(/);
       break;
     }
-    case OpCode::DIV_D: {
+    case OpCodes::DIV_D: {
       arithmeticOp_D(/);
       break;
     }
-    case OpCode::DIV_Q: {
+    case OpCodes::DIV_Q: {
       arithmeticOp_Q(/);
       break;
     }
-    case OpCode::MOD_B: {
+    case OpCodes::MOD_B: {
       arithmeticOp_B(%);
       break;
     }
-    case OpCode::MOD_W: {
+    case OpCodes::MOD_W: {
       arithmeticOp_W(%);
       break;
     }
-    case OpCode::MOD_D: {
+    case OpCodes::MOD_D: {
       arithmeticOp_D(%);
       break;
     }
-    case OpCode::MOD_Q: {
+    case OpCodes::MOD_Q: {
       arithmeticOp_Q(%);
       break;
     }
-    case OpCode::OR_B: {
+    case OpCodes::OR_B: {
       arithmeticOp_B(|);
       break;
     }
-    case OpCode::OR_W: {
+    case OpCodes::OR_W: {
       arithmeticOp_W(|);
       break;
     }
-    case OpCode::OR_D: {
+    case OpCodes::OR_D: {
       arithmeticOp_D(|);
       break;
     }
-    case OpCode::OR_Q: {
+    case OpCodes::OR_Q: {
       arithmeticOp_Q(|);
       break;
     }
-    case OpCode::AND_B: {
+    case OpCodes::AND_B: {
       arithmeticOp_B(&);
       break;
     }
-    case OpCode::AND_W: {
+    case OpCodes::AND_W: {
       arithmeticOp_W(&);
       break;
     }
-    case OpCode::AND_D: {
+    case OpCodes::AND_D: {
       arithmeticOp_D(&);
       break;
     }
-    case OpCode::AND_Q: {
+    case OpCodes::AND_Q: {
       arithmeticOp_Q(&);
       break;
     }
-    case OpCode::XOR_B: {
+    case OpCodes::XOR_B: {
       arithmeticOp_B(^);
       break;
     }
-    case OpCode::XOR_W: {
+    case OpCodes::XOR_W: {
       arithmeticOp_W(^);
       break;
     }
-    case OpCode::XOR_D: {
+    case OpCodes::XOR_D: {
       arithmeticOp_D(^);
       break;
     }
-    case OpCode::XOR_Q: {
+    case OpCodes::XOR_Q: {
       arithmeticOp_Q(^);
       break;
     }
-    case OpCode::SHIFT_L_B: {
+    case OpCodes::SHIFT_L_B: {
       arithmeticOp_B(<<);
       break;
     }
-    case OpCode::SHIFT_L_W: {
+    case OpCodes::SHIFT_L_W: {
       arithmeticOp_W(<<);
       break;
     }
-    case OpCode::SHIFT_L_D: {
+    case OpCodes::SHIFT_L_D: {
       arithmeticOp_D(<<);
       break;
     }
-    case OpCode::SHIFT_L_Q: {
+    case OpCodes::SHIFT_L_Q: {
       arithmeticOp_Q(<<);
       break;
     }
-    case OpCode::SHIFT_R_B: {
+    case OpCodes::SHIFT_R_B: {
       arithmeticOp_B(>>);
       break;
     }
-    case OpCode::SHIFT_R_W: {
+    case OpCodes::SHIFT_R_W: {
       arithmeticOp_W(>>);
       break;
     }
-    case OpCode::SHIFT_R_D: {
+    case OpCodes::SHIFT_R_D: {
       arithmeticOp_D(>>);
       break;
     }
-    case OpCode::SHIFT_R_Q: {
+    case OpCodes::SHIFT_R_Q: {
       arithmeticOp_Q(>>);
       break;
     }
-    case OpCode::F_ADD: {
+    case OpCodes::F_ADD: {
       arithmeticOp_F(+);
       break;
     }
-    case OpCode::F_SUB: {
+    case OpCodes::F_SUB: {
       arithmeticOp_F(-);
       break;
     }
-    case OpCode::F_MUL: {
+    case OpCodes::F_MUL: {
       arithmeticOp_F(*);
       break;
     }
-    case OpCode::F_DIV: {
+    case OpCodes::F_DIV: {
       arithmeticOp_F(/);
       break;
     }

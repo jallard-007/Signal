@@ -1,12 +1,25 @@
 
-enum class OpCode: unsigned char {
+// arguments are passed through registers r11 - r1x, return value passed through register r10
+enum class BuiltInFunctions: unsigned char {
+  ALLOCATE, // ALLOCATE r11 | allocate r11 bytes and place address in r10
+  REALLOCATE, // REALLOCATE r11, r12 | reallocate memory at r11 with new size r12, place new address in r10
+  DEALLOCATE, // DEALLOCATE r11 | deallocate memory
+  PRINT_STRING, // prints the string (null terminated) pointed at by r11
+  PRINT_CHAR, // prints the lowest byte in r11 as a character
+  PRINT_SIGNED, // prints r11 as a signed integer
+  PRINT_UNSIGNED, // prints r11 as an unsigned integer
+  PRINT_HEX, // prints r11 in hex
+};
+
+enum class OpCodes: unsigned char {
+  NOP, // do nothing
   EXIT, // EXIT src | exits the program with the code in src
-  CALL, // call a built in function such as malloc, free, print, etc.
+  CALL, // CALL BuiltInFunctions | call a built in function such as print, etc.
 
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
   CMP,
 
-  // set register to the value of the flag
+  // SET_ src | set register to the value of the flag
   SET_Z,
   SET_P,
 
@@ -108,8 +121,9 @@ enum class OpCode: unsigned char {
 
   EXIT,
   CALL,
-  FLAGS_U,
-  FLAGS_S,
+  CMP,
+  SET_Z,
+  SET_P,
   LOAD_B,
   LOAD_W,
   LOAD_D,

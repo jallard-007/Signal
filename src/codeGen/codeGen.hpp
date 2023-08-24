@@ -1,8 +1,10 @@
 #pragma once
 
 #include <map>
+#include <cstdint>
 #include "../nodes.hpp"
 #include "../tokenizer/tokenizer.hpp"
+#include "../bytecodeDesign.hpp"
 
 struct CodeGen {
   Program &program;
