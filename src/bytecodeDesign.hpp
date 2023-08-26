@@ -1,3 +1,11 @@
+#pragma once
+
+#define NUM_REGISTERS 32
+#define instructionPointerIndex NUM_REGISTERS - 1
+#define stackPointerIndex NUM_REGISTERS - 2
+#define basePointerIndex NUM_REGISTERS - 3
+#define dataPointerIndex NUM_REGISTERS - 4
+#define miscIndex NUM_REGISTERS - 5
 
 // arguments are passed through registers r11 - r1x, return value passed through register r10
 enum class BuiltInFunctions: unsigned char {
@@ -28,28 +36,25 @@ enum class OpCodes: unsigned char {
   LOAD_W,
   LOAD_D,
   LOAD_Q,
+
   // STORE dest, src| stores data from src into memory at the address dest
   STORE_B,
   STORE_W,
   STORE_D,
   STORE_Q,
 
-// jumps to an instruction, "src" being the address to jump to
+  // jumps to an instruction, "src" being the address to jump to
   JUMP, // JUMP src
   JUMP_Z, // jump if zero | JUMP_Z src
   JUMP_NZ, // jump if not zero | JUMP_NZ src
   JUMP_P, // jump if positive | JUMP_P src
   JUMP_N, // jump if negative | JUMP_N src
 
-
-// move data between registers
+  // move data between registers
   MOVE, // MOVE dest, src
-  MOVE_B, // MOVE dest, 1 byte immediate
-  MOVE_W, // MOVE dest, 2 byte immediate
-  MOVE_D, // MOVE dest, 4 byte immediate
-  MOVE_Q, // MOVE dest, 8 byte immediate
+  MOVE_I, // MOVE dest, 4 byte immediate
 
-// move data to/from the stack
+  // move data to/from the stack
   PUSH_B,
   PUSH_W,
   PUSH_D,
@@ -59,62 +64,37 @@ enum class OpCodes: unsigned char {
   POP_D,
   POP_Q,
 
-// arithmetic
-  ADD_B,
-  ADD_W,
-  ADD_D,
-  ADD_Q,
+  // arithmetic
+  ADD,
+  ADD_I,
+  SUB,
+  SUB_I,
+  MUL,
+  MUL_I,
+  DIV,
+  DIV_I,
+  MOD,
+  MOD_I,
+  OR,
+  OR_I,
+  AND,
+  AND_I,
+  XOR,
+  XOR_I,
+  SHIFT_L,
+  SHIFT_L_I,
+  SHIFT_R,
+  SHIFT_R_I,
 
-  SUB_B,
-  SUB_W,
-  SUB_D,
-  SUB_Q,
-
-  MUL_B,
-  MUL_W,
-  MUL_D,
-  MUL_Q,
-
-  DIV_B,
-  DIV_W,
-  DIV_D,
-  DIV_Q,
-
-  MOD_B,
-  MOD_W,
-  MOD_D,
-  MOD_Q,
-
-  OR_B,
-  OR_W,
-  OR_D,
-  OR_Q,
-
-  AND_B,
-  AND_W,
-  AND_D,
-  AND_Q,
-
-  XOR_B,
-  XOR_W,
-  XOR_D,
-  XOR_Q,
-
-  SHIFT_L_B,
-  SHIFT_L_W,
-  SHIFT_L_D,
-  SHIFT_L_Q,
-
-  SHIFT_R_B,
-  SHIFT_R_W,
-  SHIFT_R_D,
-  SHIFT_R_Q,
-
-// floating point arithmetic
-  F_ADD, // F_ADD dest, src1, src2
-  F_SUB, // F_SUB dest, src1, src2
-  F_MUL, // F_MUL dest, src1, src2
-  F_DIV, // F_DIV dest, src1, src2
+  // floating point arithmetic
+  F_ADD,
+  F_ADD_I,
+  F_SUB,
+  F_SUB_I,
+  F_MUL,
+  F_MUL_I,
+  F_DIV,
+  F_DIV_I,
 };
 
 /*
@@ -138,10 +118,7 @@ enum class OpCodes: unsigned char {
   JUMP_P,
   JUMP_N,
   MOVE,
-  MOVE_B,
-  MOVE_W,
-  MOVE_D,
-  MOVE_Q,
+  MOVE_I,
   PUSH_B,
   PUSH_W,
   PUSH_D,
@@ -150,50 +127,33 @@ enum class OpCodes: unsigned char {
   POP_W,
   POP_D,
   POP_Q,
-  ADD_B,
-  ADD_W,
-  ADD_D,
-  ADD_Q,
-  SUB_B,
-  SUB_W,
-  SUB_D,
-  SUB_Q,
-  MUL_B,
-  MUL_W,
-  MUL_D,
-  MUL_Q,
-  DIV_B,
-  DIV_W,
-  DIV_D,
-  DIV_Q,
-  MOD_B,
-  MOD_W,
-  MOD_D,
-  MOD_Q,
-  OR_B,
-  OR_W,
-  OR_D,
-  OR_Q,
-  AND_B,
-  AND_W,
-  AND_D,
-  AND_Q,
-  XOR_B,
-  XOR_W,
-  XOR_D,
-  XOR_Q,
-  SHIFT_L_B,
-  SHIFT_L_W,
-  SHIFT_L_D,
-  SHIFT_L_Q,
-  SHIFT_R_B,
-  SHIFT_R_W,
-  SHIFT_R_D,
-  SHIFT_R_Q,
+  ADD,
+  ADD_I,
+  SUB,
+  SUB_I,
+  MUL,
+  MUL_I,
+  DIV,
+  DIV_I,
+  MOD,
+  MOD_I,
+  OR,
+  OR_I,
+  AND,
+  AND_I,
+  XOR,
+  XOR_I,
+  SHIFT_L,
+  SHIFT_L_I,
+  SHIFT_R,
+  SHIFT_R_I,
   F_ADD,
+  F_ADD_I,
   F_SUB,
+  F_SUB_I,
   F_MUL,
+  F_MUL_I,
   F_DIV,
-
+  F_DIV_I,
 
 */

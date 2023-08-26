@@ -1,12 +1,21 @@
 #include <iostream>
 #include "interpreter.hpp"
 
+#define sp registers[stackPointerIndex]
+#define ip registers[instructionPointerIndex]
+#define bp registers[basePointerIndex]
+#define dp registers[dataPointerIndex]
+#define misc registers[miscIndex]
+
 Interpreter::Interpreter(
   unsigned char const *programInstructions,
-  uint64_t startInstructionIndex,
+  unsigned char *programData,
   uint64_t stackSize
-): program{programInstructions}, ip{startInstructionIndex} {
-  stack = new uint8_t [stackSize];
+): program{programInstructions} {
+  stack = new unsigned char [stackSize];
+  sp = (uint64_t)stack + stackSize;
+  bp = sp;
+  dp = (uint64_t)programData;
 }
 
 Interpreter::~Interpreter() {
@@ -22,27 +31,21 @@ int64_t Interpreter::runProgram() {
   return exitCode;
 }
 
-#define arithmeticOp_B(operator) \
-  registers[program[ip]] = (uint8_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
+#define arithmeticOp(op) \
+  registers[program[ip]] = registers[program[ip+1]] op registers[program[ip+2]]; \
   ip += 3
 
-#define arithmeticOp_W(operator) \
-  registers[program[ip]] = (uint16_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
+#define arithmeticOp_I(op) \
+  registers[program[ip]] = registers[program[ip+1]] op *(uint16_t *)(program+ip+2); \
+  ip += 4
+
+#define arithmeticOp_F(op) \
+  registers[program[ip]] = *(double *)registers+program[ip+1] op *(double *)registers+program[ip+2]; \
   ip += 3
 
-#define arithmeticOp_D(operator) \
-  registers[program[ip]] = (uint32_t)(registers[program[ip+1]] operator registers[program[ip+2]]); \
-  ip += 3
-
-#define arithmeticOp_Q(operator) \
-  registers[program[ip]] = registers[program[ip+1]] operator registers[program[ip+2]]; \
-  ip += 3
-
-#define arithmeticOp_F(operator) \
-  uint64_t dest = program[ip++]; \
-  const double temp = *(double *)&registers[program[ip]] operator *(double *)&registers[program[ip+1]]; \
-  ip += 2; \
-  registers[dest] = *(uint64_t *)&temp
+#define arithmeticOp_F_I(op) \
+  registers[program[ip]] = *(double *)registers+program[ip+1] op *(double *)(program+ip+2); \
+  ip += 10
 
 void Interpreter::executeNextInstruction() {
   OpCodes op = (OpCodes)program[ip++];
@@ -51,7 +54,7 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::EXIT: {
-      exitCode = 1;
+      exitCode = registers[0];
       running = false;
       break;
     }
@@ -195,238 +198,161 @@ void Interpreter::executeNextInstruction() {
       ip += 2;
       break;
     }
-    case OpCodes::MOVE_B: {
-      registers[program[ip]] = program[ip+1];
-      ip += 2;
-      break;
-    }
-    case OpCodes::MOVE_W: {
+    case OpCodes::MOVE_I: {
       registers[program[ip]] = *(uint16_t *)(program + ip + 1);
       ip += 3;
       break;
     }
-    case OpCodes::MOVE_D: {
-      registers[program[ip]] = *(uint32_t *)(program + ip + 1);
-      ip += 5;
-      break;
-    }
-    case OpCodes::MOVE_Q: {
-      registers[program[ip]] = *(uint64_t *)(program + ip + 1);
-      ip += 9;
-      break;
-    }
     case OpCodes::PUSH_B: {
-      stack[sp++] = registers[program[ip++]];
+      --sp;
+      *(uint8_t *)sp = registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_W: {
-      *(uint16_t *)(stack + sp) = registers[program[ip++]];
-      sp += 2;
+      sp -= 2;
+      *(uint16_t *)sp = registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_D: {
-      *(uint32_t *)(stack + sp) = registers[program[ip++]];
-      sp += 4;
+      sp -= 4;
+      *(uint32_t *)sp = registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_Q: {
-      *(uint64_t *)(stack + sp) = registers[program[ip++]];
-      sp += 8;
+      sp -= 8;
+      *(uint64_t *)sp = registers[program[ip++]];
       break;
     }
     case OpCodes::POP_B: {
-      registers[program[ip++]] = stack[sp--];
+      registers[program[ip++]] = *(uint8_t *)sp;
+      ++sp;
       break;
     }
     case OpCodes::POP_W: {
-      registers[program[ip++]] = *(uint16_t *)(stack + sp);
-      sp -= 2;
+      registers[program[ip++]] = *(uint16_t *)sp;
+      sp += 2;
       break;
     }
     case OpCodes::POP_D: {
-      registers[program[ip++]] = *(uint32_t *)(stack + sp);
-      sp -= 4;
+      registers[program[ip++]] = *(uint32_t *)sp;
+      sp += 4;
       break;
     }
     case OpCodes::POP_Q: {
-      registers[program[ip++]] = *(uint64_t *)(stack + sp);
-      sp -= 8;
+      registers[program[ip++]] = *(uint64_t *)sp;
+      sp += 8;
       break;
     }
-    case OpCodes::ADD_B: {
-      arithmeticOp_B(+);
+    case OpCodes::ADD: {
+      arithmeticOp(+);
       break;
     }
-    case OpCodes::ADD_W: {
-      arithmeticOp_W(+);
+    case OpCodes::ADD_I: {
+      arithmeticOp_I(+);
       break;
     }
-    case OpCodes::ADD_D: {
-      arithmeticOp_D(+);
+    case OpCodes::SUB: {
+      arithmeticOp(-);
       break;
     }
-    case OpCodes::ADD_Q: {
-      arithmeticOp_Q(+);
+    case OpCodes::SUB_I: {
+      arithmeticOp_I(-);
       break;
     }
-    case OpCodes::SUB_B: {
-      arithmeticOp_B(-);
+    case OpCodes::MUL: {
+      arithmeticOp(*);
       break;
     }
-    case OpCodes::SUB_W: {
-      arithmeticOp_W(-);
+    case OpCodes::MUL_I: {
+      arithmeticOp_I(*);
       break;
     }
-    case OpCodes::SUB_D: {
-      arithmeticOp_D(-);
+    case OpCodes::DIV: {
+      arithmeticOp(/);
       break;
     }
-    case OpCodes::SUB_Q: {
-      arithmeticOp_Q(-);
+    case OpCodes::DIV_I: {
+      arithmeticOp_I(/);
       break;
     }
-    case OpCodes::MUL_B: {
-      arithmeticOp_B(*);
+    case OpCodes::MOD: {
+      arithmeticOp(%);
       break;
     }
-    case OpCodes::MUL_W: {
-      arithmeticOp_W(*);
+    case OpCodes::MOD_I: {
+      arithmeticOp_I(%);
       break;
     }
-    case OpCodes::MUL_D: {
-      arithmeticOp_D(*);
+    case OpCodes::OR: {
+      arithmeticOp(|);
       break;
     }
-    case OpCodes::MUL_Q: {
-      arithmeticOp_Q(*);
+    case OpCodes::OR_I: {
+      arithmeticOp_I(|);
       break;
     }
-    case OpCodes::DIV_B: {
-      arithmeticOp_B(/);
+    case OpCodes::AND: {
+      arithmeticOp(&);
       break;
     }
-    case OpCodes::DIV_W: {
-      arithmeticOp_W(/);
+    case OpCodes::AND_I: {
+      arithmeticOp_I(&);
       break;
     }
-    case OpCodes::DIV_D: {
-      arithmeticOp_D(/);
+    case OpCodes::XOR: {
+      arithmeticOp(^);
       break;
     }
-    case OpCodes::DIV_Q: {
-      arithmeticOp_Q(/);
+    case OpCodes::XOR_I: {
+      arithmeticOp_I(^);
       break;
     }
-    case OpCodes::MOD_B: {
-      arithmeticOp_B(%);
+    case OpCodes::SHIFT_L: {
+      arithmeticOp(<<);
       break;
     }
-    case OpCodes::MOD_W: {
-      arithmeticOp_W(%);
+    case OpCodes::SHIFT_L_I: {
+      arithmeticOp_I(<<);
       break;
     }
-    case OpCodes::MOD_D: {
-      arithmeticOp_D(%);
+    case OpCodes::SHIFT_R: {
+      arithmeticOp(>>);
       break;
     }
-    case OpCodes::MOD_Q: {
-      arithmeticOp_Q(%);
-      break;
-    }
-    case OpCodes::OR_B: {
-      arithmeticOp_B(|);
-      break;
-    }
-    case OpCodes::OR_W: {
-      arithmeticOp_W(|);
-      break;
-    }
-    case OpCodes::OR_D: {
-      arithmeticOp_D(|);
-      break;
-    }
-    case OpCodes::OR_Q: {
-      arithmeticOp_Q(|);
-      break;
-    }
-    case OpCodes::AND_B: {
-      arithmeticOp_B(&);
-      break;
-    }
-    case OpCodes::AND_W: {
-      arithmeticOp_W(&);
-      break;
-    }
-    case OpCodes::AND_D: {
-      arithmeticOp_D(&);
-      break;
-    }
-    case OpCodes::AND_Q: {
-      arithmeticOp_Q(&);
-      break;
-    }
-    case OpCodes::XOR_B: {
-      arithmeticOp_B(^);
-      break;
-    }
-    case OpCodes::XOR_W: {
-      arithmeticOp_W(^);
-      break;
-    }
-    case OpCodes::XOR_D: {
-      arithmeticOp_D(^);
-      break;
-    }
-    case OpCodes::XOR_Q: {
-      arithmeticOp_Q(^);
-      break;
-    }
-    case OpCodes::SHIFT_L_B: {
-      arithmeticOp_B(<<);
-      break;
-    }
-    case OpCodes::SHIFT_L_W: {
-      arithmeticOp_W(<<);
-      break;
-    }
-    case OpCodes::SHIFT_L_D: {
-      arithmeticOp_D(<<);
-      break;
-    }
-    case OpCodes::SHIFT_L_Q: {
-      arithmeticOp_Q(<<);
-      break;
-    }
-    case OpCodes::SHIFT_R_B: {
-      arithmeticOp_B(>>);
-      break;
-    }
-    case OpCodes::SHIFT_R_W: {
-      arithmeticOp_W(>>);
-      break;
-    }
-    case OpCodes::SHIFT_R_D: {
-      arithmeticOp_D(>>);
-      break;
-    }
-    case OpCodes::SHIFT_R_Q: {
-      arithmeticOp_Q(>>);
+    case OpCodes::SHIFT_R_I: {
+      arithmeticOp_I(>>);
       break;
     }
     case OpCodes::F_ADD: {
       arithmeticOp_F(+);
       break;
     }
+    case OpCodes::F_ADD_I: {
+      arithmeticOp_F_I(+);
+      break;
+    }
     case OpCodes::F_SUB: {
       arithmeticOp_F(-);
+      break;
+    }
+    case OpCodes::F_SUB_I: {
+      arithmeticOp_F_I(-);
       break;
     }
     case OpCodes::F_MUL: {
       arithmeticOp_F(*);
       break;
     }
+    case OpCodes::F_MUL_I: {
+      arithmeticOp_F_I(*);
+      break;
+    }
     case OpCodes::F_DIV: {
       arithmeticOp_F(/);
+      break;
+    }
+    case OpCodes::F_DIV_I: {
+      arithmeticOp_F_I(/);
       break;
     }
     default: {
