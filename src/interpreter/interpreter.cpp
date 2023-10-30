@@ -36,8 +36,8 @@ int64_t Interpreter::runProgram() {
   ip += 3
 
 #define arithmeticOp_I(op) \
-  registers[program[ip]] = registers[program[ip+1]] op *(uint16_t *)(program+ip+2); \
-  ip += 4
+  registers[program[ip]] = registers[program[ip+1]] op *(uint32_t *)(program+ip+2); \
+  ip += 6
 
 #define arithmeticOp_F(op) \
   registers[program[ip]] = *(double *)registers+program[ip+1] op *(double *)registers+program[ip+2]; \
@@ -76,27 +76,35 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::PRINT_STRING: {
-          std::cout << (char *)registers[11];
+          fprintf((FILE *)registers[11], "%s", (char *)registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_CHAR: {
-          std::cout << (char)registers[11];
+          fprintf((FILE *)registers[11], "%c", (char)registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_SIGNED: {
-          std::cout << (int64_t)registers[11];
+          fprintf((FILE *)registers[11], "%lld", (int64_t)registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_UNSIGNED: {
-          std::cout << registers[11];
+          fprintf((FILE *)registers[11], "%llu", registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_HEX: {
-          std::cout << (void *)registers[11];
+          fprintf((FILE *)registers[11], "0x%08llx", registers[12]);
+          break;
+        }
+        case BuiltInFunctions::GET_CHAR: {
+          registers[10] = (uint64_t)getc((FILE *)registers[11]);
+          break;
+        }
+        case BuiltInFunctions::FFLUSH: {
+          fflush((FILE *)registers[11]);
           break;
         }
         default: {
-          std::cerr << "Runtime Error: Invalid Function Code [" << (uint32_t)func << "]\n";
+          std::cerr << "Runtime Error: Invalid BuiltInFunction, Code [" << (uint32_t)func << "]\n";
           exit(1);
         }
       }
@@ -199,8 +207,8 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::MOVE_I: {
-      registers[program[ip]] = *(uint16_t *)(program + ip + 1);
-      ip += 3;
+      registers[program[ip]] = *(uint32_t *)(program + ip + 1);
+      ip += 5;
       break;
     }
     case OpCodes::PUSH_B: {
