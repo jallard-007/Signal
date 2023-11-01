@@ -17,7 +17,7 @@ enum class BuiltInFunctions: unsigned char {
   PRINT_SIGNED, // prints r11 as a signed integer
   PRINT_UNSIGNED, // prints r11 as an unsigned integer
   PRINT_HEX, // prints r11 in hex
-  GET_CHAR, // returns one character from stream r11 in r10
+  GET_CHAR, // returns one character from file descriptor r11 in r10
   FFLUSH, // flush buffer at r11 (typically stdout)
 };
 

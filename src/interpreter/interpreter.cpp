@@ -174,30 +174,38 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::JUMP: {
-      ip = *(uint64_t *)(program + ip);
+      ip = registers[program[ip]];
       break;
     }
     case OpCodes::JUMP_Z: {
       if (z) {
-        ip = *(uint64_t *)(program + ip);
+        ip = registers[program[ip]];
+      } else {
+        ++ip;
       }
       break;
     }
     case OpCodes::JUMP_NZ: {
       if (!z) {
-        ip = *(uint64_t *)(program + ip);
+        ip = registers[program[ip]];
+      } else {
+        ++ip;
       }
       break;
     }
     case OpCodes::JUMP_P: {
       if (p) {
-        ip = *(uint64_t *)(program + ip);
+        ip = registers[program[ip]];
+      } else {
+        ++ip;
       }
       break;
     }
     case OpCodes::JUMP_N: {
       if (!p && !z) {
-        ip = *(uint64_t *)(program + ip);
+        ip = registers[program[ip]];
+      } else {
+        ++ip;
       }
       break;
     }
