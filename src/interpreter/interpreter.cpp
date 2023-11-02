@@ -32,19 +32,19 @@ int64_t Interpreter::runProgram() {
 }
 
 #define arithmeticOp(op) \
-  registers[program[ip]] = registers[program[ip+1]] op registers[program[ip+2]]; \
-  ip += 3
+  registers[program[ip]] op registers[program[ip+1]]; \
+  ip += 2
 
 #define arithmeticOp_I(op) \
-  registers[program[ip]] = registers[program[ip+1]] op *(uint32_t *)(program+ip+2); \
-  ip += 6
+  registers[program[ip]] op *(uint32_t *)(program+ip+1); \
+  ip += 5
 
 #define arithmeticOp_F(op) \
-  registers[program[ip]] = *(double *)registers+program[ip+1] op *(double *)registers+program[ip+2]; \
+  registers[program[ip]] = *(double *)(registers+program[ip+1]) op *(double *)(registers+program[ip+2]); \
   ip += 3
 
 #define arithmeticOp_F_I(op) \
-  registers[program[ip]] = *(double *)registers+program[ip+1] op *(double *)(program+ip+2); \
+  registers[program[ip]] = *(double *)(registers+program[ip+1]) op *(double *)(program+ip+2); \
   ip += 10
 
 void Interpreter::executeNextInstruction() {
@@ -54,11 +54,11 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::EXIT: {
-      exitCode = registers[0];
+      exitCode = registers[program[ip]];
       running = false;
       break;
     }
-    case OpCodes::CALL: {
+    case OpCodes::CALL_B: {
       BuiltInFunctions func = (BuiltInFunctions)program[ip++];
       switch (func) {
         case BuiltInFunctions::ALLOCATE: {
@@ -174,36 +174,104 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::JUMP: {
-      ip = registers[program[ip]];
+      ip = *(uint64_t*)(program + ip);
       break;
     }
     case OpCodes::JUMP_Z: {
       if (z) {
-        ip = registers[program[ip]];
+        ip = *(uint64_t*)(program + ip);
       } else {
-        ++ip;
+        ip+=8;
       }
       break;
     }
     case OpCodes::JUMP_NZ: {
       if (!z) {
-        ip = registers[program[ip]];
+        ip = *(uint64_t*)(program + ip);
       } else {
-        ++ip;
+        ip+=8;
       }
       break;
     }
     case OpCodes::JUMP_P: {
       if (p) {
-        ip = registers[program[ip]];
+        ip = *(uint64_t*)(program + ip);
       } else {
-        ++ip;
+        ip+=8;
+      }
+      break;
+    }
+    case OpCodes::JUMP_NP: {
+      if (!p || z) {
+        ip = *(uint64_t*)(program + ip);
+      } else {
+        ip+=8;
       }
       break;
     }
     case OpCodes::JUMP_N: {
       if (!p && !z) {
-        ip = registers[program[ip]];
+        ip = *(uint64_t*)(program + ip);
+      } else {
+        ip+=8;
+      }
+      break;
+    }
+    case OpCodes::JUMP_NN: {
+      if (p || z) {
+        ip = *(uint64_t*)(program + ip);
+      } else {
+        ip+=8;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP: {
+      ip += (int8_t)program[ip] - 1;
+      break;
+    }
+    case OpCodes::RB_JUMP_Z: {
+      if (z) {
+        ip += (int8_t)program[ip] - 1;
+      } else {
+        ++ip;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP_NZ: {
+      if (!z) {
+        ip += (int8_t)program[ip] - 1;
+      } else {
+        ++ip;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP_P: {
+      if (p) {
+        ip += (int8_t)program[ip] - 1;
+      } else {
+        ++ip;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP_NP: {
+      if (!p || z) {
+        ip += (int8_t)program[ip] - 1;
+      } else {
+        ++ip;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP_N: {
+      if (!p && !z) {
+        ip += (int8_t)program[ip] - 1;
+      } else {
+        ++ip;
+      }
+      break;
+    }
+    case OpCodes::RB_JUMP_NN: {
+      if (p || z) {
+        ip += (int8_t)program[ip] - 1;
       } else {
         ++ip;
       }
@@ -259,84 +327,94 @@ void Interpreter::executeNextInstruction() {
       sp += 8;
       break;
     }
+    case OpCodes::INC: {
+      ++registers[program[ip]];
+      ++ip;
+      break;
+    }
+    case OpCodes::DEC: {
+      --registers[program[ip]];
+      ++ip;
+      break;
+    }
     case OpCodes::ADD: {
-      arithmeticOp(+);
+      arithmeticOp(+=);
       break;
     }
     case OpCodes::ADD_I: {
-      arithmeticOp_I(+);
+      arithmeticOp_I(+=);
       break;
     }
     case OpCodes::SUB: {
-      arithmeticOp(-);
+      arithmeticOp(-=);
       break;
     }
     case OpCodes::SUB_I: {
-      arithmeticOp_I(-);
+      arithmeticOp_I(-=);
       break;
     }
     case OpCodes::MUL: {
-      arithmeticOp(*);
+      arithmeticOp(*=);
       break;
     }
     case OpCodes::MUL_I: {
-      arithmeticOp_I(*);
+      arithmeticOp_I(*=);
       break;
     }
     case OpCodes::DIV: {
-      arithmeticOp(/);
+      arithmeticOp(/=);
       break;
     }
     case OpCodes::DIV_I: {
-      arithmeticOp_I(/);
+      arithmeticOp_I(/=);
       break;
     }
     case OpCodes::MOD: {
-      arithmeticOp(%);
+      arithmeticOp(%=);
       break;
     }
     case OpCodes::MOD_I: {
-      arithmeticOp_I(%);
+      arithmeticOp_I(%=);
       break;
     }
     case OpCodes::OR: {
-      arithmeticOp(|);
+      arithmeticOp(|=);
       break;
     }
     case OpCodes::OR_I: {
-      arithmeticOp_I(|);
+      arithmeticOp_I(|=);
       break;
     }
     case OpCodes::AND: {
-      arithmeticOp(&);
+      arithmeticOp(&=);
       break;
     }
     case OpCodes::AND_I: {
-      arithmeticOp_I(&);
+      arithmeticOp_I(&=);
       break;
     }
     case OpCodes::XOR: {
-      arithmeticOp(^);
+      arithmeticOp(^=);
       break;
     }
     case OpCodes::XOR_I: {
-      arithmeticOp_I(^);
+      arithmeticOp_I(^=);
       break;
     }
     case OpCodes::SHIFT_L: {
-      arithmeticOp(<<);
+      arithmeticOp(<<=);
       break;
     }
     case OpCodes::SHIFT_L_I: {
-      arithmeticOp_I(<<);
+      arithmeticOp_I(<<=);
       break;
     }
     case OpCodes::SHIFT_R: {
-      arithmeticOp(>>);
+      arithmeticOp(>>=);
       break;
     }
     case OpCodes::SHIFT_R_I: {
-      arithmeticOp_I(>>);
+      arithmeticOp_I(>>=);
       break;
     }
     case OpCodes::F_ADD: {
@@ -372,8 +450,9 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     default: {
-      std::cerr << "Runtime Error: Invalid OpCode [" << (uint32_t)op << "]\n";
-      exit(1);
+      std::cerr << "\nRuntime Error: Invalid OpCode [" << (uint32_t)op << "]\n";
+      running = false;
+      break;
     }
   }
 }

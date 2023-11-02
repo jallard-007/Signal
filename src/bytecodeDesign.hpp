@@ -12,81 +12,94 @@ enum class BuiltInFunctions: unsigned char {
   ALLOCATE, // ALLOCATE r11 | allocate r11 bytes and place address in r10
   REALLOCATE, // REALLOCATE r11, r12 | reallocate memory at r11 with new size r12, place new address in r10
   DEALLOCATE, // DEALLOCATE r11 | deallocate memory
-  PRINT_STRING, // prints the string (null terminated) pointed at by r11
-  PRINT_CHAR, // prints the lowest byte in r11 as a character
-  PRINT_SIGNED, // prints r11 as a signed integer
-  PRINT_UNSIGNED, // prints r11 as an unsigned integer
-  PRINT_HEX, // prints r11 in hex
+  PRINT_STRING, // prints the string (null terminated) pointed at by r12 to FILE* r11
+  PRINT_CHAR, // prints the lowest byte in r12 as a character to FILE* r11
+  PRINT_SIGNED, // prints r12 as a signed integer to FILE* r11
+  PRINT_UNSIGNED, // prints r12 as an unsigned integer to FILE* r11
+  PRINT_HEX, // prints r12 in hex to FILE* r11
   GET_CHAR, // returns one character from file descriptor r11 in r10
-  FFLUSH, // flush buffer at r11 (typically stdout)
+  FFLUSH, // flush buffer FILE* r11
 };
 
 enum class OpCodes: unsigned char {
   NOP, // do nothing
   EXIT, // EXIT src | exits the program with the code in src
-  CALL, // CALL BuiltInFunctions | call a built in function such as print, etc.
+  CALL_B, // CALL_B BuiltInFunctions | call a built in function such as print, etc.
 
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
-  CMP,
+  CMP, // CMP src1, src2
 
   // SET_ src | set register to the value of the flag
-  SET_Z,
-  SET_P,
+  SET_Z, // SET dest, src
+  SET_P, // SET dest, src
 
   // LOAD dest, src | loads data from memory at the address src and places it in dest
-  LOAD_B,
-  LOAD_W,
-  LOAD_D,
-  LOAD_Q,
+  LOAD_B, // LOAD dest, src
+  LOAD_W, // LOAD dest, src
+  LOAD_D, // LOAD dest, src
+  LOAD_Q, // LOAD dest, src
 
   // STORE dest, src| stores data from src into memory at the address dest
-  STORE_B,
-  STORE_W,
-  STORE_D,
-  STORE_Q,
+  STORE_B, // STORE dest, src
+  STORE_W, // STORE dest, src
+  STORE_D, // STORE dest, src
+  STORE_Q, // STORE dest, src
 
-  // jumps to an instruction, "src" being the address to jump to
-  JUMP, // JUMP src
-  JUMP_Z, // jump if zero | JUMP_Z src
-  JUMP_NZ, // jump if not zero | JUMP_NZ src
-  JUMP_P, // jump if positive | JUMP_P src
-  JUMP_N, // jump if negative | JUMP_N src
+  // jumps to an instruction, "imm" being the 8 byte immediate address to jump to
+  JUMP, // JUMP 8 byte imm
+  JUMP_Z, // jump if zero | JUMP_Z 8 byte imm
+  JUMP_NZ, // jump if not zero | JUMP_NZ 8 byte imm
+  JUMP_P, // jump if positive | JUMP_P 8 byte imm
+  JUMP_NP, // jump if not positive (zero or negative) | JUMP_P 8 byte imm
+  JUMP_N, // jump if negative | JUMP_P 8 byte imm
+  JUMP_NN, // jump if not negative (zero or positive) | JUMP_N 8 byte imm
+
+  // relative jump by 1 byte signed 
+  RB_JUMP, // JUMP 1 byte imm
+  RB_JUMP_Z, // jump if zero | RB_JUMP_Z 1 byte signed imm
+  RB_JUMP_NZ, // jump if not zero | RB_JUMP_NZ 1 byte signed imm
+  RB_JUMP_P, // jump if positive | RB_JUMP_P 1 byte signed imm
+  RB_JUMP_NP, // jump if not positive (zero or negative) | RB_JUMP_P 1 byte imm
+  RB_JUMP_N, // jump if negative | RB_JUMP_N 1 byte signed imm
+  RB_JUMP_NN, // jump if not negative (zero or positive) | RB_JUMP_N 1 byte imm
 
   // move data between registers
   MOVE, // MOVE dest, src
-  MOVE_I, // MOVE dest, 4 byte immediate
+  MOVE_I, // MOVE dest, 4 byte imm
 
   // move data to/from the stack
-  PUSH_B,
-  PUSH_W,
-  PUSH_D,
-  PUSH_Q,
-  POP_B,
-  POP_W,
-  POP_D,
-  POP_Q,
+  PUSH_B, // PUSH_B src
+  PUSH_W, // PUSH_W src
+  PUSH_D, // PUSH_D src
+  PUSH_Q, // PUSH_Q src
+  POP_B, // POP_B dest
+  POP_W, // POP_W dest
+  POP_D, // POP_D dest
+  POP_Q, // POP_Q dest
 
   // arithmetic
-  ADD,
-  ADD_I,
-  SUB,
-  SUB_I,
-  MUL,
-  MUL_I,
-  DIV,
-  DIV_I,
-  MOD,
-  MOD_I,
-  OR,
-  OR_I,
-  AND,
-  AND_I,
-  XOR,
-  XOR_I,
-  SHIFT_L,
-  SHIFT_L_I,
-  SHIFT_R,
-  SHIFT_R_I,
+  INC,
+  DEC,
+  ADD, // ADD dest, src
+  ADD_I, // ADD_I dest, 4 byte imm
+  SUB, // SUB dest, src
+  SUB_I, // SUB_I dest, 4 byte imm
+  MUL, // MUL dest, src
+  MUL_I, // MUL_I dest, 4 byte imm
+  DIV, // DIV dest, src
+  DIV_I, // DIV_I dest, 4 byte imm
+  MOD, // MOD dest, src
+  MOD_I, // MOD_I dest, 4 byte imm
+  OR, // OR dest, src
+  OR_I, // OR_I dest, 4 byte imm
+  AND, // AND dest, src
+  AND_I, // AND_I dest, 4 byte imm
+  XOR, // XOR dest, src
+  XOR_I, // XOR_I dest, 4 byte imm
+  SHIFT_L, // SHIFT_L dest, src
+  SHIFT_L_I, // SHIFT_L_I dest, 4 byte imm
+  SHIFT_R, // SHIFT_R dest, src
+  SHIFT_R_I, // SHIFT_R_I dest, 4 byte imm
 
   // floating point arithmetic
   F_ADD,
@@ -102,7 +115,7 @@ enum class OpCodes: unsigned char {
 /*
 
   EXIT,
-  CALL,
+  CALL_B,
   CMP,
   SET_Z,
   SET_P,
