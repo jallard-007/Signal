@@ -448,7 +448,7 @@ ParseStatementErrorType Parser::parseScope(StatementList& statementList) {
 */
 ParseStatementErrorType Parser::parseStatement(Statement &statement) {
   Token token = tokenizer->peekNext();
-  if (token.type == TokenType::IDENTIFIER) { // varDec or expression
+  if (token.type != TokenType::IDENTIFIER) { // varDec or expression
     tokenizer->consumePeek();
     if (parseIdentifierStatement(statement, token) != ParseStatementErrorType::NONE) {
       return ParseStatementErrorType::REPORTED;
