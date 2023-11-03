@@ -107,7 +107,7 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
   (uc)OpCodes::STORE_B, 1, 10, // add to stack
   (uc)OpCodes::INC, 1, // increment i,
   (uc)OpCodes::CMP, 10, 2, // compare character to newline
-  (uc)OpCodes::RB_JUMP_NZ, (uc)(-10), // loop if its not newline
+  (uc)OpCodes::RB_JUMP_NE, (uc)(-10), // loop if its not newline
 
   // add null termination to end of string
   (uc)OpCodes::XOR, 2, 2,
@@ -143,7 +143,7 @@ TEST_CASE("jump", "[interpreter]") {
     (uc)OpCodes::CMP, 0, 1,
     (uc)OpCodes::XOR, 3, 3, // set exit reg to 0
     // index 26:
-    (uc)OpCodes::RB_JUMP_Z, 24, // jumps to exit
+    (uc)OpCodes::RB_JUMP_E, 24, // jumps to exit
     (uc)OpCodes::MOVE_I, 3, 1, 0, 0, 0, // set exit reg to 1, this is how the test case is checked
     (uc)OpCodes::MOVE_I, 12, 'P', '\n', 0, 0,
     (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::PRINT_CHAR,
@@ -175,7 +175,7 @@ TEST_CASE("loop", "[interpreter]") {
 
   // start of loop:
   (uc)OpCodes::CMP, 12, 2, // compare i to 9
-  (uc)OpCodes::RB_JUMP_NN, 6, // jump to end if result is not negative
+  (uc)OpCodes::RB_JUMP_GE, 6, // jump to end if result is greater than or equal to 10
   (uc)OpCodes::INC, 12,
   (uc)OpCodes::RB_JUMP, (uc)(-7),
   

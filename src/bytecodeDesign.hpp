@@ -47,21 +47,21 @@ enum class OpCodes: unsigned char {
 
   // jumps to an instruction, "imm" being the 8 byte immediate address to jump to
   JUMP, // JUMP 8 byte imm
-  JUMP_Z, // jump if zero | JUMP_Z 8 byte imm
-  JUMP_NZ, // jump if not zero | JUMP_NZ 8 byte imm
-  JUMP_P, // jump if positive | JUMP_P 8 byte imm
-  JUMP_NP, // jump if not positive (zero or negative) | JUMP_P 8 byte imm
-  JUMP_N, // jump if negative | JUMP_P 8 byte imm
-  JUMP_NN, // jump if not negative (zero or positive) | JUMP_N 8 byte imm
+  JUMP_E, // jump if equal (zero) | JUMP_E 8 byte imm
+  JUMP_NE, // jump if not equal (not zero) | JUMP_NE 8 byte imm
+  JUMP_G, // jump if greater (positive) | JUMP_G 8 byte imm
+  JUMP_GE, // jump if greater or equal (zero or positive) | JUMP_GE 8 byte imm
+  JUMP_L, // jump if less (not zero and not positive) | JUMP_L 8 byte imm
+  JUMP_LE, // jump if not less (zero or not positive) | JUMP_LE 8 byte imm
 
   // relative jump by 1 byte signed 
-  RB_JUMP, // JUMP 1 byte imm
-  RB_JUMP_Z, // jump if zero | RB_JUMP_Z 1 byte signed imm
-  RB_JUMP_NZ, // jump if not zero | RB_JUMP_NZ 1 byte signed imm
-  RB_JUMP_P, // jump if positive | RB_JUMP_P 1 byte signed imm
-  RB_JUMP_NP, // jump if not positive (zero or negative) | RB_JUMP_P 1 byte imm
-  RB_JUMP_N, // jump if negative | RB_JUMP_N 1 byte signed imm
-  RB_JUMP_NN, // jump if not negative (zero or positive) | RB_JUMP_N 1 byte imm
+  RB_JUMP, // RB_JUMP 1 byte imm
+  RB_JUMP_E, // jump if equal (zero) | RB_JUMP_E 1 byte imm
+  RB_JUMP_NE, // jump if not equal (not zero) | RB_JUMP_NE 1 byte imm
+  RB_JUMP_G, // jump if greater (positive) | RB_JUMP_G 1 byte imm
+  RB_JUMP_GE, // jump if greater or equal (zero or positive) | RB_JUMP_GE 1 byte imm
+  RB_JUMP_L, // jump if less (not zero and not positive) | RB_JUMP_L 1 byte imm
+  RB_JUMP_LE, // jump if not less (zero or not positive) | RB_JUMP_LE 1 byte imm
 
   // move data between registers
   MOVE, // MOVE dest, src
@@ -128,10 +128,10 @@ enum class OpCodes: unsigned char {
   STORE_D,
   STORE_Q,
   JUMP,
-  JUMP_Z,
-  JUMP_NZ,
-  JUMP_P,
-  JUMP_N,
+  JUMP_E,
+  JUMP_NE,
+  JUMP_GT,
+  JUMP_LT,
   MOVE,
   MOVE_I,
   PUSH_B,

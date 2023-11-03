@@ -72,19 +72,19 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
       if (charLiteral.size() == 3) {
-        return {false, charLiteral[1]};
+        return {false, true, charLiteral[1]};
       } else if (charLiteral.size() == 4) {
         if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          return {false, charLiteral[2] - '0'};
+          return {false, true, charLiteral[2] - '0'};
         } else if (charLiteral[2] == 'n') {
-          return {false, '\n'};
+          return {false, true, '\n'};
         } else if (charLiteral[2] == '\\') {
-          return {false, '\\'};
+          return {false, true, '\\'};
         } else if (charLiteral[2] == '\'') {
-          return {false, '\''};
+          return {false, true, '\''};
         }
       }
-      return {false, 0};
+      return {false, true, 0};
     }
     case TokenType::STRING_LITERAL: { 
       std::string stringLiteral = tk->extractToken(token);
@@ -103,13 +103,13 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       // convert to numeric and return
     }
     case TokenType::FALSE: { 
-      return {false, 0};
+      return {false, true, 0};
     }
     case TokenType::TRUE: { 
-      return {false, 1};
+      return {false, true, 1};
     }
     case TokenType::NULL_PTR: {
-      return {false, 0};
+      return {false, true, 0};
     }
   }
 }
@@ -199,19 +199,31 @@ void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
 
 /**
  * Generates the byte code for a mathematical binary expression
+ * Preserves any non-temporary
 */
 ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
+  const bool leftImm = !leftResult.isReg;
+  const bool rightImm = !rightResult.isReg;
 
-  if (!leftResult.isReg && !rightResult.isReg) {
+  // left imm, right imm ./
+  // left imm, right temp ./
+  // left imm, right var ./
+  // left temp, right imm ./
+  // left temp, right temp ./
+  // left temp, right var ./
+  // left var, right imm ./
+  // left var, right temp ./
+  // left var, right var ./
+
+  // left imm, right imm
+  if (leftImm && rightImm) {
     // both operands are immediate values, return the result
-    return {false, evaluateExpression(op, leftResult.val, rightResult.val)};
+    return {false, true, evaluateExpression(op, leftResult.val, rightResult.val)};
   }
-  // if we get here, one of leftSide and rightSide are not immediate values
-  // therefore, one of leftResult.isReg and rightResult.isReg are true
-  if (!leftResult.isReg) {
-    // if we get here, leftResult.isReg is false, so rightResult.isReg must be true
+
+  if (leftImm) {
     if (topBitsSet(leftResult.val)) {
       const uc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
@@ -219,8 +231,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       leftResult.isReg = true;
     }
   }
-  else {
-    // inversely, if we get here, leftResult.isReg is true, so rightResult.isReg must be false
+  else if (rightImm) {
     if (topBitsSet(rightResult.val)) {
       const uc reg = allocateRegister();
       moveImmToReg(reg, rightResult.val);
@@ -229,47 +240,119 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     }
   }
 
-  if (leftResult.isReg && rightResult.isReg) {
-    // register was allocated for both
-    addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
-    freeRegister(rightResult.val);
-    return {true, leftResult.val};
-  }
-
-  // reg was allocated for only one side
-  uc reg = 0;
-  if (isCommutative(op)) {
-    uc *split = nullptr;
-    if (rightResult.isReg) {
-      reg = rightResult.val;
-      split = (uc *)&leftResult.val; // use left side for immediate
-    } else { // leftReg was allocated
-      reg = leftResult.val;
-      split = (uc *)&rightResult.val; // use right side for immediate
+  // left temp
+  if (leftResult.isTemp) {
+    // right imm
+    if (!rightResult.isReg) {
+      uc *split = (uc *)&rightResult.val;
+      alignForImm(2);
+      addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
+      return {true, true, leftResult.val};
     }
-    alignForImm(2);
-    addBytes({(uc)opImm, reg, split[0], split[1], split[2], split[3]});
-    return {true, reg};
+    // right temp / var
+    else {
+      addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+      if (rightResult.isTemp) {
+        freeRegister(rightResult.val);
+      }
+      return {true, true, leftResult.val};
+    }
   }
+  // left imm
+  if (!leftResult.isReg) {
+    // right temp
+    if (rightResult.isTemp) {
+      if (isCommutative) {
+        uc *split = (uc *)&leftResult.val;
+        alignForImm(2);
+        addBytes({(uc)opImm, (uc)rightResult.val, split[0], split[1], split[2], split[3]});
+        return {true, true, rightResult.val};
+      }
+      // cannot flip args
+      else {
+        uc reg = allocateRegister();
+        moveImmToReg(reg, leftResult.val);
+        addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+        freeRegister(rightResult.val);
+        return {true, true, reg};
+      }
+    }
+    // right var
+    else {
+      uc reg = allocateRegister();
+      moveImmToReg(reg, leftResult.val);
+      addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+      return {true, true, reg};
+    }
+  }
+  // left var
+  {
+    // right imm
+    if (!rightResult.isReg) {
+      if (isCommutative(op)) {
+        uc reg = allocateRegister();
+        moveImmToReg(reg, rightResult.val);
+        addBytes({(uc)op, reg, (uc)leftResult.val});
+        return {true, true, reg};
+      } else {
+        uc reg = allocateRegister();
+        addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+        uc *split = (uc *)&rightResult.val;
+        addBytes({(uc)op, (uc)reg, split[0], split[1], split[2], split[3]});
+        return {true, true, reg};
+      }
+    }
+    // right temp
+    else if (rightResult.isTemp) {
+      if (isCommutative(op)) {
+        addBytes({(uc)op, (uc)rightResult.val, (uc)leftResult.val});
+        return rightResult;
+      } else {
+        uc reg = allocateRegister();
+        addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+        addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+        freeRegister(rightResult.val);
+        return {true, true, reg};
+      }
+    }
+    // right var
+    else {
+      uc reg = allocateRegister();
+      addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+      addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+      return {true, true, reg};
+    }
+  }
+}
 
-  // non commutative operations
-  reg = leftResult.val;
-  if (rightResult.isReg) {
-    // have to place right side in reg since op is not commutative
-    moveImmToReg(miscIndex, rightResult.val);
-    addBytes({(uc)op, (uc)leftResult.val, miscIndex});
+ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
+  ExpressionResult rightResult = generateExpression(binOp.rightSide);
+  ExpressionResult leftResult = generateExpression(binOp.leftSide);
+  if (!rightResult.isReg) {
+    if (topBitsSet(rightResult.val)) {
+      moveImmToReg(miscIndex, rightResult.val);
+      alignForImm(2);
+      addBytes({(uc)op, (uc)leftResult.val, miscIndex});
+    } else {
+      uc *split = (uc *)&rightResult.val;
+      alignForImm(2);
+      addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
+    }
+    return leftResult;
   }
-  else {
-    // left side is reg
-    uc *split = (uc *)&rightResult.val;
-    alignForImm(2);
-    addBytes({(uc)opImm, reg, split[0], split[1], split[2], split[3]});
-  }
-  return {true, reg};
 }
 
 ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp) {
   switch (binOp.op.type) {
+    // member access
+    case TokenType::DOT: {
+
+    }
+    case TokenType::PTR_MEMBER_ACCESS: {
+
+    }
+
+    // mathematical ops
     case TokenType::ADDITION: {
       return mathematicalBinOp(binOp, OpCodes::ADD, OpCodes::ADD_I);
     }
@@ -300,6 +383,67 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp) {
     case TokenType::SHIFT_RIGHT: {
       return mathematicalBinOp(binOp, OpCodes::SHIFT_R, OpCodes::SHIFT_R_I);
     }
+
+    // assignment ops
+    case TokenType::ASSIGNMENT: {
+
+    }
+    case TokenType::ADDITION_ASSIGNMENT: {
+    
+    }
+    case TokenType::SUBTRACTION_ASSIGNMENT: {
+    
+    }
+    case TokenType::MULTIPLICATION_ASSIGNMENT: {
+    
+    }
+    case TokenType::DIVISION_ASSIGNMENT: {
+    
+    }
+    case TokenType::MODULO_ASSIGNMENT: {
+    
+    }
+    case TokenType::BITWISE_OR_ASSIGNMENT: {
+    
+    }
+    case TokenType::BITWISE_XOR_ASSIGNMENT: {
+    
+    }
+    case TokenType::BITWISE_AND_ASSIGNMENT: {
+    
+    }
+    case TokenType::SHIFT_LEFT_ASSIGNMENT: {
+    
+    }
+    case TokenType::SHIFT_RIGHT_ASSIGNMENT: {
+    
+    }
+
+    // logical 
+    case TokenType::EQUAL: {
+    
+    }
+    case TokenType::NOT_EQUAL: {
+    
+    }
+    case TokenType::LOGICAL_AND: {
+    
+    }
+    case TokenType::LOGICAL_OR: {
+    
+    }
+    case TokenType::LESS_THAN: {
+    
+    }
+    case TokenType::LESS_THAN_EQUAL: {
+    
+    }
+    case TokenType::GREATER_THAN: {
+    
+    }
+    case TokenType::GREATER_THAN_EQUAL: {
+    
+    }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
       exit(1);
@@ -307,6 +451,4 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp) {
   }
 
 }
-
-#undef uc
 

@@ -177,7 +177,7 @@ void Interpreter::executeNextInstruction() {
       ip = *(uint64_t*)(program + ip);
       break;
     }
-    case OpCodes::JUMP_Z: {
+    case OpCodes::JUMP_E: {
       if (z) {
         ip = *(uint64_t*)(program + ip);
       } else {
@@ -185,7 +185,7 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::JUMP_NZ: {
+    case OpCodes::JUMP_NE: {
       if (!z) {
         ip = *(uint64_t*)(program + ip);
       } else {
@@ -193,7 +193,7 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::JUMP_P: {
+    case OpCodes::JUMP_G: {
       if (p) {
         ip = *(uint64_t*)(program + ip);
       } else {
@@ -201,24 +201,24 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::JUMP_NP: {
-      if (!p || z) {
+    case OpCodes::JUMP_GE: {
+      if (z || p) {
         ip = *(uint64_t*)(program + ip);
       } else {
         ip+=8;
       }
       break;
     }
-    case OpCodes::JUMP_N: {
-      if (!p && !z) {
+    case OpCodes::JUMP_L: {
+      if (!z && !p) {
         ip = *(uint64_t*)(program + ip);
       } else {
         ip+=8;
       }
       break;
     }
-    case OpCodes::JUMP_NN: {
-      if (p || z) {
+    case OpCodes::JUMP_LE: {
+      if (z || !p) {
         ip = *(uint64_t*)(program + ip);
       } else {
         ip+=8;
@@ -229,7 +229,7 @@ void Interpreter::executeNextInstruction() {
       ip += (int8_t)program[ip] - 1;
       break;
     }
-    case OpCodes::RB_JUMP_Z: {
+    case OpCodes::RB_JUMP_E: {
       if (z) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -237,7 +237,7 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::RB_JUMP_NZ: {
+    case OpCodes::RB_JUMP_NE: {
       if (!z) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -245,7 +245,7 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::RB_JUMP_P: {
+    case OpCodes::RB_JUMP_G: {
       if (p) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -253,24 +253,24 @@ void Interpreter::executeNextInstruction() {
       }
       break;
     }
-    case OpCodes::RB_JUMP_NP: {
-      if (!p || z) {
+    case OpCodes::RB_JUMP_GE: {
+      if (z || p) {
         ip += (int8_t)program[ip] - 1;
       } else {
         ++ip;
       }
       break;
     }
-    case OpCodes::RB_JUMP_N: {
-      if (!p && !z) {
+    case OpCodes::RB_JUMP_L: {
+      if (!z && !p) {
         ip += (int8_t)program[ip] - 1;
       } else {
         ++ip;
       }
       break;
     }
-    case OpCodes::RB_JUMP_NN: {
-      if (p || z) {
+    case OpCodes::RB_JUMP_LE: {
+      if (z || !p) {
         ip += (int8_t)program[ip] - 1;
       } else {
         ++ip;

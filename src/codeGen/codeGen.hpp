@@ -14,10 +14,11 @@ struct RegisterInfo {
 };
 
 struct ExpressionResult {
-  bool isReg {false};
   uint64_t val{0};
+  bool isReg {false};
+  bool isTemp {false};
   ExpressionResult() = default;
-  ExpressionResult(bool, uint64_t);
+  ExpressionResult(bool, bool, uint64_t);
 };
 
 struct CodeGen {
@@ -45,6 +46,7 @@ struct CodeGen {
   void alignForImm(uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
   ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
+  ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
   int getStackOffset(const std::string &);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
