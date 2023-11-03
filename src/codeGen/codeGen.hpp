@@ -17,6 +17,7 @@ struct ExpressionResult {
   uint64_t val{0};
   bool isReg {false};
   bool isTemp {false};
+  bool isJumpOp {false};
   ExpressionResult() = default;
   ExpressionResult(bool, bool, uint64_t);
 };
@@ -32,10 +33,10 @@ struct CodeGen {
   CodeGen(Program&, std::vector<Tokenizer>&);
 
   // expression gen
-  ExpressionResult generateExpression(const Expression &);
+  ExpressionResult generateExpression(const Expression &, bool controlFlow = false);
   ExpressionResult generateExpressionArrAccess(const ArrayAccess &);
   ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral &);
-  ExpressionResult generateExpressionBinOp(const BinOp &);
+  ExpressionResult generateExpressionBinOp(const BinOp &, bool controlFlow = false);
   ExpressionResult generateExpressionFunctionCall(const FunctionCall &);
   ExpressionResult generateExpressionUnOp(const UnOp &);
   ExpressionResult loadValue(const Token &);
@@ -43,10 +44,11 @@ struct CodeGen {
   void addByte(OpCodes);
   void addByte(unsigned char);
   void addBytes(const std::vector<unsigned char>&);
-  void alignForImm(uint32_t);
+  void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
   ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
   ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
+  ExpressionResult logicalBinOp(const BinOp&, bool, OpCodes, OpCodes, OpCodes);
   int getStackOffset(const std::string &);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);

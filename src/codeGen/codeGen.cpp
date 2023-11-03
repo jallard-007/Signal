@@ -33,7 +33,7 @@ be sure to free registers if they are no longer needed
 
 // start simple. load off of stack whenever needed, redundancy is fine, similar to -O0
 // functions will start by putting all arguments on the stack
-ExpressionResult CodeGen::generateExpression(const Expression &currExp) {
+ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
   switch (currExp.type) {
     case ExpressionType::ARRAY_ACCESS: {
       return generateExpressionArrAccess(*currExp.arrAccess);
@@ -42,7 +42,7 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp) {
       return generateExpressionArrOrStructLit(*currExp.arrayOrStruct);
     }
     case ExpressionType::BINARY_OP: {
-      return generateExpressionBinOp(*currExp.binOp);
+      return generateExpressionBinOp(*currExp.binOp, controlFlow);
     }
     case ExpressionType::FUNCTION_CALL: {
       return generateExpressionFunctionCall(*currExp.funcCall);
@@ -57,7 +57,7 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp) {
       return loadValue(currExp.value);
     }
     case ExpressionType::WRAPPED: {
-      return generateExpression(*currExp.wrapped);
+      return generateExpression(*currExp.wrapped, controlFlow);
     }
     default: {
       std::cerr << "Code generation not implemented for this expression type\n";
@@ -72,44 +72,55 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
       if (charLiteral.size() == 3) {
-        return {false, true, charLiteral[1]};
+        return {false, true, (uint64_t)charLiteral[1]};
       } else if (charLiteral.size() == 4) {
         if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          return {false, true, charLiteral[2] - '0'};
+          return {false, false, (uint64_t)(charLiteral[2] - '0')};
         } else if (charLiteral[2] == 'n') {
-          return {false, true, '\n'};
+          return {false, false, '\n'};
         } else if (charLiteral[2] == '\\') {
-          return {false, true, '\\'};
+          return {false, false, '\\'};
         } else if (charLiteral[2] == '\'') {
-          return {false, true, '\''};
+          return {false, false, '\''};
         }
       }
-      return {false, true, 0};
+      return {false, false, 0};
     }
     case TokenType::STRING_LITERAL: { 
       std::string stringLiteral = tk->extractToken(token);
-      // place string literal in data section of bytecode string
+      return {false, false, 0};
+      // place string literal in data section of bytecode string, return offset to start of string
     }
     case TokenType::DECIMAL_NUMBER: {
       std::string decimalNumber = tk->extractToken(token);
-      // convert to numeric and return
+      uint64_t num = std::stoull(decimalNumber);
+      return {false, false, num};
     }
     case TokenType::BINARY_NUMBER: { 
       std::string binaryNumber = tk->extractToken(token);
-      // convert to numeric and return
+      uint64_t num = std::stoull(binaryNumber, nullptr, 2);
+      return {false, false, num};
     }
     case TokenType::HEX_NUMBER: { 
       std::string hexNumber = tk->extractToken(token);
-      // convert to numeric and return
+      /*
+      std::invalid_argument
+      std::out_of_range
+      */
+      uint64_t num = std::stoull(hexNumber, nullptr, 16);
+      return {false, false, num};
     }
     case TokenType::FALSE: { 
-      return {false, true, 0};
+      return {false, false, 0};
     }
     case TokenType::TRUE: { 
-      return {false, true, 1};
+      return {false, false, 1};
     }
     case TokenType::NULL_PTR: {
-      return {false, true, 0};
+      return {false, false, 0};
+    }
+    default: {
+      return {false, false, 0};
     }
   }
 }
@@ -150,12 +161,13 @@ void CodeGen::addBytes(const std::vector<uc>& bytes) {
 }
 
 /**
- * Align for 4 byte immediate with offset
+ * Align for size byte immediate with offset
  * Use before any instruction that has an immediate value
  * Param offset: number of bytes before immediate
+ * Param size: size in bytes of immediate
 */
-void CodeGen::alignForImm(const uint32_t offset) {
-  uint8_t mod = (byteCode.size() + offset) % 4;
+void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
+  uint8_t mod = (byteCode.size() + offset) % size;
   while(mod--) {
     addByte(OpCodes::NOP);
   }
@@ -169,7 +181,42 @@ bool topBitsSet(uint64_t val) {
 }
 
 uint64_t evaluateExpression(OpCodes op, uint64_t left, uint64_t right) {
-
+  switch (op) {
+    case OpCodes::ADD: {
+      return left + right;
+    }
+    case OpCodes::SUB: {
+      return left - right;
+    }
+    case OpCodes::MUL: {
+      return left * right;
+    }
+    case OpCodes::DIV: {
+      return left / right;
+    }
+    case OpCodes::MOD: {
+      return left % right;
+    }
+    case OpCodes::OR: {
+      return left | right;
+    }
+    case OpCodes::AND: {
+      return left & right;
+    }
+    case OpCodes::XOR: {
+      return left ^ right;
+    }
+    case OpCodes::SHIFT_L: {
+      return left << right;
+    }
+    case OpCodes::SHIFT_R: {
+      return left >> right;
+    }
+    default: {
+      std::cerr << "Invalid OpCode in codeGen::evaluateExpression [" << (uint32_t)op  << "]\n";
+      exit(1);
+    }
+  }
 }
 
 bool isCommutative(OpCodes op) {
@@ -188,18 +235,18 @@ void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
   uc* split = (unsigned char *)&val; // split 8 byte val into array of 8 1 byte values
   if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
     // add value in little endian format
-    alignForImm(2);
+    alignForImm(2, 4);
     addBytes({(uc)OpCodes::MOVE_I, reg, split[4], split[5], split[6], split[7]});
-    alignForImm(2);
+    alignForImm(2, 4);
     addBytes({(uc)OpCodes::SHIFT_L_I, reg, 32, 0, 0, 0});
   }
-  alignForImm(2);
+  alignForImm(2, 4);
   addBytes({(uc)OpCodes::MOVE_I, reg, split[0], split[1], split[2], split[3]});
 }
 
 /**
- * Generates the byte code for a mathematical binary expression
- * Preserves any non-temporary
+ * Generates byte code for a mathematical binary expression
+ * Preserves any non-temporary values
 */
 ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
@@ -245,7 +292,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     // right imm
     if (!rightResult.isReg) {
       uc *split = (uc *)&rightResult.val;
-      alignForImm(2);
+      alignForImm(2, 4);
       addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
       return {true, true, leftResult.val};
     }
@@ -262,9 +309,9 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   if (!leftResult.isReg) {
     // right temp
     if (rightResult.isTemp) {
-      if (isCommutative) {
+      if (isCommutative(op)) {
         uc *split = (uc *)&leftResult.val;
-        alignForImm(2);
+        alignForImm(2, 4);
         addBytes({(uc)opImm, (uc)rightResult.val, split[0], split[1], split[2], split[3]});
         return {true, true, rightResult.val};
       }
@@ -325,24 +372,68 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   }
 }
 
+/**
+ * Generates byte code for assignment expressions
+ * Values on the left side are not preserved
+*/
 ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
+  registers[leftResult.val].changed = true;
   if (!rightResult.isReg) {
     if (topBitsSet(rightResult.val)) {
       moveImmToReg(miscIndex, rightResult.val);
-      alignForImm(2);
       addBytes({(uc)op, (uc)leftResult.val, miscIndex});
     } else {
       uc *split = (uc *)&rightResult.val;
-      alignForImm(2);
+      alignForImm(2, 4);
       addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
     }
-    return leftResult;
+  } else {
+    addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
   }
+  return leftResult;
 }
 
-ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp) {
+ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, bool controlFlow, OpCodes op, OpCodes jumpOp, OpCodes getOp) {
+  ExpressionResult leftResult = generateExpression(binOp.leftSide);
+  ExpressionResult rightResult = generateExpression(binOp.rightSide);
+  if (!leftResult.isReg) {
+    const uc reg = allocateRegister();
+    moveImmToReg(reg, leftResult.val);
+    leftResult.isReg = true;
+    leftResult.val = reg;
+    leftResult.isTemp = true;
+  }
+  if (!rightResult.isReg) {
+    const uc reg = allocateRegister();
+    moveImmToReg(reg, rightResult.val);
+    rightResult.isReg = true;
+    rightResult.val = reg;
+    rightResult.isTemp = true;
+  }
+  addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+  if (rightResult.isTemp) {
+    freeRegister(rightResult.val);
+  }
+  if (leftResult.isTemp) {
+    freeRegister(leftResult.val);
+  }
+  ExpressionResult expRes;
+  if (controlFlow) {
+    expRes.isJumpOp = true;
+    expRes.val = (uint64_t)jumpOp;
+  } else {
+    expRes.isReg = true;
+    expRes.isTemp = true;
+    const uc reg = allocateRegister();
+    addBytes({(uc)getOp, reg});
+    expRes.val = reg;
+  }
+  return expRes;
+}
+
+ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp, bool controlFlow) {
   switch (binOp.op.type) {
     // member access
     case TokenType::DOT: {
@@ -386,69 +477,68 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp) {
 
     // assignment ops
     case TokenType::ASSIGNMENT: {
-
+      return assignmentBinOp(binOp, OpCodes::MOVE, OpCodes::MOVE_I);
     }
     case TokenType::ADDITION_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::ADD, OpCodes::ADD_I);
     }
     case TokenType::SUBTRACTION_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::SUB, OpCodes::SUB_I);
     }
     case TokenType::MULTIPLICATION_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::MUL, OpCodes::MUL_I);
     }
     case TokenType::DIVISION_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::DIV, OpCodes::DIV_I);
     }
     case TokenType::MODULO_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::MOD, OpCodes::MOD_I);
     }
     case TokenType::BITWISE_OR_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::OR, OpCodes::OR_I);
     }
     case TokenType::BITWISE_XOR_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::XOR, OpCodes::XOR_I);
     }
     case TokenType::BITWISE_AND_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::AND, OpCodes::AND_I);
     }
     case TokenType::SHIFT_LEFT_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::SHIFT_L, OpCodes::SHIFT_L_I);
     }
     case TokenType::SHIFT_RIGHT_ASSIGNMENT: {
-    
+      return assignmentBinOp(binOp, OpCodes::SHIFT_R, OpCodes::SHIFT_R_I);
     }
 
-    // logical 
+    // figure out marker system to allow replacement of jump instruction values
+    // logical
     case TokenType::EQUAL: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_E);
     }
     case TokenType::NOT_EQUAL: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_NE);
     }
     case TokenType::LOGICAL_AND: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::LOGICAL_AND, OpCodes::JUMP_NE, OpCodes::GET_NE);
     }
     case TokenType::LOGICAL_OR: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::LOGICAL_OR, OpCodes::JUMP_NE, OpCodes::GET_NE);
     }
     case TokenType::LESS_THAN: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_L);
     }
     case TokenType::LESS_THAN_EQUAL: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_LE);
     }
     case TokenType::GREATER_THAN: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_G);
     }
     case TokenType::GREATER_THAN_EQUAL: {
-    
+      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_GE);
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
       exit(1);
     }
   }
-
 }
-

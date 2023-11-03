@@ -126,12 +126,30 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::SET_Z: {
-      registers[program[ip++]] = z;
+      z = registers[program[ip++]];
       break;
     }
     case OpCodes::SET_P: {
-      registers[program[ip++]] = p;
+      p = registers[program[ip++]];
       break;
+    }
+    case OpCodes::GET_E: {
+      registers[program[ip++]] = z;
+    }
+    case OpCodes::GET_NE: {
+      registers[program[ip++]] = !z;
+    }
+    case OpCodes::GET_G: {
+      registers[program[ip++]] = p;
+    }
+    case OpCodes::GET_GE: {
+      registers[program[ip++]] = z || p;
+    }
+    case OpCodes::GET_L: {
+      registers[program[ip++]] = !z && !p;
+    }
+    case OpCodes::GET_LE: {
+      registers[program[ip++]] = z || !p;
     }
     case OpCodes::LOAD_B: {
       registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
@@ -415,6 +433,16 @@ void Interpreter::executeNextInstruction() {
     }
     case OpCodes::SHIFT_R_I: {
       arithmeticOp_I(>>=);
+      break;
+    }
+    case OpCodes::LOGICAL_OR: {
+      z = !(registers[program[ip]] || registers[program[ip+1]]);
+      ip += 2;
+      break;
+    }
+    case OpCodes::LOGICAL_AND: {
+      z = !(registers[program[ip]] && registers[program[ip+1]]);
+      ip += 2;
       break;
     }
     case OpCodes::F_ADD: {

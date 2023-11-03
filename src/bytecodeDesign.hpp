@@ -29,9 +29,15 @@ enum class OpCodes: unsigned char {
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
   CMP, // CMP src1, src2
 
-  // SET_ src | set register to the value of the flag
-  SET_Z, // SET dest, src
-  SET_P, // SET dest, src
+  SET_Z, // SET src
+  SET_P, // SET src
+  GET_E, // GET_E dest | set dest to 1 if z is true
+  GET_NE, // GET_NE dest | set dest to 1 if z is false
+  GET_G, // GET_G dest | set dest to 1 if p is true
+  GET_GE, // GET_GE dest | set dest to 1 if z or p are true
+  GET_L, // GET_L dest | set dest to 1 if z and p are false
+  GET_LE, // GET_LE dest | set dest to 1 if z is true or p is false
+
 
   // LOAD dest, src | loads data from memory at the address src and places it in dest
   LOAD_B, // LOAD dest, src
@@ -100,6 +106,9 @@ enum class OpCodes: unsigned char {
   SHIFT_L_I, // SHIFT_L_I dest, 4 byte imm
   SHIFT_R, // SHIFT_R dest, src
   SHIFT_R_I, // SHIFT_R_I dest, 4 byte imm
+
+  LOGICAL_OR,
+  LOGICAL_AND,
 
   // floating point arithmetic
   F_ADD,
