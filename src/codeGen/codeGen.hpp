@@ -8,32 +8,46 @@
 #include "../bytecodeDesign.hpp"
 
 struct RegisterInfo {
-  uint32_t stackOffset;
+  uint32_t stackOffset{0};
   bool inUse {false};
   bool changed {false};
 };
 
+struct ExpressionResult {
+  bool isReg {false};
+  uint64_t val{0};
+  ExpressionResult() = default;
+  ExpressionResult(bool, uint64_t);
+};
+
 struct CodeGen {
   std::map<std::string, uint32_t> variableNameToRegister;
+  std::vector<unsigned char> byteCode;
   std::array<RegisterInfo, NUM_REGISTERS> registers;
+  Tokenizer *tk{nullptr};
   Program &program;
   std::vector<Tokenizer> &tokenizers;
-  Tokenizer *tk;
 
   CodeGen(Program&, std::vector<Tokenizer>&);
 
   // expression gen
-  uint32_t generateExpression(const Expression &);
-  uint32_t generateExpressionArrAccess(const ArrayAccess &);
-  uint32_t generateExpressionArrOrStructLit(const ArrayOrStructLiteral &);
-  uint32_t generateExpressionBinOp(const BinOp &);
-  uint32_t generateExpressionFunctionCall(const FunctionCall &);
-  uint32_t generateExpressionUnOp(const UnOp &);
-  uint64_t loadValue(const Token &);
-
+  ExpressionResult generateExpression(const Expression &);
+  ExpressionResult generateExpressionArrAccess(const ArrayAccess &);
+  ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral &);
+  ExpressionResult generateExpressionBinOp(const BinOp &);
+  ExpressionResult generateExpressionFunctionCall(const FunctionCall &);
+  ExpressionResult generateExpressionUnOp(const UnOp &);
+  ExpressionResult loadValue(const Token &);
+  
+  void addByte(OpCodes);
+  void addByte(unsigned char);
+  void addBytes(const std::vector<unsigned char>&);
+  void alignForImm(uint32_t);
+  void moveImmToReg(uint8_t, uint64_t);
+  ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
   int getStackOffset(const std::string &);
-  uint32_t allocateRegister();
-  void freeRegister(uint32_t);
+  unsigned char allocateRegister();
+  void freeRegister(unsigned char);
 };
 
 /*
