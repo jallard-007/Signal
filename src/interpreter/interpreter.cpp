@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cinttypes>
 #include "interpreter.hpp"
 
 #define sp registers[stackPointerIndex]
@@ -84,15 +85,15 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::PRINT_SIGNED: {
-          fprintf((FILE *)registers[11], "%ld", (int64_t)registers[12]);
+          fprintf((FILE *)registers[11], "%" PRId64, (int64_t)registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_UNSIGNED: {
-          fprintf((FILE *)registers[11], "%lu", registers[12]);
+          fprintf((FILE *)registers[11], "%" PRIu64, registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_HEX: {
-          fprintf((FILE *)registers[11], "0x%08lx", registers[12]);
+          fprintf((FILE *)registers[11], "0x%08" PRIx64, registers[12]);
           break;
         }
         case BuiltInFunctions::GET_CHAR: {
