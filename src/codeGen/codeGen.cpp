@@ -395,7 +395,12 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
   return leftResult;
 }
 
-ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, bool controlFlow, OpCodes op, OpCodes jumpOp, OpCodes getOp) {
+/**
+ * Generates the code for a logical/boolean bin op 
+ * On controlFlow, this will set the jumpOp field in ExpressionResult to the correct jump op
+ * On !controlFlow, the result will be put into a register
+*/
+ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, OpCodes op, OpCodes jumpOp, OpCodes getOp, bool controlFlow) {
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   if (!leftResult.isReg) {
@@ -421,8 +426,7 @@ ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, bool controlFlow, OpC
   }
   ExpressionResult expRes;
   if (controlFlow) {
-    expRes.isJumpOp = true;
-    expRes.val = (uint64_t)jumpOp;
+    expRes.jumpOp = jumpOp;
   } else {
     expRes.isReg = true;
     expRes.isTemp = true;
@@ -433,7 +437,7 @@ ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, bool controlFlow, OpC
   return expRes;
 }
 
-ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp, bool controlFlow) {
+ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool controlFlow) {
   switch (binOp.op.type) {
     // member access
     case TokenType::DOT: {
@@ -513,28 +517,28 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp &binOp, bool contr
     // figure out marker system to allow replacement of jump instruction values
     // logical
     case TokenType::EQUAL: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_E);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_E, controlFlow);
     }
     case TokenType::NOT_EQUAL: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_NE);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_AND: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::LOGICAL_AND, OpCodes::JUMP_NE, OpCodes::GET_NE);
+      return logicalBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_OR: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::LOGICAL_OR, OpCodes::JUMP_NE, OpCodes::GET_NE);
+      return logicalBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LESS_THAN: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_L);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_L, controlFlow);
     }
     case TokenType::LESS_THAN_EQUAL: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_LE);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_LE, controlFlow);
     }
     case TokenType::GREATER_THAN: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_G);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_G, controlFlow);
     }
     case TokenType::GREATER_THAN_EQUAL: {
-      return logicalBinOp(binOp, controlFlow, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_GE);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_GE, controlFlow);
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
