@@ -84,15 +84,15 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::PRINT_SIGNED: {
-          fprintf((FILE *)registers[11], "%lld", (int64_t)registers[12]);
+          fprintf((FILE *)registers[11], "%ld", (int64_t)registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_UNSIGNED: {
-          fprintf((FILE *)registers[11], "%llu", registers[12]);
+          fprintf((FILE *)registers[11], "%lu", registers[12]);
           break;
         }
         case BuiltInFunctions::PRINT_HEX: {
-          fprintf((FILE *)registers[11], "0x%08llx", registers[12]);
+          fprintf((FILE *)registers[11], "0x%08lx", registers[12]);
           break;
         }
         case BuiltInFunctions::GET_CHAR: {
@@ -135,21 +135,27 @@ void Interpreter::executeNextInstruction() {
     }
     case OpCodes::GET_E: {
       registers[program[ip++]] = z;
+      break;
     }
     case OpCodes::GET_NE: {
       registers[program[ip++]] = !z;
+      break;
     }
     case OpCodes::GET_G: {
       registers[program[ip++]] = p;
+      break;
     }
     case OpCodes::GET_GE: {
       registers[program[ip++]] = z || p;
+      break;
     }
     case OpCodes::GET_L: {
       registers[program[ip++]] = !z && !p;
+      break;
     }
     case OpCodes::GET_LE: {
       registers[program[ip++]] = z || !p;
+      break;
     }
     case OpCodes::LOAD_B: {
       registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
