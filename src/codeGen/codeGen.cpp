@@ -11,8 +11,9 @@
 
 CodeGen::CodeGen(
   Program& program,
-  std::vector<Tokenizer>& tokenizers
-): program{program}, tokenizers{tokenizers} {
+  std::vector<Tokenizer>& tokenizers,
+  Checker& checker
+): program{program}, tokenizers{tokenizers}, checker{checker} {
   sp.inUse = true;
   ip.inUse = true;
   bp.inUse = true;
@@ -581,4 +582,172 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
       exit(1);
     }
   }
+}
+
+uint32_t sizeOfType(const TokenType type) {
+  switch (type) {
+    case TokenType::BOOL: {
+      return 1;
+    }
+    case TokenType::CHAR_TYPE: {
+      return 1;
+    }
+    case TokenType::STRING_TYPE: {
+      return 8;
+    }
+    case TokenType::INT8_TYPE: {
+      return 1;
+    }
+    case TokenType::UINT8_TYPE: {
+      return 1;
+    }
+    case TokenType::INT16_TYPE: {
+      return 2;
+    }
+    case TokenType::UINT16_TYPE: {
+      return 2;
+    }
+    case TokenType::INT32_TYPE: {
+      return 4;
+    }
+    case TokenType::UINT32_TYPE: {
+      return 4;
+    }
+    case TokenType::INT64_TYPE: {
+      return 8;
+    }
+    case TokenType::UINT64_TYPE: {
+      return 8;
+    }
+    case TokenType::POINTER: {
+      return 8;
+    }
+    case TokenType::DOUBLE_TYPE: {
+      return 8;
+    }
+    case TokenType::VOID: {
+      return 0;
+    }
+  }
+}
+
+/**
+ * Makes rooms on the stack for the variable and assigns the initial assignment to it
+ * \returns the size of the type
+*/
+uint32_t CodeGen::generateDeclarationVariable(const VariableDec& varDec, bool initialize) {
+  int16_t reg = -1; 
+  Token typeToken = varDec.type.token;
+  if (isBuiltInType(typeToken.type)) {
+    if (initialize && varDec.initialAssignment) {
+      ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
+      if (!expRes.isReg) {
+        reg = allocateRegister();
+        moveImmToReg(reg, expRes.val);
+      } else {
+        reg = expRes.val;
+      }
+    }
+    const uint32_t size = sizeOfType(varDec.type.token.type);
+    switch (size) {
+      case 0: {
+        break;
+      }
+      case 1: {
+        if (reg != -1) {
+          addBytes({(uc)OpCodes::PUSH_B, (uc)reg});
+        } else {
+          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+        }
+        break;
+      }
+      case 2: {
+        if (reg != -1) {
+          addBytes({(uc)OpCodes::PUSH_W, (uc)reg});
+        } else {
+          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+        }
+        break;
+      }
+      case 4: {
+        if (reg != -1) {
+          addBytes({(uc)OpCodes::PUSH_D, (uc)reg});
+        } else {
+          alignForImm(2, 4);
+          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+        }
+        break;
+      }
+      case 8: {
+        if (reg != -1) {
+          addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
+        } else {
+          alignForImm(2, 4);
+          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+        }
+        break;
+      }
+      default: {
+        std::cerr << "Invalid Size in generateDeclarationVariable\n";
+        exit(1);
+      }
+    }
+    return size;
+  }
+  else if (typeToken.type == TokenType::IDENTIFIER) {
+    const uint32_t size = generateDeclarationVariableStructType(varDec, initialize);
+    return size;
+  } else {
+    assert(typeToken.type==TokenType::REFERENCE);
+    return 0;
+  }
+}
+
+uint32_t CodeGen::sizeOfStruct(StructDecList *structDecList) {
+  uint32_t size = 0;
+  while (structDecList) {
+    if (structDecList->type != StructDecType::VAR) {
+      continue;
+    }
+    Token typeToken = structDecList->varDec->type.token;
+    if (isBuiltInType(typeToken.type)) {
+      size += sizeOfType(typeToken.type);
+    } else {
+      const std::string typeName = tk->extractToken(typeToken);
+      StructInformation &info = structNameToInfoMap[typeName];
+      if (info.size != -1) {
+        size += info.size;
+      } else {
+        GeneralDec const * const &generalDec = checker.lookUp[typeName];
+        Tokenizer *oldTk = tk;
+        tk = &tokenizers[generalDec->tokenizerIndex];
+        size += sizeOfStruct(&generalDec->structDec->decs);
+        tk = oldTk;
+      }
+    }
+    structDecList = structDecList->next;
+  }
+  return size;
+}
+
+uint32_t CodeGen::generateDeclarationVariableStructType(const VariableDec& varDec, bool initialize) {
+  Tokenizer *oldTk = tk;
+  std::string typeName = tk->extractToken(varDec.type.token);
+  StructInformation &info = structNameToInfoMap[typeName];
+  if (info.size != -1) {
+    return info.size;
+  }
+  GeneralDec const * const &generalDec = checker.lookUp[typeName];
+  tk = &tokenizers[generalDec->tokenizerIndex];
+  StructDecList *structDecList = &generalDec->structDec->decs;
+  info.size = sizeOfStruct(structDecList);
+  while (structDecList) {
+    if (structDecList->type == StructDecType::VAR) {
+      generateDeclarationVariable(*structDecList->varDec, initialize);
+    }
+    structDecList = structDecList->next;
+  }
+  tk = oldTk;
+  return info.size;
 }
