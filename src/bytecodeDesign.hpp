@@ -86,6 +86,7 @@ enum class OpCodes: unsigned char {
   // arithmetic
   INC,
   DEC,
+  NOT,
   ADD, // ADD dest, src
   ADD_I, // ADD_I dest, 4 byte imm
   SUB, // SUB dest, src

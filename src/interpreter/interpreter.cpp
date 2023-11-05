@@ -362,6 +362,11 @@ void Interpreter::executeNextInstruction() {
       ++ip;
       break;
     }
+    case OpCodes::NOT: {
+      registers[program[ip]] = !registers[program[ip]];
+      ++ip;
+      break;
+    }
     case OpCodes::ADD: {
       arithmeticOp(+=);
       break;

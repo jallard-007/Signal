@@ -336,18 +336,11 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   {
     // right imm
     if (!rightResult.isReg) {
-      if (isCommutative(op)) {
-        uc reg = allocateRegister();
-        moveImmToReg(reg, rightResult.val);
-        addBytes({(uc)op, reg, (uc)leftResult.val});
-        return {true, true, reg};
-      } else {
-        uc reg = allocateRegister();
-        addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
-        uc *split = (uc *)&rightResult.val;
-        addBytes({(uc)op, (uc)reg, split[0], split[1], split[2], split[3]});
-        return {true, true, reg};
-      }
+      uc reg = allocateRegister();
+      addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+      uc *split = (uc *)&rightResult.val;
+      addBytes({(uc)op, (uc)reg, split[0], split[1], split[2], split[3]});
+      return {true, true, reg};
     }
     // right temp
     else if (rightResult.isTemp) {
@@ -542,6 +535,49 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
+      exit(1);
+    }
+  }
+}
+
+ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
+  ExpressionResult expRes = generateExpression(unOp.operand);
+
+  switch (unOp.op.type) {
+    case TokenType::NOT: {
+      if (!expRes.isReg) {
+        const uc reg = allocateRegister();
+        moveImmToReg(reg, expRes.val);
+        expRes.val = reg;
+        expRes.isReg = true;
+        expRes.isTemp = true;
+      }
+      addBytes({(uc)OpCodes::NOT, (uc)expRes.val});
+      return expRes;
+    }
+    case TokenType::ADDRESS_OF: {
+      return expRes;
+    }
+    case TokenType::DEREFERENCE: {
+      return expRes;
+    }
+    case TokenType::INCREMENT_POSTFIX: {
+      return expRes;
+    }
+    case TokenType::INCREMENT_PREFIX: {
+      return expRes;
+    }
+    case TokenType::DECREMENT_POSTFIX: {
+      return expRes;
+    }
+    case TokenType::DECREMENT_PREFIX: {
+      return expRes;
+    }
+    case TokenType::NEGATIVE: {
+      return expRes;
+    }
+    default: {
+      std::cerr << "Invalid\n";
       exit(1);
     }
   }
