@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include "codeGen.hpp"
 
 #define sp registers[stackPointerIndex]
@@ -9,11 +10,21 @@
 
 #define uc unsigned char
 
+ExpressionResult::ExpressionResult(bool isReg, bool isTemp, uint64_t val):
+  val{val}, jumpOp{OpCodes::NOP}, isReg{isReg}, isTemp{isTemp}, isStruct{false} {}
+
+JumpMarker::JumpMarker(uint64_t index, JumpMarkerType type):
+  index{index}, type{type} {}
+
+bool JumpMarker::operator==(const JumpMarker other) const {
+  return other.index == index && other.type == type;
+}
+
 CodeGen::CodeGen(
   Program& program,
   std::vector<Tokenizer>& tokenizers,
   Checker& checker
-): program{program}, tokenizers{tokenizers}, checker{checker} {
+): program{program}, checker{checker}, tokenizers{tokenizers} {
   sp.inUse = true;
   ip.inUse = true;
   bp.inUse = true;
@@ -30,8 +41,25 @@ update value on stack with the value in the register if its been updated (need t
 be sure to free registers if they are no longer needed
 
 */
+ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAccess) {
+  if (arrAccess.array.wrapped) {
+    return {false, false, 0};
+  }
+  return {false, false, 0};
+}
 
-
+ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLiteral &arrOrStructLit) {
+  if (arrOrStructLit.values.next) {
+    return {false, false, 0};
+  }
+  return {false, false, 0};
+}
+ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
+  if (functionCall.name.length) {
+    return {false, false, 0};
+  }
+  return {false, false, 0};
+}
 // start simple. load off of stack whenever needed, redundancy is fine, similar to -O0
 // functions will start by putting all arguments on the stack
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
@@ -73,7 +101,7 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
       if (charLiteral.size() == 3) {
-        return {false, true, (uint64_t)charLiteral[1]};
+        return {false, false, (uint64_t)charLiteral[1]};
       } else if (charLiteral.size() == 4) {
         if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
           return {false, false, (uint64_t)(charLiteral[2] - '0')};
@@ -119,6 +147,10 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::NULL_PTR: {
       return {false, false, 0};
+    }
+    case TokenType::IDENTIFIER: {
+      // check if value is already in a reg. to do that we need a lookup. variable name to information regarding location, if its already in a register, etc.
+      
     }
     default: {
       return {false, false, 0};
@@ -169,7 +201,10 @@ void CodeGen::addBytes(const std::vector<uc>& bytes) {
 */
 void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
   uint8_t mod = (byteCode.size() + offset) % size;
-  while(mod--) {
+  if (mod == 0) {
+    return;
+  }
+  while(mod++ != size) {
     addByte(OpCodes::NOP);
   }
 }
@@ -268,7 +303,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   // left imm, right imm
   if (leftImm && rightImm) {
     // both operands are immediate values, return the result
-    return {false, true, evaluateExpression(op, leftResult.val, rightResult.val)};
+    return {false, false, evaluateExpression(op, leftResult.val, rightResult.val)};
   }
 
   if (leftImm) {
@@ -393,6 +428,11 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
  * Generates the code for a logical/boolean bin op 
  * On controlFlow, this will set the jumpOp field in ExpressionResult to the correct jump op
  * On !controlFlow, the result will be put into a register
+ * \param binOp the binOp object to generate code for
+ * \param op the op code used to do the comparison
+ * \param jumpOp the jump op code to use on control flow statement. jump on !condition, so the jump op jumps when the condition is false. used when controlFlow is true
+ * \param getOp the get op code to use when placing the result in a register. used when controlFlow is false
+ * \param controlFlow dictates if the jump op will be returned, or if the get op will be used and a register will be returned
 */
 ExpressionResult CodeGen::logicalBinOp(const BinOp& binOp, OpCodes op, OpCodes jumpOp, OpCodes getOp, bool controlFlow) {
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
@@ -511,28 +551,28 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
     // figure out marker system to allow replacement of jump instruction values
     // logical
     case TokenType::EQUAL: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_E, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_E, controlFlow);
     }
     case TokenType::NOT_EQUAL: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_AND: {
-      return logicalBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
+      return logicalBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_OR: {
-      return logicalBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::JUMP_NE, OpCodes::GET_NE, controlFlow);
+      return logicalBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LESS_THAN: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_L, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_L, controlFlow);
     }
     case TokenType::LESS_THAN_EQUAL: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_LE, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_LE, controlFlow);
     }
     case TokenType::GREATER_THAN: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_G, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_G, controlFlow);
     }
     case TokenType::GREATER_THAN_EQUAL: {
-      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_GE, controlFlow);
+      return logicalBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_GE, controlFlow);
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
@@ -628,6 +668,10 @@ uint32_t sizeOfType(const TokenType type) {
     case TokenType::VOID: {
       return 0;
     }
+    default: {
+      std::cerr << "Invalid TokenType in CodeGen::sizeOfType\n";
+      exit(1);
+    }
   }
 }
 
@@ -704,6 +748,10 @@ uint32_t CodeGen::generateDeclarationVariable(const VariableDec& varDec, bool in
   }
 }
 
+/**
+ * TODO: add padding to align data
+ * also need to make offset info for each member variable, probably not in here though
+*/
 uint32_t CodeGen::sizeOfStruct(StructDecList *structDecList) {
   uint32_t size = 0;
   while (structDecList) {
@@ -750,4 +798,119 @@ uint32_t CodeGen::generateDeclarationVariableStructType(const VariableDec& varDe
   }
   tk = oldTk;
   return info.size;
+}
+
+void CodeGen::addMarker(JumpMarkerType type) {
+  jumpMarkers.emplace_back(byteCode.size(), type);
+}
+
+void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
+  ExpressionResult expRes = generateExpression(ifStatement.condition, true);
+  if (expRes.jumpOp == OpCodes::NOP) {
+    if (!expRes.isReg) {
+      if (expRes.val) {
+        // condition always true
+        generateScope(ifStatement.body);
+      }
+      // else condition always false
+      return;
+    } else {
+      addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
+      expRes.jumpOp = OpCodes::JUMP_E;
+    }
+  }
+  alignForImm(1, 8);
+  addMarker(JumpMarkerType::IF_STATEMENT);
+  addBytes({(uc)expRes.jumpOp, 0, 0, 0, 0, 0, 0, 0, 0});
+  // if condition is false, jump to next in chain (elif if there is one, otherwise else if there is one, otherwise next statement)
+  generateScope(ifStatement.body);
+}
+
+void CodeGen::updateJumpOp(JumpMarkerType type, JumpMarkerType until) {
+  if (until != JumpMarkerType::NONE) {
+  }
+  const uint64_t currentIndex = byteCode.size();
+  for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
+    if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
+      jumpMarker->type = JumpMarkerType::NONE;
+      break;
+    }
+    if (jumpMarker->type == type) {
+      uint64_t index = jumpMarker->index + 1;
+      *(uint64_t *)(byteCode.data() + index) = currentIndex;
+      jumpMarker->type = JumpMarkerType::NONE;
+      if (until == JumpMarkerType::NONE) {
+        break;
+      }
+    }
+  }
+  // clean up
+  while (!jumpMarkers.empty() && jumpMarkers.back().type == JumpMarkerType::NONE) {
+    jumpMarkers.pop_back();
+  }
+}
+
+void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
+  switch (controlFlowStatement.type) {
+    case ControlFlowStatementType::FOR_LOOP: {
+      break;
+    }
+    case ControlFlowStatementType::WHILE_LOOP: {
+      break;
+    }
+    case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
+      const IfStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
+      const ElifStatementList *elifStatementList = controlFlowStatement.conditional->elifStatement;
+      const Scope* elseStatement = controlFlowStatement.conditional->elseStatement;
+      addMarker(JumpMarkerType::START_IF); // mark start of this if/elif/else chain
+
+      // if statement
+      generateIfStatement(ifStatement);
+      if (elifStatementList || elseStatement) {
+        alignForImm(1, 8);
+        addMarker(JumpMarkerType::END_IF);
+        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+      }
+      updateJumpOp(JumpMarkerType::IF_STATEMENT);
+
+      // elif statements
+      while (elifStatementList) {
+        generateIfStatement(elifStatementList->elif);
+        elifStatementList = elifStatementList->next;
+        if (elifStatementList || elseStatement) {
+          alignForImm(1, 8);
+          addMarker(JumpMarkerType::END_IF);
+          addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+        }
+        updateJumpOp(JumpMarkerType::IF_STATEMENT);
+      }
+
+      // else statement
+      if (elseStatement) {
+        generateScope(*elseStatement);
+      }
+
+      // update all END_IF jump ops (until START_IF) to go to current index
+      updateJumpOp(JumpMarkerType::END_IF, JumpMarkerType::START_IF);
+      break;
+    }
+    case ControlFlowStatementType::RETURN_STATEMENT: {
+      break;
+    }
+    case ControlFlowStatementType::EXIT_STATEMENT: {
+      break;
+    }
+    case ControlFlowStatementType::SWITCH_STATEMENT: {
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
+
+void CodeGen::generateScope(const Scope& scope) {
+  if (scope.scopeStatements.next) {
+    return;
+  }
 }

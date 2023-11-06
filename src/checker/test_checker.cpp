@@ -1,18 +1,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include "checker.hpp"
 #include "../parser/parser.hpp"
-
-NodeMemPool mem3;
+#include "../testingMemPool.hpp"
 
 TEST_CASE("scanTopLevel", "[checker]") {
   const std::string str = "func funcName(): int {other: char; }var : int;struct thing {  var : int;}";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/checker/test_checker.cpp", str);
-  Parser pr{tks.back(), mem3};
+  Parser pr{tks.back(), memPool};
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tks, mem3};
+  Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
   CHECK(tc.errors.empty());
   CHECK(tc.lookUp["funcName"]);
@@ -28,11 +27,11 @@ TEST_CASE("checkType", "[checker]") {
   const std::string str = "struct other { } struct thing { var : another; } func another(): int {} ";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/checker/test_checker.cpp", str);
-  Parser pr{tks.back(), mem3};
+  Parser pr{tks.back(), memPool};
   REQUIRE(pr.parse());
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tks, mem3};
+  Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
   {
     TokenList tokenList;
@@ -95,11 +94,11 @@ struct customType {
 )";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/checker/test_checker.cpp", str);
-  Parser pr{tks.back(), mem3};
+  Parser pr{tks.back(), memPool};
   pr.parse();
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tks, mem3};
+  Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
   CHECK(tc.errors.empty());
@@ -135,11 +134,11 @@ struct customType {
 )";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/checker/test_checker.cpp", str);
-  Parser pr{tks.back(), mem3};
+  Parser pr{tks.back(), memPool};
   pr.parse();
   REQUIRE(pr.expected.empty());
   REQUIRE(pr.unexpected.empty());
-  Checker tc{pr.program, tks, mem3};
+  Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
   tc.fullScan();

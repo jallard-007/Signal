@@ -11,7 +11,7 @@ set_target_properties(interpreter common PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${P
 add_executable(main ./src/main.cpp)
 target_link_libraries(main PRIVATE common)
 
-add_executable(test ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp ./src/interpreter/test_interpreter.cpp)
+add_executable(test ./src/testingMemPool.cpp ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp ./src/interpreter/test_interpreter.cpp ./src/codeGen/test_codeGen.cpp)
 target_link_libraries(test PRIVATE common interpreter Catch2::Catch2WithMain)
 
 if ( UNIX )

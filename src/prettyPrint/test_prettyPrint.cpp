@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "../parser/parser.hpp"
-
-NodeMemPool memPool2;
+#include "../testingMemPool.hpp"
 
 TEST_CASE("Something", "[prettyPrinter]") {
   const std::string str = 
@@ -33,7 +32,7 @@ R"(func getType(type: Type ref): Token {
 )";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
-  Parser parser{tks.back(), memPool2};
+  Parser parser{tks.back(), memPool};
   REQUIRE(parser.parse());
   REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());
@@ -63,7 +62,7 @@ R"(func getType(type: Type ref): Token {
 )";
   std::vector<Tokenizer> tks;
   tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp",  str);
-  Parser parser{tks.back(), memPool2};
+  Parser parser{tks.back(), memPool};
   parser.parse();
   REQUIRE(parser.expected.empty());
   REQUIRE(parser.unexpected.empty());

@@ -29,10 +29,30 @@ struct StructInformation {
   StructInformation() = default;
 };
 
+enum class JumpMarkerType: unsigned char {
+  NONE,
+  START_IF,
+  IF_STATEMENT,
+  END_IF,
+  LOOP,
+  SWITCH,
+  BREAK,
+  CONTINUE,
+};
+
+struct JumpMarker {
+  uint64_t index;
+  JumpMarkerType type;
+  JumpMarker() = delete;
+  JumpMarker(uint64_t, JumpMarkerType);
+  bool operator==(const JumpMarker) const;
+};
+
 struct CodeGen {
+  std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
   std::vector<unsigned char> byteCode;
-  std::array<RegisterInfo, NUM_REGISTERS> registers;
+  std::vector<JumpMarker> jumpMarkers;
   Tokenizer *tk{nullptr};
   Program &program;
   Checker &checker;
@@ -52,6 +72,13 @@ struct CodeGen {
   uint32_t generateDeclarationVariable(const VariableDec&, bool = true);
   uint32_t generateDeclarationVariableStructType(const VariableDec&, bool);
   uint32_t sizeOfStruct(StructDecList *);
+
+  void generateControlFlowStatement(const ControlFlowStatement&);
+  void generateIfStatement(const IfStatement&);
+  void updateJumpOp(JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
+  void addMarker(JumpMarkerType);
+
+  void generateScope(const Scope&);
 
   void addByte(OpCodes);
   void addByte(unsigned char);
