@@ -679,7 +679,7 @@ uint32_t sizeOfType(const TokenType type) {
  * Makes rooms on the stack for the variable and assigns the initial assignment to it
  * \returns the size of the type
 */
-uint32_t CodeGen::generateDeclarationVariable(const VariableDec& varDec, bool initialize) {
+uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
   int16_t reg = -1; 
   Token typeToken = varDec.type.token;
   if (isBuiltInType(typeToken.type)) {
@@ -733,14 +733,14 @@ uint32_t CodeGen::generateDeclarationVariable(const VariableDec& varDec, bool in
         break;
       }
       default: {
-        std::cerr << "Invalid Size in generateDeclarationVariable\n";
+        std::cerr << "Invalid Size in generateVariableDeclaration\n";
         exit(1);
       }
     }
     return size;
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
-    const uint32_t size = generateDeclarationVariableStructType(varDec, initialize);
+    const uint32_t size = generateVariableDeclarationStructType(varDec, initialize);
     return size;
   } else {
     assert(typeToken.type==TokenType::REFERENCE);
@@ -779,7 +779,7 @@ uint32_t CodeGen::sizeOfStruct(StructDecList *structDecList) {
   return size;
 }
 
-uint32_t CodeGen::generateDeclarationVariableStructType(const VariableDec& varDec, bool initialize) {
+uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
   Tokenizer *oldTk = tk;
   std::string typeName = tk->extractToken(varDec.type.token);
   StructInformation &info = structNameToInfoMap[typeName];
@@ -792,7 +792,7 @@ uint32_t CodeGen::generateDeclarationVariableStructType(const VariableDec& varDe
   info.size = sizeOfStruct(structDecList);
   while (structDecList) {
     if (structDecList->type == StructDecType::VAR) {
-      generateDeclarationVariable(*structDecList->varDec, initialize);
+      generateVariableDeclaration(*structDecList->varDec, initialize);
     }
     structDecList = structDecList->next;
   }
@@ -910,7 +910,55 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
 }
 
 void CodeGen::generateScope(const Scope& scope) {
-  if (scope.scopeStatements.next) {
+  for (
+    const StatementList *statementList = &scope.scopeStatements;
+    statementList;
+    statementList = statementList->next
+  ) {
+    generateStatement(statementList->curr);
     return;
+  }
+}
+
+void CodeGen::generateStatement(const Statement& statement) {
+  switch(statement.type) {
+    case StatementType::NOTHING: {
+      break;
+    }
+    case StatementType::EXPRESSION: {
+      generateExpression(*statement.expression);
+      break;
+    }
+    case StatementType::CONTROL_FLOW: {
+      generateControlFlowStatement(*statement.controlFlow);
+      break;
+    }
+    case StatementType::SCOPE: {
+      generateScope(*statement.scope);
+      break;
+    }
+    case StatementType::VARIABLE_DEC: {
+      generateVariableDeclaration(*statement.varDec);
+      break;
+    }
+    case StatementType::KEYWORD: {
+      // continue or break
+      if (statement.keyword.type == TokenType::BREAK) {
+        alignForImm(1, 8);
+        addMarker(JumpMarkerType::BREAK);
+        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+
+      }
+      else if (statement.keyword.type == TokenType::CONTINUE) {
+        alignForImm(1, 8);
+        addMarker(JumpMarkerType::CONTINUE);
+        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+      }
+      else {
+        std::cerr << "Invalid keyword type in CodeGen::generateStatement\n";
+        exit(1);
+      }
+      break;
+    }
   }
 }

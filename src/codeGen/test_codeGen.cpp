@@ -6,7 +6,7 @@
 
 #define uc unsigned char
 
-#define UT_boilerPlate(str) std::vector<Tokenizer> dummyTokenizers; \
+#define testBoilerPlate(str) std::vector<Tokenizer> dummyTokenizers; \
   Program dummyProgram; \
   Checker dummyChecker{dummyProgram, dummyTokenizers, memPool}; \
   CodeGen codeGen{dummyProgram, dummyTokenizers, dummyChecker}; \
@@ -18,7 +18,7 @@ TEST_CASE("expressions", "[codeGen]") {
   // boiler plate
   {
     const std::string str = " 4 + 4 ;";
-    UT_boilerPlate(str);
+    testBoilerPlate(str);
     Expression expression;
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
     REQUIRE(errorType == ParseExpressionErrorType::NONE);
@@ -34,12 +34,12 @@ TEST_CASE("variable creation", "[codeGen]") {
   // boiler plate
   {
     const std::string str = "x:uint32;";
-    UT_boilerPlate(str);
+    testBoilerPlate(str);
     Statement statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
-    uint32_t size = codeGen.generateDeclarationVariable(*statement.varDec);
+    uint32_t size = codeGen.generateVariableDeclaration(*statement.varDec);
     CHECK(size == 4);
     const std::vector<uc> expected = {
       (uc)OpCodes::NOP, (uc)OpCodes::NOP,
@@ -50,11 +50,11 @@ TEST_CASE("variable creation", "[codeGen]") {
   }
 }
 
-TEST_CASE("if statement", "[codeGen]") {
+TEST_CASE("jump statements", "[codeGen]") {
   // boiler plate
   {
     const std::string str = "if (1) {} else {} ";
-    UT_boilerPlate(str);
+    testBoilerPlate(str);
     Statement statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
@@ -65,6 +65,20 @@ TEST_CASE("if statement", "[codeGen]") {
       (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP,
       (uc)OpCodes::JUMP, 16, 0, 0, 0, 0, 0, 0, 0,
     };
+    CHECK(codeGen.byteCode == expected);
+  }
+  {
+    const std::string str = "";
+    testBoilerPlate(str);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+
+    // fails, need to update the str to have nested control flow and see if the jump addresses are correct
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement.controlFlow);
+    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
+    codeGen.generateControlFlowStatement(*statement.controlFlow);
+    const std::vector<uc> expected =  {};
     CHECK(codeGen.byteCode == expected);
   }
 }

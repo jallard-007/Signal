@@ -29,7 +29,7 @@ struct StructInformation {
   StructInformation() = default;
 };
 
-enum class JumpMarkerType: unsigned char {
+enum class JumpMarkerType: uint8_t {
   NONE,
   START_IF,
   IF_STATEMENT,
@@ -61,18 +61,19 @@ struct CodeGen {
   CodeGen(Program&, std::vector<Tokenizer>&, Checker&);
 
   // expression gen
-  ExpressionResult generateExpression(const Expression &, bool = false);
-  ExpressionResult generateExpressionArrAccess(const ArrayAccess &);
-  ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral &);
-  ExpressionResult generateExpressionBinOp(const BinOp &, bool = false);
-  ExpressionResult generateExpressionFunctionCall(const FunctionCall &);
-  ExpressionResult generateExpressionUnOp(const UnOp &);
-  ExpressionResult loadValue(const Token &);
+  ExpressionResult generateExpression(const Expression&, bool = false);
+  ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
+  ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
+  ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
+  ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
+  ExpressionResult generateExpressionUnOp(const UnOp&);
+  ExpressionResult loadValue(const Token&);
 
-  uint32_t generateDeclarationVariable(const VariableDec&, bool = true);
-  uint32_t generateDeclarationVariableStructType(const VariableDec&, bool);
+  uint32_t generateVariableDeclaration(const VariableDec&, bool = true);
+  uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
   uint32_t sizeOfStruct(StructDecList *);
 
+  void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
   void generateIfStatement(const IfStatement&);
   void updateJumpOp(JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
@@ -88,7 +89,7 @@ struct CodeGen {
   ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
   ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
   ExpressionResult logicalBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
-  int getStackOffset(const std::string &);
+  int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
 };
