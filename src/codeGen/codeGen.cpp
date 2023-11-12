@@ -23,8 +23,8 @@ bool JumpMarker::operator==(const JumpMarker other) const {
 CodeGen::CodeGen(
   Program& program,
   std::vector<Tokenizer>& tokenizers,
-  Checker& checker
-): program{program}, checker{checker}, tokenizers{tokenizers} {
+  std::map<std::string, GeneralDec *>& lookUp
+): program{program}, lookUp{lookUp}, tokenizers{tokenizers} {
   sp.inUse = true;
   ip.inUse = true;
   bp.inUse = true;
@@ -748,21 +748,16 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
     const uint32_t size = generateVariableDeclarationStructType(varDec, initialize);
     return size;
   }
-  assert(false);
   exit(1);
 }
 
-/**
- * TODO: add padding to align data
- * also need to make offset info for each member variable
-*/
-uint32_t CodeGen::sizeOfStruct(const std::string& structName) {
+StructInformation& CodeGen::getStructInfo(const std::string& structName) {
   StructInformation &info = structNameToInfoMap[structName];
   if (info.size != -1) {
-    return info.size;
+    return info;
   }
   info.size = 0;
-  GeneralDec const * const &generalDec = checker.lookUp[structName];
+  GeneralDec const * const &generalDec = lookUp[structName];
   Tokenizer *oldTk = tk;
   tk = &tokenizers[generalDec->tokenizerIndex];
   StructDecList *structDecList = &generalDec->structDec->decs;
@@ -771,26 +766,41 @@ uint32_t CodeGen::sizeOfStruct(const std::string& structName) {
       continue;
     }
     Token typeToken = structDecList->varDec->type.token;
-    if (isBuiltInType(typeToken.type)) {
-      info.size += sizeOfType(typeToken.type);
-    } 
-    else if (typeToken.type == TokenType::REFERENCE) {
-      info.size += 8;
+    uint32_t& offset = info.offsetMap[tk->extractToken(structDecList->varDec->name)];
+    uint32_t size, alignTo;
+    if (typeToken.type == TokenType::IDENTIFIER) {
+      StructInformation& subStructInfo = getStructInfo(tk->extractToken(typeToken));
+      size = subStructInfo.size;
+      alignTo = subStructInfo.alignTo;
     }
-    else {
-      const std::string structName = tk->extractToken(typeToken);
-      info.size += sizeOfStruct(structName);
+    else if (isBuiltInType(typeToken.type)) {
+      size = sizeOfType(typeToken.type);
+      alignTo = size;
+    }
+    else /*if (typeToken.type == TokenType::REFERENCE)*/ {
+      size = 8;
+      alignTo = size;
+    }
+    uint32_t paddingRequired = size - ((info.size) % size);
+    if (paddingRequired == size) {
+      paddingRequired = 0;
+    }
+    info.size += paddingRequired;
+    offset = info.size;
+    info.size += size;
+    if (alignTo > info.alignTo) {
+      info.alignTo = alignTo;
     }
     structDecList = structDecList->next;
   }
   tk = oldTk;
-  return info.size;
+  return info;
 }
 
 // TODO:
 uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
   std::string structName = tk->extractToken(varDec.type.token);
-  GeneralDec const * const &generalDec = checker.lookUp[structName];
+  GeneralDec const * const &generalDec = lookUp[structName];
   Tokenizer *oldTk = tk;
   tk = &tokenizers[generalDec->tokenizerIndex];
   StructDecList *structDecList = &generalDec->structDec->decs;

@@ -16,3 +16,5 @@ output.png
 .DS_Store
 a.out
 asm
+compile_commands.json
+*ninja*

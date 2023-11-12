@@ -6,13 +6,14 @@
 
 #define uc unsigned char
 
-#define testBoilerPlate(str) std::vector<Tokenizer> dummyTokenizers; \
-  Program dummyProgram; \
-  Checker dummyChecker{dummyProgram, dummyTokenizers, memPool}; \
-  CodeGen codeGen{dummyProgram, dummyTokenizers, dummyChecker}; \
-  Tokenizer tokenizer {"./src/parser/test_parser.cpp", str}; \
-  codeGen.tk = &tokenizer; \
-  Parser parser{tokenizer, memPool};
+#define testBoilerPlate(str) \
+  std::vector<Tokenizer> tokenizers; \
+  Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str); \
+  Parser parser{tokenizer, memPool}; \
+  Checker checker{parser.program, tokenizers, memPool}; \
+  CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
+  codeGen.tk = &tokenizer
+
 
 // copy of addByte from CodeGen class
 void addByte(std::vector<uc>& byteCode, uc byte) {
@@ -137,5 +138,18 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     alignForImm(expected, 1, 8);
     addBytes(expected, {(uc)OpCodes::JUMP, 8, 0, 0, 0, 0, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
+  }
+}
+TEST_CASE("struct info generation", "[codeGen]") {
+  {
+    // constant expression, should return the actual value of the expression
+    const std::string str = "struct Thing { x: uint32; }";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+    CHECK(structInfo.size == 4);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.offsetMap["x"] == 0);
   }
 }

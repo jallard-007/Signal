@@ -25,7 +25,9 @@ struct ExpressionResult {
 };
 
 struct StructInformation {
+  std::map<std::string, uint32_t> offsetMap;
   int32_t size = -1;
+  uint32_t alignTo = 0;
   StructInformation() = default;
 };
 
@@ -55,10 +57,10 @@ struct CodeGen {
   std::vector<JumpMarker> jumpMarkers;
   Tokenizer *tk{nullptr};
   Program &program;
-  Checker &checker;
+  std::map<std::string, GeneralDec *>& lookUp;
   std::vector<Tokenizer> &tokenizers;
 
-  CodeGen(Program&, std::vector<Tokenizer>&, Checker&);
+  CodeGen(Program&, std::vector<Tokenizer>&, std::map<std::string, GeneralDec *>&);
 
   // expression gen
   ExpressionResult generateExpression(const Expression&, bool = false);
@@ -71,7 +73,7 @@ struct CodeGen {
 
   uint32_t generateVariableDeclaration(const VariableDec&, bool = true, bool = false);
   uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
-  uint32_t sizeOfStruct(const std::string&);
+  StructInformation& getStructInfo(const std::string&);
 
   void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
