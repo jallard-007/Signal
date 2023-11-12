@@ -23,9 +23,18 @@ std::string Expected::getErrorMessage(std::vector<Tokenizer>& tks) {
   return message + "\n\n";
 }
 
+#if defined(_MSC_VER)
+struct Construct { Construct(void (*f)(void)) { f(); } };
+#define constructor(fn) \
+void fn(void); static Construct constructor_##fn(fn);
+#elif defined(__GNUC__)
+#define constructor(fn) \
+__attribute__((constructor))
+#endif
+
 // TokenType::NEGATIVE is the "largest" operator token type with an enum value of 83, hence size 84
 uint8_t operatorPrecedence [84]{};
-__attribute__((constructor))
+constructor(initializeOperatorPrecedence)
 void initializeOperatorPrecedence() {
   operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
   operatorPrecedence[(uint8_t)TokenType::MODULO_ASSIGNMENT] = 1;
@@ -988,7 +997,7 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
       }
       else {
         Expression* prev = nullptr;
-        Expression* listIter;
+        Expression* listIter = nullptr;
         Expression* next = &rootExpression;
         while (next) {
           listIter = next;

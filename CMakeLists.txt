@@ -33,6 +33,11 @@ endif()
 
 if ( MSVC )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+    if ( DEV )
+        set(CMAKE_BUILD_TYPE Debug)
+    else()
+        set(CMAKE_BUILD_TYPE Release)
+    endif()
 endif()
 
 # -O3 -flto
