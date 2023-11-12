@@ -71,6 +71,21 @@ TEST_CASE("variable creation", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
   }
+  {
+    const std::string str = "x:uint32 = 10;";
+    testBoilerPlate(str);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement.varDec);
+    uint32_t size = codeGen.generateVariableDeclaration(*statement.varDec);
+    CHECK(size == 4);
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 10, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::PUSH_D, 0});
+    CHECK(codeGen.byteCode == expected);
+  }
 }
 
 TEST_CASE("jump statements in always true control flow", "[codeGen]") {
@@ -140,9 +155,9 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     CHECK(codeGen.byteCode == expected);
   }
 }
+
 TEST_CASE("struct info generation", "[codeGen]") {
   {
-    // constant expression, should return the actual value of the expression
     const std::string str = "struct Thing { x: uint32; }";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
@@ -151,5 +166,106 @@ TEST_CASE("struct info generation", "[codeGen]") {
     CHECK(structInfo.size == 4);
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["x"] == 0);
+  }
+  {
+    const std::string str = "struct Thing { y:bool; x: uint32; }";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+    CHECK(structInfo.size == 8);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.offsetMap["y"] == 0);
+    CHECK(structInfo.offsetMap["x"] == 4);
+  }
+  {
+    const std::string str = "struct Thing { x: uint32; y:bool; }";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+    CHECK(structInfo.size == 8);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.offsetMap["y"] == 4);
+    CHECK(structInfo.offsetMap["x"] == 0);
+  }
+  {
+    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; }";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+    CHECK(structInfo.size == 12);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.offsetMap["y"] == 0);
+    CHECK(structInfo.offsetMap["x"] == 4);
+    CHECK(structInfo.offsetMap["j"] == 8);
+  }
+}
+
+TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
+  {
+    const std::string str = "if (true && false) { num:uint32; } ";
+    testBoilerPlate(str);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement.controlFlow);
+    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
+    codeGen.generateStatement(statement);
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 1, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::SET_Z, 0});
+
+    // short circuit
+    alignForImm(expected, 1, 8);
+    const uint32_t indexOfShortCircuitJump = expected.size() + 1;
+    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::LOGICAL_AND, 0, 1});
+    expected[indexOfShortCircuitJump] = expected.size();
+    alignForImm(expected, 1, 8);
+    const uint32_t indexOfSecondJump = expected.size() + 1;
+    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    expected[indexOfSecondJump] = expected.size();
+
+    CHECK(codeGen.byteCode == expected);
+  }
+  {
+    const std::string str = "if (true || false) { num:uint32; } ";
+    testBoilerPlate(str);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement.controlFlow);
+    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
+    codeGen.generateStatement(statement);
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 1, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::SET_Z, 0});
+
+    // short circuit
+    alignForImm(expected, 1, 8);
+    const uint32_t indexOfShortCircuitJump = expected.size() + 1;
+    addBytes(expected, {(uc)OpCodes::JUMP_NE, 0, 0, 0, 0, 0, 0, 0, 0});
+
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::LOGICAL_OR, 0, 1});
+    expected[indexOfShortCircuitJump] = expected.size();
+    alignForImm(expected, 1, 8);
+    const uint32_t indexOfSecondJump = expected.size() + 1;
+    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    expected[indexOfSecondJump] = expected.size();
+
+    CHECK(codeGen.byteCode == expected);
   }
 }

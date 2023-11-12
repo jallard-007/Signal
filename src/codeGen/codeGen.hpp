@@ -40,6 +40,7 @@ enum class JumpMarkerType: uint8_t {
   SWITCH,
   BREAK,
   CONTINUE,
+  SHORT_CIRCUIT,
 };
 
 struct JumpMarker {
@@ -90,7 +91,7 @@ struct CodeGen {
   void moveImmToReg(uint8_t, uint64_t);
   ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
   ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
-  ExpressionResult logicalBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
+  ExpressionResult booleanBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
   int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);

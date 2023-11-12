@@ -70,7 +70,7 @@ TEST_CASE("print \"Hello World!\"", "[interpreter]") {
   interpreter.runProgram();
   std::string buffer;
   buffer.resize(data.size());
-  read(fd[0], buffer.data(), buffer.size()); // read from pipe
+  REQUIRE(read(fd[0], buffer.data(), buffer.size())); // read from pipe
   CHECK(buffer == data);
   CHECK(interpreter.registers[0] == 0);
   close(fd[0]);
@@ -89,7 +89,7 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
     s_stdin[0], s_stdin[1], s_stdin[2], s_stdin[3], s_stdin[4], s_stdin[5], s_stdin[6], s_stdin[7], // stdin FILE *
   };
   const std::string input = "Hello World!\n";
-  write(fd[1], input.data(), input.size()); // write to pipe
+  REQUIRE(write(fd[1], input.data(), input.size()));
   unsigned char const program [] =
   {
   (uc)OpCodes::MOVE, 2, dataPointerIndex,
