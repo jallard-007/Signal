@@ -51,7 +51,6 @@ TEST_CASE("expressions", "[codeGen]") {
     ExpressionResult expRes = codeGen.generateExpression(expression);
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
-    CHECK_FALSE(expRes.isStruct);
     CHECK(expRes.val == 8);
   }
 }

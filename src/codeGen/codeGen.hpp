@@ -9,7 +9,6 @@
 #include "../checker/checker.hpp"
 
 struct RegisterInfo {
-  uint32_t stackOffset{0};
   bool inUse {false};
   bool changed {false};
 };
@@ -19,7 +18,6 @@ struct ExpressionResult {
   OpCodes jumpOp {OpCodes::NOP};
   bool isReg {false};
   bool isTemp {false};
-  bool isStruct {false};
   ExpressionResult() = default;
   ExpressionResult(bool, bool, uint64_t);
 };
@@ -54,7 +52,7 @@ struct JumpMarker {
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
-  std::vector<unsigned char> byteCode;
+    std::vector<unsigned char> byteCode;
   std::vector<JumpMarker> jumpMarkers;
   Tokenizer *tk{nullptr};
   Program &program;

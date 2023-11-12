@@ -40,8 +40,7 @@ if ( MSVC )
     endif()
 endif()
 
-# -O3 -flto
+# -fprofile-arcs -ftest-coverage -fPIC -O0 or -O1
 
-# -fprofile-arcs -ftest-coverage
 # -pg
 # gprof main gmon.out | gprof2dot -s | dot -Gdpi=200 -Tpng -o output.png

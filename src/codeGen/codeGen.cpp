@@ -11,7 +11,7 @@
 #define uc unsigned char
 
 ExpressionResult::ExpressionResult(bool isReg, bool isTemp, uint64_t val):
-  val{val}, jumpOp{OpCodes::NOP}, isReg{isReg}, isTemp{isTemp}, isStruct{false} {}
+  val{val}, jumpOp{OpCodes::NOP}, isReg{isReg}, isTemp{isTemp} {}
 
 JumpMarker::JumpMarker(uint64_t index, JumpMarkerType type):
   index{index}, type{type} {}
@@ -150,7 +150,7 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::IDENTIFIER: {
       // check if value is already in a reg. to do that we need a lookup. variable name to information regarding location, if its already in a register, etc.
-    }
+          }
     default: {
       return {false, false, 0};
     }
@@ -170,11 +170,10 @@ uc CodeGen::allocateRegister() {
 
 void CodeGen::freeRegister(uc regNum) {
   RegisterInfo& regInfo = registers[regNum];
-  if (regInfo.stackOffset && regInfo.changed) {
+  if (regInfo.changed) {
     // SUB_I misc, bp, regInfo.stackOffset
     // STORE misc, currReg
   }
-  regInfo.stackOffset = 0;
   regInfo.changed = false;
   regInfo.inUse = false;
 }
@@ -488,10 +487,10 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
   switch (binOp.op.type) {
     // member access
     case TokenType::DOT: {
-
+      return {};
     }
     case TokenType::PTR_MEMBER_ACCESS: {
-
+      return {};
     }
 
     // mathematical ops
