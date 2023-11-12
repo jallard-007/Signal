@@ -34,7 +34,7 @@ enum class JumpMarkerType: uint8_t {
   START_IF,
   IF_STATEMENT,
   END_IF,
-  LOOP,
+  START_LOOP,
   SWITCH,
   BREAK,
   CONTINUE,
@@ -71,17 +71,17 @@ struct CodeGen {
 
   uint32_t generateVariableDeclaration(const VariableDec&, bool = true);
   uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
-  uint32_t sizeOfStruct(StructDecList *);
+  uint32_t sizeOfStruct(const std::string&);
 
   void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
   void generateIfStatement(const IfStatement&);
-  void updateJumpOp(JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
-  void addMarker(JumpMarkerType);
+  void updateJumpOpTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
+  uint64_t addMarker(JumpMarkerType);
 
   void generateScope(const Scope&);
 
-  void addByte(OpCodes);
+  void addByteOp(OpCodes);
   void addByte(unsigned char);
   void addBytes(const std::vector<unsigned char>&);
   void alignForImm(uint32_t, uint32_t);

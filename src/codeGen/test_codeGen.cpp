@@ -14,9 +14,34 @@
   codeGen.tk = &tokenizer; \
   Parser parser{tokenizer, memPool};
 
+// copy of addByte from CodeGen class
+void addByte(std::vector<uc>& byteCode, uc byte) {
+  byteCode.emplace_back(byte);
+}
+// copy of addByteOp from CodeGen class
+void addByteOp(std::vector<uc>& byteCode, OpCodes opCode) {
+  addByte(byteCode, (uc)opCode);
+}
+// copy of addBytes from CodeGen class
+void addBytes(std::vector<uc>& byteCode, const std::vector<uc>& bytes) {
+  for (const uc byte: bytes) {
+    addByte(byteCode, byte);
+  }
+}
+// copy of alignForImm from CodeGen class
+void alignForImm(std::vector<uc>& byteCode, const uint32_t offset, const uint32_t size) {
+  uint8_t mod = (byteCode.size() + offset) % size;
+  if (mod == 0) {
+    return;
+  }
+  while(mod++ != size) {
+    addByteOp(byteCode, OpCodes::NOP);
+  }
+}
+
 TEST_CASE("expressions", "[codeGen]") {
-  // boiler plate
   {
+    // constant expression, should return the actual value of the expression
     const std::string str = " 4 + 4 ;";
     testBoilerPlate(str);
     Expression expression;
@@ -31,7 +56,6 @@ TEST_CASE("expressions", "[codeGen]") {
 }
 
 TEST_CASE("variable creation", "[codeGen]") {
-  // boiler plate
   {
     const std::string str = "x:uint32;";
     testBoilerPlate(str);
@@ -41,44 +65,77 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(statement.varDec);
     uint32_t size = codeGen.generateVariableDeclaration(*statement.varDec);
     CHECK(size == 4);
-    const std::vector<uc> expected = {
-      (uc)OpCodes::NOP, (uc)OpCodes::NOP,
-      (uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0
-    };
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
-
   }
 }
 
-TEST_CASE("jump statements", "[codeGen]") {
-  // boiler plate
+TEST_CASE("jump statements in always true control flow", "[codeGen]") {
   {
-    const std::string str = "if (1) {} else {} ";
+    // at the end of the `if (1)` body, it should jump past the else body
+    const std::string str = "if (1) {} else {num:uint64;} ";
     testBoilerPlate(str);
     Statement statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
-    codeGen.generateControlFlowStatement(*statement.controlFlow);
-    const std::vector<uc> expected =  {
-      (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP,
-      (uc)OpCodes::JUMP, 16, 0, 0, 0, 0, 0, 0, 0,
-    };
+    codeGen.generateStatement(statement);
+    std::vector<uc> expected;
+    alignForImm(expected, 1, 8);
+    addBytes(expected, {(uc)OpCodes::JUMP, 24, 0, 0, 0, 0, 0, 0, 0});
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
-    const std::string str = "";
+    // should jump to the start of the for loop (just after the variable dec)
+    const std::string str = "num:uint64; for (;;) {} ";
     testBoilerPlate(str);
+    { // add some instructions above the loop to check if jump address is right
+      Statement statement;
+      ParseStatementErrorType errorType = parser.parseStatement(statement);
+      REQUIRE(errorType == ParseStatementErrorType::NONE);
+      codeGen.generateStatement(statement);
+    }
     Statement statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement);
 
-    // fails, need to update the str to have nested control flow and see if the jump addresses are correct
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.controlFlow);
-    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
-    codeGen.generateControlFlowStatement(*statement.controlFlow);
-    const std::vector<uc> expected =  {};
+    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
+    codeGen.generateStatement(statement);
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 1, 8);
+    addBytes(expected, {(uc)OpCodes::JUMP, 8, 0, 0, 0, 0, 0, 0, 0});
+    CHECK(codeGen.byteCode == expected);
+  }
+  {
+    // should jump to the start of the while loop (just after the variable dec)
+    const std::string str = "num:uint64; while true {} ";
+    testBoilerPlate(str);
+    { // add some instructions above the loop to check if jump address is right
+      Statement statement;
+      ParseStatementErrorType errorType = parser.parseStatement(statement);
+      REQUIRE(errorType == ParseStatementErrorType::NONE);
+      codeGen.generateStatement(statement);
+    }
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement.controlFlow);
+    REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
+    codeGen.generateStatement(statement);
+    std::vector<uc> expected;
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 1, 8);
+    addBytes(expected, {(uc)OpCodes::JUMP, 8, 0, 0, 0, 0, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
   }
 }

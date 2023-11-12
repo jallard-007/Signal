@@ -60,8 +60,8 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   }
   return {false, false, 0};
 }
-// start simple. load off of stack whenever needed, redundancy is fine, similar to -O0
-// functions will start by putting all arguments on the stack
+
+
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
   switch (currExp.type) {
     case ExpressionType::ARRAY_ACCESS: {
@@ -150,7 +150,6 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::IDENTIFIER: {
       // check if value is already in a reg. to do that we need a lookup. variable name to information regarding location, if its already in a register, etc.
-      
     }
     default: {
       return {false, false, 0};
@@ -183,7 +182,7 @@ void CodeGen::freeRegister(uc regNum) {
 void CodeGen::addByte(uc byte) {
   byteCode.emplace_back(byte);
 }
-void CodeGen::addByte(OpCodes opCode) {
+void CodeGen::addByteOp(OpCodes opCode) {
   addByte((uc)opCode);
 }
 
@@ -205,7 +204,7 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
     return;
   }
   while(mod++ != size) {
-    addByte(OpCodes::NOP);
+    addByteOp(OpCodes::NOP);
   }
 }
 
@@ -583,7 +582,6 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 
 ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   ExpressionResult expRes = generateExpression(unOp.operand);
-
   switch (unOp.op.type) {
     case TokenType::NOT: {
       if (!expRes.isReg) {
@@ -750,49 +748,32 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
 
 /**
  * TODO: add padding to align data
- * also need to make offset info for each member variable, probably not in here though
+ * also need to make offset info for each member variable
 */
-uint32_t CodeGen::sizeOfStruct(StructDecList *structDecList) {
-  uint32_t size = 0;
+uint32_t CodeGen::sizeOfStruct(const std::string& structName) {
+  StructInformation &info = structNameToInfoMap[structName];
+  if (info.size != -1) {
+    return info.size;
+  }
+  info.size = 0;
+  GeneralDec const * const &generalDec = checker.lookUp[structName];
+  Tokenizer *oldTk = tk;
+  tk = &tokenizers[generalDec->tokenizerIndex];
+  StructDecList *structDecList = &generalDec->structDec->decs;
   while (structDecList) {
     if (structDecList->type != StructDecType::VAR) {
       continue;
     }
     Token typeToken = structDecList->varDec->type.token;
     if (isBuiltInType(typeToken.type)) {
-      size += sizeOfType(typeToken.type);
-    } else {
-      const std::string typeName = tk->extractToken(typeToken);
-      StructInformation &info = structNameToInfoMap[typeName];
-      if (info.size != -1) {
-        size += info.size;
-      } else {
-        GeneralDec const * const &generalDec = checker.lookUp[typeName];
-        Tokenizer *oldTk = tk;
-        tk = &tokenizers[generalDec->tokenizerIndex];
-        size += sizeOfStruct(&generalDec->structDec->decs);
-        tk = oldTk;
-      }
+      info.size += sizeOfType(typeToken.type);
+    } 
+    else if (typeToken.type == TokenType::REFERENCE) {
+      info.size += 8;
     }
-    structDecList = structDecList->next;
-  }
-  return size;
-}
-
-uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
-  Tokenizer *oldTk = tk;
-  std::string typeName = tk->extractToken(varDec.type.token);
-  StructInformation &info = structNameToInfoMap[typeName];
-  if (info.size != -1) {
-    return info.size;
-  }
-  GeneralDec const * const &generalDec = checker.lookUp[typeName];
-  tk = &tokenizers[generalDec->tokenizerIndex];
-  StructDecList *structDecList = &generalDec->structDec->decs;
-  info.size = sizeOfStruct(structDecList);
-  while (structDecList) {
-    if (structDecList->type == StructDecType::VAR) {
-      generateVariableDeclaration(*structDecList->varDec, initialize);
+    else {
+      const std::string structName = tk->extractToken(typeToken);
+      info.size += sizeOfStruct(structName);
     }
     structDecList = structDecList->next;
   }
@@ -800,8 +781,26 @@ uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDe
   return info.size;
 }
 
-void CodeGen::addMarker(JumpMarkerType type) {
+// TODO:
+uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
+  Tokenizer *oldTk = tk;
+  std::string structName = tk->extractToken(varDec.type.token);
+  GeneralDec const * const &generalDec = checker.lookUp[structName];
+  tk = &tokenizers[generalDec->tokenizerIndex];
+  StructDecList *structDecList = &generalDec->structDec->decs;
+  while (structDecList) {
+    if (structDecList->type == StructDecType::VAR) {
+      generateVariableDeclaration(*structDecList->varDec, initialize);
+    }
+    structDecList = structDecList->next;
+  }
+  tk = oldTk;
+  return 999; // need to update
+}
+
+uint64_t CodeGen::addMarker(JumpMarkerType type) {
   jumpMarkers.emplace_back(byteCode.size(), type);
+  return byteCode.size();
 }
 
 void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
@@ -826,10 +825,7 @@ void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
   generateScope(ifStatement.body);
 }
 
-void CodeGen::updateJumpOp(JumpMarkerType type, JumpMarkerType until) {
-  if (until != JumpMarkerType::NONE) {
-  }
-  const uint64_t currentIndex = byteCode.size();
+void CodeGen::updateJumpOpTo(const uint64_t indexTo, JumpMarkerType type, JumpMarkerType until) {
   for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
     if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
       jumpMarker->type = JumpMarkerType::NONE;
@@ -837,7 +833,7 @@ void CodeGen::updateJumpOp(JumpMarkerType type, JumpMarkerType until) {
     }
     if (jumpMarker->type == type) {
       uint64_t index = jumpMarker->index + 1;
-      *(uint64_t *)(byteCode.data() + index) = currentIndex;
+      *(uint64_t *)(byteCode.data() + index) = indexTo;
       jumpMarker->type = JumpMarkerType::NONE;
       if (until == JumpMarkerType::NONE) {
         break;
@@ -853,10 +849,52 @@ void CodeGen::updateJumpOp(JumpMarkerType type, JumpMarkerType until) {
 void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
   switch (controlFlowStatement.type) {
     case ControlFlowStatementType::FOR_LOOP: {
+      generateStatement(controlFlowStatement.forLoop->initialize);
+      const uint64_t startOfLoopIndex = addMarker(JumpMarkerType::START_LOOP);
+      if (controlFlowStatement.forLoop->condition.type != ExpressionType::NONE) {
+        ExpressionResult expRes = generateExpression(controlFlowStatement.forLoop->condition);
+        if (expRes.jumpOp == OpCodes::NOP) {
+          if (!expRes.isReg) {
+            if (!expRes.val) {
+              // condition always false
+              break;
+            }
+            // dont need to add a jump statement, go straight to the body
+          } else {
+            addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
+            alignForImm(1, 8);
+            addMarker(JumpMarkerType::IF_STATEMENT);
+            addBytes({(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+          }
+        } else {
+          alignForImm(1, 8);
+          addMarker(JumpMarkerType::IF_STATEMENT);
+          addBytes({(uc)expRes.jumpOp, 0, 0, 0, 0, 0, 0, 0, 0});
+        }
+      }
+      generateScope(controlFlowStatement.forLoop->body);
+      generateExpression(controlFlowStatement.forLoop->iteration);
+      alignForImm(1, 8);
+      std::vector<uc> jumpOp  = {(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0};
+      *(uint64_t *)(jumpOp.data() + 1) = startOfLoopIndex;
+      addBytes(jumpOp);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::IF_STATEMENT);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::BREAK, JumpMarkerType::START_LOOP);
+      updateJumpOpTo(startOfLoopIndex, JumpMarkerType::CONTINUE, JumpMarkerType::START_LOOP);
       break;
     }
     case ControlFlowStatementType::WHILE_LOOP: {
-      break;
+      const uint64_t startOfLoopIndex = addMarker(JumpMarkerType::START_LOOP);
+      IfStatement& whileLoop = controlFlowStatement.whileLoop->statement;
+      generateIfStatement(whileLoop);
+      alignForImm(1, 8);
+      std::vector<uc> jumpOp  = {(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0};
+      *(uint64_t *)(jumpOp.data() + 1) = startOfLoopIndex;
+      addBytes(jumpOp);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::IF_STATEMENT);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::BREAK, JumpMarkerType::START_LOOP);
+      updateJumpOpTo(startOfLoopIndex, JumpMarkerType::CONTINUE, JumpMarkerType::START_LOOP);
+      break; 
     }
     case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
       const IfStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
@@ -871,7 +909,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         addMarker(JumpMarkerType::END_IF);
         addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
       }
-      updateJumpOp(JumpMarkerType::IF_STATEMENT);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::IF_STATEMENT);
 
       // elif statements
       while (elifStatementList) {
@@ -882,7 +920,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
           addMarker(JumpMarkerType::END_IF);
           addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
         }
-        updateJumpOp(JumpMarkerType::IF_STATEMENT);
+        updateJumpOpTo(byteCode.size(), JumpMarkerType::IF_STATEMENT);
       }
 
       // else statement
@@ -891,7 +929,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       }
 
       // update all END_IF jump ops (until START_IF) to go to current index
-      updateJumpOp(JumpMarkerType::END_IF, JumpMarkerType::START_IF);
+      updateJumpOpTo(byteCode.size(), JumpMarkerType::END_IF, JumpMarkerType::START_IF);
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
@@ -904,7 +942,8 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       break;
     }
     default: {
-      break;
+      std::cerr << "Invalid ControlFlowStatementType in CodeGen::generateControlFlowStatement\n";
+      exit(1);
     }
   }
 }
@@ -951,7 +990,7 @@ void CodeGen::generateStatement(const Statement& statement) {
       }
       else if (statement.keyword.type == TokenType::CONTINUE) {
         alignForImm(1, 8);
-        addMarker(JumpMarkerType::CONTINUE);
+        // jump to START_LOOP
         addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
       }
       else {
