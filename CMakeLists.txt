@@ -32,7 +32,7 @@ if ( UNIX )
 endif()
 
 if ( MSVC )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /WX")
     if ( DEV )
         set(CMAKE_BUILD_TYPE Debug)
     else()

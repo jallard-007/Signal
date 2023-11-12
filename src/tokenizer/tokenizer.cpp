@@ -27,7 +27,7 @@ TokenPositionInfo Tokenizer::getTokenPositionInfo(const Token& tk) {
   if (newlinePositions.empty()) {
     return {1, tk.position + 1};
   }
-  uint32_t high = newlinePositions.size() - 1;
+  uint32_t high = (uint32_t)newlinePositions.size() - 1;
   uint32_t low = 0;
   uint32_t middle = high / 2;
   while (low < high) {

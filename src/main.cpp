@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
           return 1;
         }
         tokenizers.emplace_back(std::move(relativePath), std::move(buffer));
-        tokenizerIndex = tokenizers.size() - 1;
+        tokenizerIndex = (uint32_t)tokenizers.size() - 1;
         tokenizers.back().tokenizerIndex = tokenizerIndex;
         parser.swapTokenizer(tokenizers.back());
       }

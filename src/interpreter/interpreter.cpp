@@ -41,11 +41,11 @@ int64_t Interpreter::runProgram() {
   ip += 5
 
 #define arithmeticOp_F(op) \
-  registers[program[ip]] = *(double *)(registers+program[ip+1]) op *(double *)(registers+program[ip+2]); \
+  *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(registers+program[ip+2]); \
   ip += 3
 
 #define arithmeticOp_F_I(op) \
-  registers[program[ip]] = *(double *)(registers+program[ip+1]) op *(double *)(program+ip+2); \
+  *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(program+ip+2); \
   ip += 10
 
 void Interpreter::executeNextInstruction() {
@@ -314,17 +314,17 @@ void Interpreter::executeNextInstruction() {
     }
     case OpCodes::PUSH_B: {
       --sp;
-      *(uint8_t *)sp = registers[program[ip++]];
+      *(uint8_t *)sp = (uint8_t)registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_W: {
       sp -= 2;
-      *(uint16_t *)sp = registers[program[ip++]];
+      *(uint16_t *)sp = (uint16_t)registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_D: {
       sp -= 4;
-      *(uint32_t *)sp = registers[program[ip++]];
+      *(uint32_t *)sp = (uint32_t)registers[program[ip++]];
       break;
     }
     case OpCodes::PUSH_Q: {

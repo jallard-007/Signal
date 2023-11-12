@@ -199,7 +199,7 @@ void CodeGen::addBytes(const std::vector<uc>& bytes) {
  * Param size: size in bytes of immediate
 */
 void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
-  uint8_t mod = (byteCode.size() + offset) % size;
+  uint32_t mod = (byteCode.size() + offset) % size;
   if (mod == 0) {
     return;
   }
@@ -335,7 +335,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     else {
       addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
       if (rightResult.isTemp) {
-        freeRegister(rightResult.val);
+        freeRegister((uc)rightResult.val);
       }
       return {true, true, leftResult.val};
     }
@@ -355,7 +355,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
         uc reg = allocateRegister();
         moveImmToReg(reg, leftResult.val);
         addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-        freeRegister(rightResult.val);
+        freeRegister((uc)rightResult.val);
         return {true, true, reg};
       }
     }
@@ -386,7 +386,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
         uc reg = allocateRegister();
         addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
         addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-        freeRegister(rightResult.val);
+        freeRegister((uc)rightResult.val);
         return {true, true, reg};
       }
     }
@@ -466,10 +466,10 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
   addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
   updateJumpOpTo(byteCode.size(), JumpMarkerType::SHORT_CIRCUIT);
   if (rightResult.isTemp) {
-    freeRegister(rightResult.val);
+    freeRegister((uc)rightResult.val);
   }
   if (leftResult.isTemp) {
-    freeRegister(leftResult.val);
+    freeRegister((uc)leftResult.val);
   }
   ExpressionResult expRes;
   if (controlFlow) {
@@ -699,9 +699,9 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
       if (!expRes.isReg) {
         reg = allocateRegister();
-        moveImmToReg(reg, expRes.val);
+        moveImmToReg((uc)reg, expRes.val);
       } else {
-        reg = expRes.val;
+        reg = (uc)expRes.val;
       }
     }
     const uint32_t size = sizeOfType(varDec.type.token.type);
@@ -989,7 +989,6 @@ void CodeGen::generateScope(const Scope& scope) {
     statementList = statementList->next
   ) {
     generateStatement(statementList->curr);
-    return;
   }
 }
 
