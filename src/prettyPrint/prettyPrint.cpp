@@ -3,7 +3,7 @@
 const uint8_t indentationSize = 2;
 
 void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
-  if (token.type == TokenType::NOTHING) {
+  if (token.type == TokenType::NONE) {
     return;
   }
   std::vector<TokenList *> r;
@@ -49,7 +49,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     case StatementType::VARIABLE_DEC:
       varDec->prettyPrint(tk, str); break;
     case StatementType::KEYWORD: str += typeToString.at(keyword.type); break;
-    case StatementType::NOTHING: break;
+    case StatementType::NONE: break;
     default: str += "{not yet implemented in pretty printer}"; break;
   }
 }
@@ -91,10 +91,10 @@ void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str) {
 
 void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += "{\n";
-  if (scopeStatements.curr.type != StatementType::NOTHING) {
+  if (scopeStatements.curr.type != StatementType::NONE) {
     indentation += indentationSize;
     for (StatementList *iter = &scopeStatements; iter; iter = iter->next) {
-      if (iter->curr.type != StatementType::NOTHING) {
+      if (iter->curr.type != StatementType::NONE) {
         str += std::string(indentation, ' ');
         iter->curr.prettyPrint(tk, str, indentation);
         if (iter->curr.type != StatementType::SCOPE && (iter->curr.type != StatementType::CONTROL_FLOW || iter->curr.controlFlow->type == ControlFlowStatementType::RETURN_STATEMENT)) {
@@ -110,7 +110,7 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
 void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
   str += typeToString.at(TokenType::FUNC);
   str += tk.extractToken(name) + '(';
-  if (params.curr.type != StatementType::NOTHING) {
+  if (params.curr.type != StatementType::NONE) {
     StatementList * iter = &params;
     for (; iter->next; iter = iter->next) {
       iter->curr.prettyPrint(tk, str, indentationSize);
@@ -125,7 +125,7 @@ void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
 void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::FUNC);
   str += tk.extractToken(name) + '(';
-  if (params.curr.type != StatementType::NOTHING) {
+  if (params.curr.type != StatementType::NONE) {
     indentation += indentationSize;
     StatementList * iter = &params;
     for (; iter->next; iter = iter->next) {
@@ -152,7 +152,7 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
 }
 
 void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string& str) {
-  if (type == GeneralDecType::NOTHING) {
+  if (type == GeneralDecType::NONE) {
     return;
   }
   Tokenizer& tk = tks[tokenizerIndex];
@@ -174,7 +174,7 @@ void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string&
 }
 
 void GeneralDec::prettyPrint(std::vector<Tokenizer>& tks, std::string& str) {
-  if (type == GeneralDecType::NOTHING) {
+  if (type == GeneralDecType::NONE) {
     return;
   }
   Tokenizer& tk = tks[tokenizerIndex];
@@ -224,7 +224,7 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
 
 void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
   str += typeToString.at(TokenType::TEMPLATE) + '[';
-  if (templateTypes.token.type != TokenType::NOTHING) {
+  if (templateTypes.token.type != TokenType::NONE) {
     TokenList * iter = &templateTypes;
     for (; iter->next; iter = iter->next) {
       str += tk.extractToken(iter->token);
@@ -242,7 +242,7 @@ void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
 
 void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::TEMPLATE) + '[';
-  if (templateTypes.token.type != TokenType::NOTHING) {
+  if (templateTypes.token.type != TokenType::NONE) {
     TokenList * iter = &templateTypes;
     for (; iter->next; iter = iter->next) {
       str += tk.extractToken(iter->token);
@@ -391,7 +391,7 @@ void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) {
 
 void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
   str += typeToString.at(TokenType::CREATE) + " [";
-  if (templateTypes.token.type != TokenType::NOTHING) {
+  if (templateTypes.token.type != TokenType::NONE) {
     str += tk.extractToken(templateTypes.token);
     TokenList * list = templateTypes.next;
     while (list) {

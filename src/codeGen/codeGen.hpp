@@ -69,7 +69,7 @@ struct CodeGen {
   ExpressionResult generateExpressionUnOp(const UnOp&);
   ExpressionResult loadValue(const Token&);
 
-  uint32_t generateVariableDeclaration(const VariableDec&, bool = true);
+  uint32_t generateVariableDeclaration(const VariableDec&, bool = true, bool = false);
   uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
   uint32_t sizeOfStruct(const std::string&);
 

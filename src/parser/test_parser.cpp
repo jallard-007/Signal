@@ -55,7 +55,7 @@ TEST_CASE("Function Declaration", "[parser]") {
   // check return type
   CHECK(func->returnType.next == nullptr);
   CHECK(func->returnType.token.type == TokenType::UINT32_TYPE);
-  CHECK(func->body.scopeStatements.curr.type == StatementType::NOTHING);
+  CHECK(func->body.scopeStatements.curr.type == StatementType::NONE);
 }
 
 TEST_CASE("Function Call - Base", "[parser]") {

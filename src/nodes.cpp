@@ -23,7 +23,7 @@ Expression& Expression::operator=(const Expression&ref) {
 
 ExpressionList::ExpressionList(): curr{}, next{nullptr} {}
 
-Statement::Statement(): expression{}, type{StatementType::NOTHING} {}
+Statement::Statement(): expression{}, type{StatementType::NONE} {}
 Statement::Statement(const Statement& ref): expression{ref.expression}, type{ref.type} {}
 Statement& Statement::operator=(const Statement& ref) {
   expression = ref.expression;
@@ -168,7 +168,7 @@ Statement Statement::deepCopy(NodeMemPool& mem) {
     case StatementType::KEYWORD: copy.keyword = keyword; break;
     case StatementType::SCOPE: copy.scope = mem.makeScope(); *copy.scope = scope->deepCopy(mem); break;
     case StatementType::VARIABLE_DEC: copy.varDec = mem.makeVariableDec(VariableDec{varDec->name}); *copy.varDec = varDec->deepCopy(mem); break;
-    case StatementType::NOTHING: break;
+    case StatementType::NONE: break;
   }
   return copy;
 }

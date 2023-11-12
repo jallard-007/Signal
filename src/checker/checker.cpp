@@ -31,7 +31,7 @@ Token getTokenOfExpression(Expression& exp) {
   }
 }
 
-TokenList Checker::noneValue {Token{0,0,TokenType::NOTHING}};
+TokenList Checker::noneValue {Token{0,0,TokenType::NONE}};
 TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
 TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
 TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
@@ -202,7 +202,7 @@ void Checker::firstTopLevelScan() {
         break;
       }
       case GeneralDecType::TEMPLATE: {
-        Token token{0,0,TokenType::NOTHING};
+        Token token{0,0,TokenType::NONE};
         if (list->curr.tempDec->isStruct) {
           token = list->curr.tempDec->structDec.name;
         } else {
@@ -353,7 +353,7 @@ bool Checker::validateFunctionHeader(Tokenizer& tk, FunctionDec &funcDec) {
     }
   }
   // check parameters
-  if (funcDec.params.curr.type != StatementType::NOTHING) {
+  if (funcDec.params.curr.type != StatementType::NONE) {
     StatementList* params = &funcDec.params;
     do {
       if (!checkType(tk, params->curr.varDec->type)) {
@@ -420,7 +420,7 @@ void Checker::validateStructTopLevel(Tokenizer& tk, StructDec& structDec) {
 void Checker::checkFunction(Tokenizer& tk, FunctionDec& funcDec) {
   // validate parameter names
   std::vector<std::string> locals;
-  if (funcDec.params.curr.type != StatementType::NOTHING) {
+  if (funcDec.params.curr.type != StatementType::NONE) {
     StatementList *list = &funcDec.params;
     while (list) {
       locals.emplace_back(tk.extractToken(list->curr.varDec->name));
@@ -469,11 +469,11 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
               checkLocalVarDec(tk, *forLoop.initialize.varDec, locals);
             } else if (forLoop.initialize.type == StatementType::EXPRESSION) {
               checkExpression(tk, *forLoop.initialize.expression);
-            } else if (forLoop.initialize.type != StatementType::NOTHING) {
+            } else if (forLoop.initialize.type != StatementType::NONE) {
               exit(1);
             }
             ResultingType res = checkExpression(tk, forLoop.condition);
-            if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NOTHING && !canBeConvertedToBool(*res.type)) {
+            if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NONE && !canBeConvertedToBool(*res.type)) {
               errors.emplace_back(CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &forLoop.condition);
             }
             checkExpression(tk, forLoop.iteration);
@@ -510,7 +510,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
           case ControlFlowStatementType::RETURN_STATEMENT: {
             wasReturned = true;
             ResultingType res = checkExpression(tk, list->curr.controlFlow->returnStatement->returnValue);
-            if (res.type->token.type == TokenType::NOTHING && returnType.token.type == TokenType::VOID) {
+            if (res.type->token.type == TokenType::NONE && returnType.token.type == TokenType::VOID) {
               break; // ok
             }
             if (!checkAssignment(returnType, *res.type)) {
@@ -521,7 +521,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
           case ControlFlowStatementType::EXIT_STATEMENT: {
             wasReturned = true;
             ResultingType res = checkExpression(tk, list->curr.controlFlow->returnStatement->returnValue);
-            if (res.type->token.type == TokenType::NOTHING && returnType.token.type == TokenType::VOID) {
+            if (res.type->token.type == TokenType::NONE && returnType.token.type == TokenType::VOID) {
               break; // ok
             }
             if (!checkAssignment(int64Value, *res.type)) {
@@ -579,7 +579,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
         break;
       }
 
-      case StatementType::NOTHING: {
+      case StatementType::NONE: {
         break;
       }
     }

@@ -14,7 +14,7 @@ R"(func getType(type: Type ref): Token {
         memPool.release(curr->next);
         curr->next = nullptr;
       }
-      if (curr && curr->curr.type == TokenType.NOTHING) {
+      if (curr && curr->curr.type == TokenType.NONE) {
         prev->next = nullptr;
         memPool.release(curr);
       }

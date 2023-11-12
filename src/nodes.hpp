@@ -54,7 +54,7 @@ typedef struct Scope Scope;
 typedef struct VariableDec VariableDec;
 
 enum class StatementType: uint8_t {
-  NOTHING,
+  NONE,
   EXPRESSION,
   CONTROL_FLOW,
   SCOPE,
@@ -86,7 +86,7 @@ struct Statement {
 //                     // | typeQualifier [number | nothing] indirectionTypeList ignore arrays for now
 //                     | typeQualifier ref
 struct TokenList {
-  Token token{0,0,TokenType::NOTHING};
+  Token token{0,0,TokenType::NONE};
   TokenList *next{nullptr};
   TokenList() = default;
   TokenList(const Token&);
@@ -309,7 +309,7 @@ struct FunctionDec {
   StatementList params{};
   Scope body{};
   TokenList returnType{};
-  Token name{0,0,TokenType::NOTHING};
+  Token name{0,0,TokenType::NONE};
   FunctionDec() = default;
   explicit FunctionDec(const Token&);
   FunctionDec(const FunctionDec&) = default;
@@ -342,7 +342,7 @@ struct StructDecList {
 // structDec:= struct identifier { structDecList }
 struct StructDec {
   StructDecList decs{};
-  Token name{0,0,TokenType::NOTHING};
+  Token name{0,0,TokenType::NONE};
   bool checked{false};
   bool hasCycle{false};
   StructDec() = default;
@@ -374,7 +374,7 @@ struct TemplateDec {
     FunctionDec funcDec;
   };
   TokenList templateTypes{};
-  Token token{0,0,TokenType::NOTHING};
+  Token token{0,0,TokenType::NONE};
   bool isStruct{false};
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -400,7 +400,7 @@ struct IncludeDec {
 };
 
 enum class GeneralDecType: uint8_t {
-  NOTHING,
+  NONE,
   STRUCT,
   VARIABLE,
   FUNCTION,
@@ -422,7 +422,7 @@ struct GeneralDec {
     IncludeDec *includeDec;
   };
   uint32_t tokenizerIndex{0};
-  GeneralDecType type{GeneralDecType::NOTHING};
+  GeneralDecType type{GeneralDecType::NONE};
   GeneralDec();
   void prettyPrint(std::vector<Tokenizer>&, std::string&);
   void prettyPrintDefinition(std::vector<Tokenizer>&, std::string&);

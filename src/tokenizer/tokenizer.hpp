@@ -18,7 +18,7 @@ struct Tokenizer {
   Token peeked;
   uint32_t position{0};
   uint32_t tokenizerIndex{0};
-  TokenType prevType{TokenType::NOTHING};
+  TokenType prevType{TokenType::NONE};
 
   Tokenizer() = delete;
 

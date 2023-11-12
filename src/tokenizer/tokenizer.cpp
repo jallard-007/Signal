@@ -4,7 +4,7 @@
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
 
 Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
-  newlinePositions{}, filePath{std::move(filePath)}, content{std::move(fileContent)}, peeked{0, 0, TokenType::NOTHING}
+  newlinePositions{}, filePath{std::move(filePath)}, content{std::move(fileContent)}, peeked{0, 0, TokenType::NONE}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -13,7 +13,7 @@ Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
   newlinePositions.emplace_back(0);
 }
 Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
-  newlinePositions{}, filePath{std::move(filePath)}, content{fileContent}, peeked{0, 0, TokenType::NOTHING}
+  newlinePositions{}, filePath{std::move(filePath)}, content{fileContent}, peeked{0, 0, TokenType::NONE}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -61,7 +61,7 @@ if (tNext != TokenType::IDENTIFIER && tNext != TokenType::DECIMAL_NUMBER) { \
  * The Token must be consumed by calling tokenizeNext before peeking to the next
 */
 Token Tokenizer::peekNext() {
-  if (peeked.type != TokenType::NOTHING) {
+  if (peeked.type != TokenType::NONE) {
     return peeked;
   }
   peeked = tokenizeNext();
@@ -71,16 +71,16 @@ Token Tokenizer::peekNext() {
 }
 
 void Tokenizer::consumePeek() {
-  if (peeked.type != TokenType::NOTHING) {
-    peeked.type = TokenType::NOTHING;
+  if (peeked.type != TokenType::NONE) {
+    peeked.type = TokenType::NONE;
     position = peeked.position + peeked.length;
   }
 }
 
 Token Tokenizer::tokenizeNext() {
-  if (peeked.type != TokenType::NOTHING) {
+  if (peeked.type != TokenType::NONE) {
     const Token temp = peeked;
-    peeked.type = TokenType::NOTHING;
+    peeked.type = TokenType::NONE;
     position = peeked.position + peeked.length;
     return temp;
   }

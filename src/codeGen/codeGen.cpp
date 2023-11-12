@@ -677,7 +677,7 @@ uint32_t sizeOfType(const TokenType type) {
  * Makes rooms on the stack for the variable and assigns the initial assignment to it
  * \returns the size of the type
 */
-uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize, bool inStruct) {
   int16_t reg = -1; 
   Token typeToken = varDec.type.token;
   if (isBuiltInType(typeToken.type)) {
@@ -737,13 +737,19 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
     }
     return size;
   }
+  else if (typeToken.type == TokenType::REFERENCE) {
+    if (!inStruct) {
+      return 0;
+    }
+    addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
+    return 8;
+  }
   else if (typeToken.type == TokenType::IDENTIFIER) {
     const uint32_t size = generateVariableDeclarationStructType(varDec, initialize);
     return size;
-  } else {
-    assert(typeToken.type==TokenType::REFERENCE);
-    return 0;
   }
+  assert(false);
+  exit(1);
 }
 
 /**
@@ -783,14 +789,14 @@ uint32_t CodeGen::sizeOfStruct(const std::string& structName) {
 
 // TODO:
 uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
-  Tokenizer *oldTk = tk;
   std::string structName = tk->extractToken(varDec.type.token);
   GeneralDec const * const &generalDec = checker.lookUp[structName];
+  Tokenizer *oldTk = tk;
   tk = &tokenizers[generalDec->tokenizerIndex];
   StructDecList *structDecList = &generalDec->structDec->decs;
   while (structDecList) {
     if (structDecList->type == StructDecType::VAR) {
-      generateVariableDeclaration(*structDecList->varDec, initialize);
+      generateVariableDeclaration(*structDecList->varDec, initialize, true);
     }
     structDecList = structDecList->next;
   }
@@ -961,7 +967,7 @@ void CodeGen::generateScope(const Scope& scope) {
 
 void CodeGen::generateStatement(const Statement& statement) {
   switch(statement.type) {
-    case StatementType::NOTHING: {
+    case StatementType::NONE: {
       break;
     }
     case StatementType::EXPRESSION: {
@@ -986,11 +992,10 @@ void CodeGen::generateStatement(const Statement& statement) {
         alignForImm(1, 8);
         addMarker(JumpMarkerType::BREAK);
         addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
-
       }
       else if (statement.keyword.type == TokenType::CONTINUE) {
         alignForImm(1, 8);
-        // jump to START_LOOP
+        addMarker(JumpMarkerType::CONTINUE);
         addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
       }
       else {

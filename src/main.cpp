@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
       break;
     }
     dec->tokenizerIndex = tokenizerIndex;
-    if (dec->type == GeneralDecType::NOTHING) {
+    if (dec->type == GeneralDecType::NONE) {
       // end of file for current tokenizer. find next valid tokenizer, swap, and continue parsing
       if (tokenizerIndex == 0) {
         // no more tokenizers

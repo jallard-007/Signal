@@ -8,7 +8,7 @@ std::string Unexpected::getErrorMessage(std::vector<Tokenizer>& tks) {
   return message + "Unexpected Token: " + tk.extractToken(token) + "\n\n";
 }
 
-Expected::Expected(ExpectedType exType, const Token& token, uint32_t tkIndex): tokenWhereExpected{token}, tkIndex{tkIndex}, expectedTokenType{TokenType::NOTHING}, expectedType{exType} {}
+Expected::Expected(ExpectedType exType, const Token& token, uint32_t tkIndex): tokenWhereExpected{token}, tkIndex{tkIndex}, expectedTokenType{TokenType::NONE}, expectedType{exType} {}
 Expected::Expected(ExpectedType exType, const Token& token, TokenType tkType, uint32_t tkIndex): tokenWhereExpected{token}, tkIndex{tkIndex}, expectedTokenType{tkType}, expectedType{exType} {}
 std::string Expected::getErrorMessage(std::vector<Tokenizer>& tks) {
   auto& tk = tks[tkIndex];
@@ -70,7 +70,7 @@ void initializeOperatorPrecedence() {
 }
 
 Parser::Parser(Tokenizer& tokenizer, NodeMemPool& memPool):
-  tokenizer{&tokenizer}, memPool{memPool}, errorToken{0,0,TokenType::NOTHING} {}
+  tokenizer{&tokenizer}, memPool{memPool}, errorToken{0,0,TokenType::NONE} {}
 
 Parser::~Parser() {
   memPool.reset();
@@ -818,7 +818,7 @@ ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, T
   statement.type = StatementType::EXPRESSION;
   statement.expression = memPool.makeExpression();
   tokenizer->position = token.position;
-  tokenizer->peeked.type = TokenType::NOTHING;
+  tokenizer->peeked.type = TokenType::NONE;
   ParseExpressionErrorType errorType = parseExpression(*statement.expression);
   if (errorType != ParseExpressionErrorType::NONE) {
     if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {

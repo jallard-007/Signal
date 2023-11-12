@@ -56,7 +56,7 @@ enum class CheckerErrorType: uint8_t {
 };
 
 struct CheckerError {
-  Token token{0,0,TokenType::NOTHING};
+  Token token{0,0,TokenType::NONE};
   GeneralDec *dec;
   uint32_t tkIndex;
   CheckerErrorType type;

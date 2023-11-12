@@ -6,7 +6,7 @@
 
 enum class TokenType : uint8_t {
   // special
-  NOTHING,
+  NONE,
   BAD_VALUE,
   END_OF_FILE,
   
@@ -136,7 +136,7 @@ enum class TokenType : uint8_t {
 struct Token {
   uint32_t position{0};
   uint16_t length{0};
-  TokenType type{TokenType::NOTHING};
+  TokenType type{TokenType::NONE};
   Token() = default;
   Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
   bool operator==(const Token&) const;

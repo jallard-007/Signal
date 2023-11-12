@@ -12,7 +12,7 @@ struct Unexpected {
 };
 
 enum class ExpectedType : uint8_t {
-  NOTHING,
+  NONE,
   EXPRESSION,
   TOKEN,
 };
