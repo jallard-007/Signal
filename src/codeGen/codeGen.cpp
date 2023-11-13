@@ -150,7 +150,7 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::IDENTIFIER: {
       // check if value is already in a reg. to do that we need a lookup. variable name to information regarding location, if its already in a register, etc.
-          }
+    }
     default: {
       return {false, false, 0};
     }
@@ -687,6 +687,8 @@ uint32_t sizeOfType(const TokenType type) {
 }
 
 /**
+ * TODO: add each var dec to fake stack, then we tally everything and have one sub op at the top of the scope for all variables
+ * and one add at the end to bring the sp back. wont need to use base pointer this way
  * Makes rooms on the stack for the variable and assigns the initial assignment to it
  * \returns the size of the type
 */
@@ -982,6 +984,9 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
 }
 
 void CodeGen::generateScope(const Scope& scope) {
+  // need to simulate stack for each scope
+  alignForImm(2, 4);
+  addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 0, 0, 0, 0});
   for (
     const StatementList *statementList = &scope.scopeStatements;
     statementList;
@@ -989,6 +994,10 @@ void CodeGen::generateScope(const Scope& scope) {
   ) {
     generateStatement(statementList->curr);
   }
+  // move stack pointer back
+  alignForImm(2, 4);
+  addBytes({(uc)OpCodes::ADD_I, stackPointerIndex, 0, 0, 0, 0});
+  // update sub_i and add_i commands with stack usage
 }
 
 void CodeGen::generateStatement(const Statement& statement) {

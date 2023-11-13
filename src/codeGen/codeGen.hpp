@@ -49,11 +49,17 @@ struct JumpMarker {
   bool operator==(const JumpMarker) const;
 };
 
+struct StackObject {
+  uint32_t stackIndex;
+  uint32_t size;
+};
+
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
-    std::vector<unsigned char> byteCode;
+  std::vector<unsigned char> byteCode;
   std::vector<JumpMarker> jumpMarkers;
+  // std::vector<StackObject> stack;
   Tokenizer *tk{nullptr};
   Program &program;
   std::map<std::string, GeneralDec *>& lookUp;
