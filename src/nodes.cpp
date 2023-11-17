@@ -21,8 +21,6 @@ Expression& Expression::operator=(const Expression&ref) {
   return *this;
 }
 
-ExpressionList::ExpressionList(): curr{}, next{nullptr} {}
-
 Statement::Statement(): expression{}, type{StatementType::NONE} {}
 Statement::Statement(const Statement& ref): expression{ref.expression}, type{ref.type} {}
 Statement& Statement::operator=(const Statement& ref) {

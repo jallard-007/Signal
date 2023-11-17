@@ -44,8 +44,8 @@ struct Expression {
 
 struct ExpressionList {
   Expression curr;
-  ExpressionList *next;
-  ExpressionList();
+  ExpressionList *next{nullptr};
+  ExpressionList() = default;
   ExpressionList deepCopy(NodeMemPool&);
 };
 
@@ -101,7 +101,7 @@ struct TokenList {
 // varDec:= simpleVarDec initialization
 //                     | nothing
 struct VariableDec {
-  TokenList type{};
+  TokenList type;
   Token name;
   Expression *initialAssignment{nullptr};
   VariableDec() = delete;
@@ -115,7 +115,7 @@ struct VariableDec {
 
 // statementList:= statement statementList | nothing
 struct StatementList {
-  Statement curr{};
+  Statement curr;
   StatementList *next{nullptr};
   StatementList() = default;
   StatementList(const StatementList &) = default;
@@ -125,7 +125,7 @@ struct StatementList {
 
 // scope:= { statementList }
 struct Scope {
-  StatementList scopeStatements{};
+  StatementList scopeStatements;
   Scope() = default;
   Scope(const Scope &) = default;
   Scope& operator=(const Scope &) = default;
@@ -137,7 +137,7 @@ struct Scope {
 
 // arrayAccess:= identifier [ expression ]
 struct ArrayAccess {
-  Expression offset{};
+  Expression offset;
   Expression array;
   ArrayAccess() = delete;
   explicit ArrayAccess(const Token&);
@@ -148,8 +148,8 @@ struct ArrayAccess {
 
 // binOp:= expression binOpOperator expression
 struct BinOp {
-  Expression leftSide{};
-  Expression rightSide{};
+  Expression leftSide;
+  Expression rightSide;
   Token op;
   BinOp() = delete;
   explicit BinOp(const Token&);
@@ -160,7 +160,7 @@ struct BinOp {
 
 // unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
 struct UnOp {
-  Expression operand{};
+  Expression operand;
   Token op;
   UnOp() = delete;
   explicit UnOp(const Token&);
@@ -171,7 +171,7 @@ struct UnOp {
 
 // functionCall:= identifier(expressionList)
 struct FunctionCall {
-  ExpressionList args{};
+  ExpressionList args;
   Token name;
   FunctionCall() = delete;
   explicit FunctionCall(const Token &);
@@ -218,6 +218,7 @@ struct ConditionalStatement {
   IfStatement ifStatement;
   ElifStatementList *elifStatement{nullptr};
   Scope *elseStatement{nullptr};
+  ConditionalStatement() = default;
   ConditionalStatement(const ConditionalStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   ConditionalStatement *deepCopy(NodeMemPool&);
@@ -225,8 +226,8 @@ struct ConditionalStatement {
 
 // returnStatement:= return expression;
 struct ReturnStatement {
-  Expression returnValue{};
-  Token token{};
+  Expression returnValue;
+  Token token;
   ReturnStatement() = default;
   explicit ReturnStatement(const Token&);
   void prettyPrint(Tokenizer&, std::string&);
@@ -244,8 +245,8 @@ struct SwitchScopeStatementList {
 
 // switchStatement:=  switch (identifier) switchScope
 struct SwitchStatement {
-  SwitchScopeStatementList body{};
-  Expression switched{};
+  SwitchScopeStatementList body;
+  Expression switched;
   SwitchStatement() = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
   SwitchStatement *deepCopy(NodeMemPool&);
@@ -255,7 +256,7 @@ struct SwitchStatement {
 
 // whileLoop:= while (expression) scope
 struct WhileLoop {
-  IfStatement statement{};
+  IfStatement statement;
   WhileLoop() = default;
   WhileLoop(const WhileLoop&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -264,10 +265,10 @@ struct WhileLoop {
 
 // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 struct ForLoop {
-  Scope body{};
-  Statement initialize{};
-  Expression condition{};
-  Expression iteration{};
+  Scope body;
+  Statement initialize;
+  Expression condition;
+  Expression iteration;
   ForLoop() = default;
   ForLoop(const ForLoop &) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -306,10 +307,10 @@ struct ControlFlowStatement {
 
 // functionDec:= func identifier (varDecList): typeList scope
 struct FunctionDec {
-  StatementList params{};
-  Scope body{};
-  TokenList returnType{};
-  Token name{0,0,TokenType::NONE};
+  StatementList params;
+  Scope body;
+  TokenList returnType;
+  Token name;
   FunctionDec() = default;
   explicit FunctionDec(const Token&);
   FunctionDec(const FunctionDec&) = default;
@@ -341,8 +342,8 @@ struct StructDecList {
 
 // structDec:= struct identifier { structDecList }
 struct StructDec {
-  StructDecList decs{};
-  Token name{0,0,TokenType::NONE};
+  StructDecList decs;
+  Token name;
   bool checked{false};
   bool hasCycle{false};
   StructDec() = default;
@@ -355,7 +356,7 @@ struct StructDec {
 
 // enumDec:= enum identifier { identifierList }
 struct EnumDec {
-  TokenList members{};
+  TokenList members;
   Token name;
   EnumDec() = delete;
   explicit EnumDec(const Token&);
@@ -373,8 +374,8 @@ struct TemplateDec {
     StructDec structDec;
     FunctionDec funcDec;
   };
-  TokenList templateTypes{};
-  Token token{0,0,TokenType::NONE};
+  TokenList templateTypes;
+  Token token;
   bool isStruct{false};
   TemplateDec();
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -386,7 +387,7 @@ struct TemplateDec {
 struct TemplateCreation {
   Token templateName;
   TemplateDec *templateDec{nullptr};
-  TokenList templateTypes{};
+  TokenList templateTypes;
   Token typeName;
   TemplateCreation() = default;
   TemplateCreation(const TemplateCreation&) = default;
@@ -431,7 +432,7 @@ struct GeneralDec {
 
 // globalDecList:= globalDec globalDecList | nothing
 struct GeneralDecList {
-  GeneralDec curr{};
+  GeneralDec curr;
   GeneralDecList *next{nullptr};
   GeneralDecList() = default;
   void prettyPrint(std::vector<Tokenizer>&, std::string&);
@@ -440,7 +441,7 @@ struct GeneralDecList {
 
 // program:= globalDecList
 struct Program {
-  GeneralDecList decs{};
+  GeneralDecList decs;
   Program() = default;
   void prettyPrint(std::vector<Tokenizer>&, std::string&);
 };

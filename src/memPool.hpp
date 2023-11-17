@@ -101,7 +101,7 @@ struct MemPool {
 
     T *curr = &freeObj->val;
     freeObj = freeObj->next;
-    new (curr) T{};
+    new (curr) T;
     return curr;
   }
   

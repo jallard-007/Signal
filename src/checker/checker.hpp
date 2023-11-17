@@ -56,12 +56,12 @@ enum class CheckerErrorType: uint8_t {
 };
 
 struct CheckerError {
-  Token token{0,0,TokenType::NONE};
+  Token token;
   GeneralDec *dec;
   uint32_t tkIndex;
   CheckerErrorType type;
   CheckerError() = delete;
-  CheckerError(CheckerErrorType, uint32_t, Token );
+  CheckerError(CheckerErrorType, uint32_t, Token);
   CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
   CheckerError(CheckerErrorType, uint32_t, Expression*);
   CheckerError(CheckerErrorType, uint32_t, Expression*, GeneralDec*);
