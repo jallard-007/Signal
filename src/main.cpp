@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <iterator>
+#include <chrono>
 #include "./parser/parser.hpp"
 #include "./checker/checker.hpp"
 
@@ -44,6 +45,7 @@ void splitFilePath(const std::string& filePath, std::vector<std::string>& split)
  * and removing or adding directories only when required from 'include's
 */
 int main(int argc, char **argv) {
+  auto begin = std::chrono::high_resolution_clock::now();
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " <Filepath>\n";
     return 1;
@@ -168,17 +170,8 @@ int main(int argc, char **argv) {
   }
   Checker checker{parser.program, tokenizers, mem};
   checker.check();
-  if (!checker.errors.empty()) {
-    int i = 0;
-    for (auto& error : checker.errors) {
-      std::cerr << error.getErrorMessage(tokenizers);
-      if (++i >= 20) {
-        std::cout << "max errors reached\n";
-        return 1;
-      }
-    }
-    return 1;
-  }
-  std::cout << "No errors found\n";
-  return 0;
+  auto end = std::chrono::high_resolution_clock::now();
+  double total = std::chrono::duration_cast<std::chrono::duration<double>>(end - begin).count();
+  std::cout << "Execution time: " << total << '\n';
+  return !checker.errors;
 }

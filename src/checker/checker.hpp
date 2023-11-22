@@ -57,9 +57,9 @@ enum class CheckerErrorType: uint8_t {
 
 struct CheckerError {
   Token token;
-  GeneralDec *dec;
-  uint32_t tkIndex;
-  CheckerErrorType type;
+  GeneralDec *dec{nullptr};
+  uint32_t tkIndex{0};
+  CheckerErrorType type{CheckerErrorType::NONE};
   CheckerError() = delete;
   CheckerError(CheckerErrorType, uint32_t, Token);
   CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
@@ -74,13 +74,19 @@ struct ResultingType {
   ResultingType(TokenList*, bool);
 };
 
+#define MAX_ERRORS 20
+
 struct Checker {
   std::map<std::string, std::map<std::string, StructDecList *>> structsLookUp;
   std::map<std::string, GeneralDec *> lookUp;
-  std::vector<CheckerError> errors;
+  CheckerError lastError {CheckerErrorType::NONE, 0, Token{}};
   Program& program;
   std::vector<Tokenizer>& tokenizers;
   NodeMemPool &memPool;
+  uint32_t errorCount{0};
+  bool wasErrors{false};
+  bool errors{false};
+
   static TokenList noneValue;
   static TokenList badValue;
   static TokenList boolValue;
@@ -110,6 +116,9 @@ struct Checker {
   ResultingType checkExpression(Tokenizer&, Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
   ResultingType checkMemberAccess(Tokenizer&, ResultingType&, Expression&);
   bool checkType(Tokenizer&, TokenList&);
+  void addError(const CheckerError&);
+  void removeLastError();
+  bool checkForErrors();
   static TokenList& largestType(TokenList&, TokenList&);
 };
 
