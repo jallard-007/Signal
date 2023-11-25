@@ -985,8 +985,9 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
 
 void CodeGen::generateScope(const Scope& scope) {
   // need to simulate stack for each scope
-  alignForImm(2, 4);
-  addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 0, 0, 0, 0});
+  // add flag to generate stack pointer code or not for loops (optimize)
+  // alignForImm(2, 4);
+  // addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 0, 0, 0, 0});
   for (
     const StatementList *statementList = &scope.scopeStatements;
     statementList;
@@ -995,8 +996,8 @@ void CodeGen::generateScope(const Scope& scope) {
     generateStatement(statementList->curr);
   }
   // move stack pointer back
-  alignForImm(2, 4);
-  addBytes({(uc)OpCodes::ADD_I, stackPointerIndex, 0, 0, 0, 0});
+  // alignForImm(2, 4);
+  // addBytes({(uc)OpCodes::ADD_I, stackPointerIndex, 0, 0, 0, 0});
   // update sub_i and add_i commands with stack usage
 }
 
