@@ -1,7 +1,7 @@
 .vscode
 .idea
 main
-test
+tests
 out
 build
 Makefile
@@ -19,3 +19,4 @@ asm
 compile_commands.json
 *ninja*
 *.exe*
+DartConfiguration.tcl

@@ -13,7 +13,7 @@ TEST_CASE("scanTopLevel", "[checker]") {
   REQUIRE(pr.unexpected.empty());
   Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
-  CHECK_FALSE(tc.errors);
+  CHECK(tc.errors.empty());
   CHECK(tc.lookUp["funcName"]);
   CHECK(tc.lookUp["var"]);
   CHECK(tc.lookUp["thing"]);
@@ -101,7 +101,7 @@ struct customType {
   Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
-  CHECK_FALSE(tc.errors);
+  CHECK(tc.errors.empty());
 }
 
 
@@ -142,5 +142,5 @@ struct customType {
   tc.firstTopLevelScan();
   tc.secondTopLevelScan();
   tc.fullScan();
-  CHECK_FALSE(tc.errors);
+  CHECK(tc.errors.empty());
 }

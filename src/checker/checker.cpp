@@ -54,7 +54,7 @@ CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Expression *
   token = getTokenOfExpression(*expression);
 }
 
-std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) {
+std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) const {
   auto& tk = tokenizers[tkIndex];
   TokenPositionInfo posInfo = tk.getTokenPositionInfo(token);
   std::string message = tk.filePath + ':' + std::to_string(posInfo.lineNum) + ':' + std::to_string(posInfo.linePos) + '\n';
@@ -107,23 +107,13 @@ ResultingType::ResultingType(TokenList* type, bool isLValue): type{type}, isLVal
 Checker::Checker(Program& prog, std::vector<Tokenizer>& tks, NodeMemPool& mem):
 structsLookUp{}, lookUp{}, program{prog}, tokenizers{tks}, memPool{mem} {}
 
-bool Checker::checkForErrors() {
-  if (errors) {
-    if (errorCount <= MAX_ERRORS) {
-      std::cout << lastError.getErrorMessage(tokenizers) << '\n';
-    }
-    return false;
-  }
-  return true;
-}
-
 bool Checker::check() {
   firstTopLevelScan();
-  if (!checkForErrors()) {
+  if (!errors.empty()) {
     return false;
   }
   secondTopLevelScan();
-  if (!checkForErrors()) {
+  if (!errors.empty()) {
     return false;
   }
   std::vector<StructDec *> chain;
@@ -135,14 +125,11 @@ bool Checker::check() {
       checkForStructCycles(list->curr, chain);
     }
   }
-  if (!checkForErrors()) {
+  if (!errors.empty()) {
     return false;
   }
   fullScan();
-  if (!checkForErrors()) {
-    return false;
-  }
-  return true;
+  return errors.empty();
 }
 
 /**
@@ -273,6 +260,7 @@ void Checker::secondTopLevelScan() {
           templateTypes.push_back(tk.extractToken(templateIdentifiers->token));
           GeneralDec *&tempTypeDec = lookUp[templateTypes.back()];
           if (tempTypeDec) {
+            templateTypes.pop_back();
             addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk.tokenizerIndex, templateIdentifiers->token, tempTypeDec});
             errorFound = true;
             break;
@@ -282,13 +270,12 @@ void Checker::secondTopLevelScan() {
           templateIdentifiers = templateIdentifiers->next;
         } while (templateIdentifiers);
         // validate top level types
-        if (errorFound) {
-          break;
-        }
-        if (list->curr.tempDec->isStruct) {
-          validateStructTopLevel(tk, list->curr.tempDec->structDec);
-        } else {
-          validateFunctionHeader(tk, list->curr.tempDec->funcDec);
+        if (!errorFound) {
+          if (list->curr.tempDec->isStruct) {
+            validateStructTopLevel(tk, list->curr.tempDec->structDec);
+          } else {
+            validateFunctionHeader(tk, list->curr.tempDec->funcDec);
+          }
         }
         // remove templated types
         while (!templateTypes.empty()) {
@@ -356,7 +343,7 @@ bool Checker::validateFunctionHeader(Tokenizer& tk, FunctionDec &funcDec) {
   bool valid = true;
   // check return type
   if (!checkType(tk, funcDec.returnType)) {
-    if (lastError.type == CheckerErrorType::VOID_TYPE) {
+    if (errors.back().type == CheckerErrorType::VOID_TYPE) {
       removeLastError();
     } else {
       valid = false;
@@ -1045,27 +1032,14 @@ ResultingType Checker::checkMemberAccess(Tokenizer& tk, ResultingType& leftSide,
 }
 
 void Checker::addError(const CheckerError& error) {
-  if (errorCount > MAX_ERRORS) {
+  if (errors.size() > MAX_ERRORS) {
     return;
   }
-  if (errors) {
-    wasErrors = true;
-  }
-  errors = true;
-  if (lastError.type != CheckerErrorType::NONE) {
-    std::cout << lastError.getErrorMessage(tokenizers);
-  }
-  lastError = error;
-  if (errorCount++ == MAX_ERRORS) {
-    std::cout << "Max errors reached, not displaying more\n";
-  }
+  errors.emplace_back(error);
 }
 
 void Checker::removeLastError() {
-  if (!wasErrors) {
-    errors = false;
-  }
-  lastError.type = CheckerErrorType::NONE;
+  errors.pop_back();
 }
 
 bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {

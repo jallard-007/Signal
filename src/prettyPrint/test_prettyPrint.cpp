@@ -2,7 +2,7 @@
 #include "../parser/parser.hpp"
 #include "../testingMemPool.hpp"
 
-TEST_CASE("Something", "[prettyPrinter]") {
+TEST_CASE("pretty print test1", "[prettyPrinter]") {
   const std::string str = 
 R"(func getType(type: Type ref): Token {
   tp: Token = tokenizer.peekNext();
@@ -41,7 +41,7 @@ R"(func getType(type: Type ref): Token {
   CHECK(str == output);
 }
 
-TEST_CASE("Other", "[prettyPrinter]") {
+TEST_CASE("pretty print test 2", "[prettyPrinter]") {
   const std::string str = 
 R"(func getType(type: Type ref): Token {
   if (1) {

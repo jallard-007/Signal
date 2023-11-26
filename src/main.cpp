@@ -173,5 +173,11 @@ int main(int argc, char **argv) {
   auto end = std::chrono::high_resolution_clock::now();
   double total = std::chrono::duration_cast<std::chrono::duration<double>>(end - begin).count();
   std::cout << "Execution time: " << total << '\n';
-  return !checker.errors;
+  for (const CheckerError &err : checker.errors) {
+    std::cout << err.getErrorMessage(tokenizers) << '\n';
+  }
+  if (checker.errors.size() == MAX_ERRORS) {
+    std::cout << "Max errors reached\n";
+  }
+  return !checker.errors.empty();
 }

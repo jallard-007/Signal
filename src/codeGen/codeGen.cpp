@@ -985,7 +985,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
 
 void CodeGen::generateScope(const Scope& scope) {
   // need to simulate stack for each scope
-  // add flag to generate stack pointer code or not for loops (optimize)
+  // add flag to generate stack pointer code or not for loops (optimization)
   // alignForImm(2, 4);
   // addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 0, 0, 0, 0});
   for (

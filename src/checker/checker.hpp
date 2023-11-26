@@ -65,7 +65,7 @@ struct CheckerError {
   CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
   CheckerError(CheckerErrorType, uint32_t, Expression*);
   CheckerError(CheckerErrorType, uint32_t, Expression*, GeneralDec*);
-  std::string getErrorMessage(std::vector<Tokenizer>&);
+  std::string getErrorMessage(std::vector<Tokenizer>&) const;
 };
 
 struct ResultingType {
@@ -79,13 +79,10 @@ struct ResultingType {
 struct Checker {
   std::map<std::string, std::map<std::string, StructDecList *>> structsLookUp;
   std::map<std::string, GeneralDec *> lookUp;
-  CheckerError lastError {CheckerErrorType::NONE, 0, Token{}};
+  std::vector<CheckerError> errors;
   Program& program;
   std::vector<Tokenizer>& tokenizers;
   NodeMemPool &memPool;
-  uint32_t errorCount{0};
-  bool wasErrors{false};
-  bool errors{false};
 
   static TokenList noneValue;
   static TokenList badValue;
@@ -118,7 +115,6 @@ struct Checker {
   bool checkType(Tokenizer&, TokenList&);
   void addError(const CheckerError&);
   void removeLastError();
-  bool checkForErrors();
   static TokenList& largestType(TokenList&, TokenList&);
 };
 
