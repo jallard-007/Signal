@@ -2,18 +2,23 @@
 #include <cinttypes>
 #include "interpreter.hpp"
 
+#define uc unsigned char
+#define u64 uint64_t
+
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
 #define bp registers[basePointerIndex]
 #define dp registers[dataPointerIndex]
 #define misc registers[miscIndex]
 
+#define valAtSP(offset) *(u64 *)(sp + offset)
+
 Interpreter::Interpreter(
-  unsigned char const *programInstructions,
-  unsigned char *programData,
+  uc const *programInstructions,
+  uc *programData,
   uint64_t stackSize
 ): program{programInstructions} {
-  stack = new unsigned char [stackSize];
+  stack = new uc [stackSize];
   sp = (uint64_t)stack + stackSize;
   bp = sp;
   dp = (uint64_t)programData;
@@ -63,45 +68,53 @@ void Interpreter::executeNextInstruction() {
       BuiltInFunctions func = (BuiltInFunctions)program[ip++];
       switch (func) {
         case BuiltInFunctions::ALLOCATE: {
-          registers[10] = (uint64_t)malloc(registers[11]);
-          ip += 2;
+          valAtSP(8) = (uint64_t)malloc(valAtSP(0));
+          sp += 8;
           break;
         }
         case BuiltInFunctions::REALLOCATE: {
-          registers[10] = (uint64_t)realloc((void *)registers[11], registers[12]);
-          ip += 2;
+          valAtSP(16) = (u64)realloc((void *)valAtSP(8), *(u64 *)valAtSP(0));
+          sp += 16;
           break;
         }
         case BuiltInFunctions::DEALLOCATE: {
-          free((void *)registers[11]);
+          free((void *)sp);
+          sp += 8;
           break;
         }
         case BuiltInFunctions::PRINT_STRING: {
-          fprintf((FILE *)registers[11], "%s", (char *)registers[12]);
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%s", (char *)valAtSP(0));
+          sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_CHAR: {
-          fprintf((FILE *)registers[11], "%c", (char)registers[12]);
+          *(int32_t *)(sp + 13) = fprintf((FILE *)valAtSP(1), "%c", *(char *)sp);
+          sp += 13;
           break;
         }
         case BuiltInFunctions::PRINT_SIGNED: {
-          fprintf((FILE *)registers[11], "%" PRId64, (int64_t)registers[12]);
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%" PRId64, (int64_t)valAtSP(0));
+          sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_UNSIGNED: {
-          fprintf((FILE *)registers[11], "%" PRIu64, registers[12]);
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%" PRIu64, valAtSP(0));
+          sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_HEX: {
-          fprintf((FILE *)registers[11], "0x%08" PRIx64, registers[12]);
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "0x%08" PRIx64, valAtSP(0));
+          sp += 20;
           break;
         }
         case BuiltInFunctions::GET_CHAR: {
-          registers[10] = (uint64_t)getc((FILE *)registers[11]);
+          *(int32_t *)(sp + 12) = (uint64_t)getc((FILE *)valAtSP(0));
+          sp += 12;
           break;
         }
         case BuiltInFunctions::FFLUSH: {
-          fflush((FILE *)registers[11]);
+          *(int32_t *)(sp + 12) = fflush((FILE *)valAtSP(0));
+          sp += 12;
           break;
         }
         default: {

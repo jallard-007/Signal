@@ -49,7 +49,7 @@ TEST_CASE("push/pop", "[interpreter]") {
 TEST_CASE("print \"Hello World!\"", "[interpreter]") {
   int fd[2]{0};
   REQUIRE_FALSE(pipe(fd) == -1);
-  FILE *fp = fdopen(fd[1],"w");
+  FILE *fp = fdopen(fd[1], "w");
   uc *split = (uc *)&fp;
   unsigned char const program [] =
   {
@@ -59,8 +59,12 @@ TEST_CASE("print \"Hello World!\"", "[interpreter]") {
   (uc)OpCodes::SHIFT_L_I, 11, 32, 0, 0, 0,
   (uc)OpCodes::NOP, (uc)OpCodes::NOP,
   (uc)OpCodes::ADD_I, 11, split[0], split[1], split[2], split[3],
-  (uc)OpCodes::MOVE, 12, dataPointerIndex,
+  (uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0,
+  (uc)OpCodes::PUSH_Q, 11,
+  (uc)OpCodes::PUSH_Q, dataPointerIndex,
   (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::PRINT_STRING,
+  (uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0,
+  (uc)OpCodes::PUSH_Q, 11,
   (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::FFLUSH,
   (uc)OpCodes::EXIT, 0,
   };
@@ -81,13 +85,10 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
   int fd[2]{0};
   REQUIRE_FALSE(pipe(fd) == -1);
   FILE *fp = fdopen(fd[0],"r");
-  uc *s_stdin = (uc *)&fp;
   FILE *fp_stdout = stdout;
-  uc *s_stdout = (uc *)&fp_stdout;
-  uc data[] = {
-    s_stdout[0], s_stdout[1], s_stdout[2], s_stdout[3], s_stdout[4], s_stdout[5], s_stdout[6], s_stdout[7], // stdout FILE *
-    s_stdin[0], s_stdin[1], s_stdin[2], s_stdin[3], s_stdin[4], s_stdin[5], s_stdin[6], s_stdin[7], // stdin FILE *
-  };
+  uc data[16];
+  ((FILE**)&data)[0] = fp_stdout;
+  ((FILE**)&data)[1] = fp;
   const std::string input = "Hello World!\n";
   REQUIRE(write(fd[1], input.data(), input.size()));
   unsigned char const program [] =
@@ -97,21 +98,24 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
   (uc)OpCodes::ADD_I, 2, 8, 0, 0, 0,
   (uc)OpCodes::LOAD_Q, 11, 2, // load stdin FILE * from data
   (uc)OpCodes::NOP,
-  (uc)OpCodes::MOVE_I, 2, '\n', 0, 0, 0, // set j to newline char
+  (uc)OpCodes::MOVE_I, 12, '\n', 0, 0, 0, // set j to newline char
   (uc)OpCodes::NOP, (uc)OpCodes::NOP,
-  (uc)OpCodes::SUB_I, stackPointerIndex, 20, 0, 0, 0, // make room on stack for 20 bytes
-  (uc)OpCodes::MOVE, 1, stackPointerIndex, // set i to start of buffer
+  (uc)OpCodes::SUB_I, stackPointerIndex, 32, 0, 0, 0, // make room on stack for array of 32 chars
+  (uc)OpCodes::MOVE, 13, stackPointerIndex, // set i to start of buffer
 
   // loop here
+  (uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0, // make room for return value (int) + padding (4 bytes)
+  (uc)OpCodes::PUSH_Q, 11, // add file ptr to stack
   (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::GET_CHAR,
-  (uc)OpCodes::STORE_B, 1, 10, // add to stack
-  (uc)OpCodes::INC, 1, // increment i,
-  (uc)OpCodes::CMP, 10, 2, // compare character to newline
-  (uc)OpCodes::RB_JUMP_NE, (uc)(-10), // loop if its not newline
+  (uc)OpCodes::POP_D, 2, // load return value
+  (uc)OpCodes::STORE_B, 13, 2,
+  (uc)OpCodes::INC, 13, // increment i,
+  (uc)OpCodes::CMP, 2, 12, // compare character to newline
+  (uc)OpCodes::RB_JUMP_NE, (uc)(-20), // loop if its not newline
 
   // add null termination to end of string
   (uc)OpCodes::XOR, 2, 2,
-  (uc)OpCodes::STORE_B, 1, 2, 
+  (uc)OpCodes::STORE_B, 13, 2, 
 
   (uc)OpCodes::EXIT, 0,
   };
@@ -127,13 +131,10 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
 
 TEST_CASE("jump", "[interpreter]") {
   FILE *fp_stdout = stdout;
-  uc *s_stdout = (uc *)&fp_stdout;
   FILE *fp_stdin = stdin;
-  uc *s_stdin = (uc *)&fp_stdin;
-  uc data[] = {
-    s_stdout[0], s_stdout[1], s_stdout[2], s_stdout[3], s_stdout[4], s_stdout[5], s_stdout[6], s_stdout[7], // stdout FILE *
-    s_stdin[0], s_stdin[1], s_stdin[2], s_stdin[3], s_stdin[4], s_stdin[5], s_stdin[6], s_stdin[7], // stdin FILE *
-  };
+  uc data[16];
+  ((FILE**)&data)[0] = fp_stdout;
+  ((FILE**)&data)[1] = fp_stdin;
   uc const program[] = {
     (uc)OpCodes::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data
     (uc)OpCodes::NOP, (uc)OpCodes::NOP, (uc)OpCodes::NOP,
@@ -159,13 +160,10 @@ TEST_CASE("jump", "[interpreter]") {
 
 TEST_CASE("loop", "[interpreter]") {
   FILE *fp_stdout = stdout;
-  uc *s_stdout = (uc *)&fp_stdout;
   FILE *fp_stdin = stdin;
-  uc *s_stdin = (uc *)&fp_stdin;
-  uc data[] = {
-    s_stdout[0], s_stdout[1], s_stdout[2], s_stdout[3], s_stdout[4], s_stdout[5], s_stdout[6], s_stdout[7], // stdout FILE *
-    s_stdin[0], s_stdin[1], s_stdin[2], s_stdin[3], s_stdin[4], s_stdin[5], s_stdin[6], s_stdin[7], // stdin FILE *
-  };
+  uc data[16];
+  ((FILE**)&data)[0] = fp_stdout;
+  ((FILE**)&data)[1] = fp_stdin;
   unsigned char const program [] =
   {
   (uc)OpCodes::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data

@@ -7,18 +7,38 @@
 #define dataPointerIndex NUM_REGISTERS - 4
 #define miscIndex NUM_REGISTERS - 5
 
-// arguments are passed through registers r11 - r1x, return value passed through register r10
+/*
+arguments are passed on the stack. before calling a function, space for the return value needs to be made
+initial position = sp
+sp += size of return value
+space for return value will be between initial position and new sp (sp will point to start of data since stack grows down)
+each argument will be placed one after the other (padding if necessary) starting with the first argument, ex:
+
+function with args (char, int32) and returns int32
+ADD sp 4  // for 32 bit return value
+PUSH_B arg1  // first argument of size 8 bit (adds 1 to the sp)
+ADD sp 3  // padding for 32 bit value
+PUSH_D arg2  // second argument of size 32 bit (adds 4 to the sp)
+
+arguments can then be accessed within the function via:
+argument 1: sp + 7 (4 + 3)
+argument 2: sp
+
+and return value via: sp + 8
+
+the return value can be accessed by the caller from sp
+*/
 enum class BuiltInFunctions: unsigned char {
-  ALLOCATE, // ALLOCATE r11 | allocate r11 bytes and place address in r10
-  REALLOCATE, // REALLOCATE r11, r12 | reallocate memory at r11 with new size r12, place new address in r10
-  DEALLOCATE, // DEALLOCATE r11 | deallocate memory
-  PRINT_STRING, // prints the string (null terminated) pointed at by r12 to FILE* r11
-  PRINT_CHAR, // prints the lowest byte in r12 as a character to FILE* r11
-  PRINT_SIGNED, // prints r12 as a signed integer to FILE* r11
-  PRINT_UNSIGNED, // prints r12 as an unsigned integer to FILE* r11
-  PRINT_HEX, // prints r12 in hex to FILE* r11
-  GET_CHAR, // returns one character from file descriptor r11 in r10
-  FFLUSH, // flush buffer FILE* r11
+  ALLOCATE, // ALLOCATE arg1 | allocate arg1 bytes and return address
+  REALLOCATE, // REALLOCATE arg1, arg2 | reallocate memory pointed at by arg1 with new size arg2, return new address
+  DEALLOCATE, // DEALLOCATE arg1 | deallocate memory at arg1
+  PRINT_STRING, // PRINT_STRING arg1, arg2 | prints the string (null terminated) pointed at by arg2 to FILE* arg1
+  PRINT_CHAR, // PRINT_STRING arg1, arg2 | prints the lowest byte in arg2 as a character to FILE* arg1
+  PRINT_SIGNED, // PRINT_STRING arg1, arg2 | prints arg2 as a signed integer to FILE* arg1
+  PRINT_UNSIGNED, // PRINT_STRING arg1, arg2 | prints arg2 as an unsigned integer to FILE* arg1
+  PRINT_HEX, // PRINT_STRING arg1, arg2 | prints arg2 in hex to FILE* arg1
+  GET_CHAR, // PRINT_STRING arg1 | returns one character from file descriptor arg1
+  FFLUSH, // PRINT_STRING arg1 | flush buffer FILE* arg1
 };
 
 enum class OpCodes: unsigned char {
