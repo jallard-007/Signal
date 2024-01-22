@@ -200,6 +200,18 @@ TEST_CASE("struct info generation", "[codeGen]") {
     CHECK(structInfo.offsetMap["x"] == 4);
     CHECK(structInfo.offsetMap["j"] == 8);
   }
+  {
+    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct Thing1 { y:Thing; x: bool; j:uint32 ptr; }";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    StructInformation& structInfo = codeGen.getStructInfo("Thing1");
+    CHECK(structInfo.size == 24);
+    CHECK(structInfo.alignTo == 8);
+    CHECK(structInfo.offsetMap["y"] == 0);
+    CHECK(structInfo.offsetMap["x"] == 12);
+    CHECK(structInfo.offsetMap["j"] == 16);
+  }
 }
 
 TEST_CASE("short-circuit logical bin ops", "[codeGen]") {

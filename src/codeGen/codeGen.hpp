@@ -56,7 +56,9 @@ struct StackObject {
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
+  std::unordered_map<uint64_t, uint64_t> declarationAddressToByteCodeAddress;
   std::map<std::string, StructInformation> structNameToInfoMap;
+  std::map<std::string, uint64_t> functionNameToLocation;
   std::vector<unsigned char> byteCode;
   std::vector<JumpMarker> jumpMarkers;
   // std::vector<StackObject> stack;
@@ -91,6 +93,11 @@ struct CodeGen {
   void addByteOp(OpCodes);
   void addByte(unsigned char);
   void addBytes(const std::vector<unsigned char>&);
+  void add2ByteNum(const uint16_t);
+  void add4ByteNum(const uint32_t);
+  void add8ByteNum(const uint64_t);
+  void addBytesBasedOnEndianess(const void *, uint64_t);
+
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
   ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
@@ -99,6 +106,7 @@ struct CodeGen {
   int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
+  uint32_t sizeOfType(const Token);
 };
 
 /*

@@ -5,7 +5,16 @@ endif()
 project(main CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-add_library(common STATIC ./src/codeGen/codeGen.cpp ./src/checker/checker.cpp ./src/prettyPrint/prettyPrint.cpp ./src/parser/parser.cpp ./src/nodes.cpp ./src/tokenizer/tokenizer.cpp ./src/token.cpp)
+add_library(common STATIC
+    ./src/codeGen/codeGen.cpp
+    ./src/checker/checker.cpp
+    ./src/prettyPrint/prettyPrint.cpp
+    ./src/parser/parser.cpp
+    ./src/nodes.cpp
+    ./src/tokenizer/tokenizer.cpp
+    ./src/token.cpp
+    ./src/utils.cpp
+)
 add_library(interpreter STATIC ./src/interpreter/interpreter.cpp)
 
 set_target_properties(interpreter common PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)

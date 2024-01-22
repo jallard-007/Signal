@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cinttypes>
+#include <cstring>
 #include "interpreter.hpp"
 
 #define uc unsigned char
@@ -115,6 +116,11 @@ void Interpreter::executeNextInstruction() {
         case BuiltInFunctions::FFLUSH: {
           *(int32_t *)(sp + 12) = fflush((FILE *)valAtSP(0));
           sp += 12;
+          break;
+        }
+        case BuiltInFunctions::MEM_COPY: {
+          std::memcpy((void *)valAtSP(16), (void *)valAtSP(8), valAtSP(0));
+          sp += 24;
           break;
         }
         default: {

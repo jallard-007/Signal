@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include "codeGen.hpp"
+#include "../utils.hpp"
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
@@ -54,11 +55,31 @@ ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLi
   }
   return {false, false, 0};
 }
+
+/**
+ * Generates a function call expression
+ * \param functionCall the function call node
+ * \returns an ExpressionResult object, with val containing the address of the returned value
+*/
 ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
-  if (functionCall.name.length) {
-    return {false, false, 0};
-  }
-  return {false, false, 0};
+  GeneralDec const *const &generalDec = lookUp[tk->extractToken(functionCall.name)];
+  const uint64_t addressOfReturnValue = byteCode.size();
+
+  // make room for return value
+  const uint32_t sizeOfReturnType = sizeOfType(generalDec->funcDec->returnType.token);
+  addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+  add4ByteNum(sizeOfReturnType);
+
+  // push arguments to stack
+
+
+  // jump to function
+  addByteOp(OpCodes::FUNC_CALL);
+  // using the address of the declaration node as a temp,
+  // we can use this address to lookup the functions address later ("linker stage")
+  // using map of uint64_t -> uint64_t, this is populated as generateFunction is called
+  add8ByteNum((uint64_t)generalDec);
+  return {false, true, addressOfReturnValue};
 }
 
 
@@ -97,7 +118,7 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool con
 
 ExpressionResult CodeGen::loadValue(const Token &token) {
   switch (token.type) {
-    case TokenType::CHAR_LITERAL: { // TODO: validate chars
+    case TokenType::CHAR_LITERAL: {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
       if (charLiteral.size() == 3) {
@@ -189,6 +210,32 @@ void CodeGen::addBytes(const std::vector<uc>& bytes) {
   for (const uc byte: bytes) {
     addByte(byte);
   }
+}
+
+void CodeGen::addBytesBasedOnEndianess(const void *num, const uint64_t size) {
+  auto bytes = (const uc *)num;
+  if (isBigEndian()) {
+    for (uint64_t i = size; i > 0; ++i) {
+      addByte(bytes[i]);
+    }
+    addByte(bytes[0]);
+  } else {
+    for (uint64_t i = 0; i < size; ++i) {
+      addByte(bytes[i]);
+    }
+  }
+}
+
+void CodeGen::add2ByteNum(const uint16_t num) {
+  addBytesBasedOnEndianess(&num, sizeof(num));
+}
+
+void CodeGen::add4ByteNum(const uint32_t num) {
+  addBytesBasedOnEndianess(&num, sizeof(num));
+}
+
+void CodeGen::add8ByteNum(const uint64_t num) {
+  addBytesBasedOnEndianess(&num, sizeof(num));
 }
 
 /**
@@ -304,6 +351,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     return {false, false, evaluateExpression(op, leftResult.val, rightResult.val)};
   }
 
+  // move any immediate values larger than 32 bits into registers so we don't have to worry about it later
   if (leftImm) {
     if (topBitsSet(leftResult.val)) {
       const uc reg = allocateRegister();
@@ -372,8 +420,8 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     if (!rightResult.isReg) {
       uc reg = allocateRegister();
       addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
-      uc *split = (uc *)&rightResult.val;
-      addBytes({(uc)op, (uc)reg, split[0], split[1], split[2], split[3]});
+      addBytes({(uc)op, (uc)reg});
+      add4ByteNum(uint32_t(rightResult.val));
       return {true, true, reg};
     }
     // right temp
@@ -412,9 +460,9 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
       moveImmToReg(miscIndex, rightResult.val);
       addBytes({(uc)op, (uc)leftResult.val, miscIndex});
     } else {
-      uc *split = (uc *)&rightResult.val;
       alignForImm(2, 4);
-      addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
+      addBytes({(uc)opImm, (uc)leftResult.val});
+      add4ByteNum((uint32_t)rightResult.val);
     }
   } else {
     addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
@@ -423,9 +471,9 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
 }
 
 /**
- * Generates the code for a boolean bin op 
- * On controlFlow, this will set the jumpOp field in ExpressionResult to the correct jump op
- * On !controlFlow, the result will be put into a register
+ * Generates the code for a boolean bin op.
+ * When controlFlow is set to true, this will set the jumpOp field in the return value to the correct jump op.
+ * When controlFlow is set to false, the result will be put into a register
  * \param binOp the binOp object to generate code for
  * \param op the op code used to do the comparison
  * \param jumpOp the jump op code to use on control flow statement. jump on !condition, so the jump op jumps when the condition is false. used when controlFlow is true
@@ -446,13 +494,15 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
     alignForImm(1, 8);
     addMarker(JumpMarkerType::SHORT_CIRCUIT);
-    addBytes({(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    addByteOp(OpCodes::JUMP_E);
+    add8ByteNum(0);
   }
   else if (binOp.op.type == TokenType::LOGICAL_OR) {
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
     alignForImm(1, 8);
     addMarker(JumpMarkerType::SHORT_CIRCUIT);
-    addBytes({(uc)OpCodes::JUMP_NE, 0, 0, 0, 0, 0, 0, 0, 0});
+    addByteOp(OpCodes::JUMP_NE);
+    add8ByteNum(0);
   }
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   if (!rightResult.isReg) {
@@ -635,8 +685,13 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   }
 }
 
-uint32_t sizeOfType(const TokenType type) {
-  switch (type) {
+/**
+ * Returns the size of a type
+ * \param token the token of the type
+ * \returns the size of the type
+*/
+uint32_t CodeGen::sizeOfType(const Token token) {
+  switch (token.type) {
     case TokenType::BOOL: {
       return 1;
     }
@@ -679,8 +734,14 @@ uint32_t sizeOfType(const TokenType type) {
     case TokenType::VOID: {
       return 0;
     }
+    case TokenType::REFERENCE: {
+      return 8;
+    }
+    case TokenType::IDENTIFIER: {
+      return getStructInfo(tk->extractToken(token)).size;
+    }
     default: {
-      std::cerr << "Invalid TokenType in CodeGen::sizeOfType\n";
+      std::cerr << "Invalid TokenType ["<< (uint32_t)token.type << "] in CodeGen::sizeOfType\n";
       exit(1);
     }
   }
@@ -705,7 +766,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         reg = (uc)expRes.val;
       }
     }
-    const uint32_t size = sizeOfType(varDec.type.token.type);
+    const uint32_t size = sizeOfType(varDec.type.token);
     switch (size) {
       case 0: {
         break;
@@ -732,7 +793,8 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
           addBytes({(uc)OpCodes::PUSH_D, (uc)reg});
         } else {
           alignForImm(2, 4);
-          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          add4ByteNum(size);
         }
         break;
       }
@@ -741,7 +803,8 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
           addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
         } else {
           alignForImm(2, 4);
-          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          add4ByteNum(size);
         }
         break;
       }
@@ -788,13 +851,12 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
       size = subStructInfo.size;
       alignTo = subStructInfo.alignTo;
     }
-    else if (isBuiltInType(typeToken.type)) {
-      size = sizeOfType(typeToken.type);
+    else if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
+      size = sizeOfType(typeToken);
       alignTo = size;
-    }
-    else /*if (typeToken.type == TokenType::REFERENCE)*/ {
-      size = 8;
-      alignTo = size;
+    } else {
+      std::cerr << "Invalid token type with enum value: " << (uint32_t)typeToken.type << '\n';
+      assert(false);
     }
     uint32_t paddingRequired = size - ((info.size) % size);
     if (paddingRequired == size) {

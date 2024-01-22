@@ -39,6 +39,7 @@ enum class BuiltInFunctions: unsigned char {
   PRINT_HEX, // PRINT_STRING arg1, arg2 | prints arg2 in hex to FILE* arg1
   GET_CHAR, // PRINT_STRING arg1 | returns one character from file descriptor arg1
   FFLUSH, // PRINT_STRING arg1 | flush buffer FILE* arg1
+  MEM_COPY, // MEM_COPY arg1, arg2, arg3 | copy arg3 bytes from arg1 to arg2
 };
 
 enum class OpCodes: unsigned char {
@@ -140,6 +141,11 @@ enum class OpCodes: unsigned char {
   F_MUL_I,
   F_DIV,
   F_DIV_I,
+
+  // this marks the end of ops that should be in the executable
+  // any ops below are temporary ops that should be changed before code gen process is done
+  END_OF_VALID_OPS,
+  FUNC_CALL,
 };
 
 /*
