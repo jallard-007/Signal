@@ -19,7 +19,6 @@ struct ExpressionResult {
   bool isReg {false};
   bool isTemp {false};
   ExpressionResult() = default;
-  ExpressionResult(bool, bool, uint64_t);
 };
 
 struct StructInformation {
@@ -49,19 +48,46 @@ struct JumpMarker {
   bool operator==(const JumpMarker) const;
 };
 
-struct StackObject {
-  uint32_t stackIndex;
-  uint32_t size;
+enum class StackMarkerType: uint8_t {
+  NONE,
+  HARD_SCOPE_START,
+  SOFT_SCOPE_START,
+};
+
+struct StackMarker {
+  StackMarkerType type = StackMarkerType::NONE;
+};
+
+struct StackVariable {
+  const VariableDec &varDec;
+  uint32_t size = 0;
+  uint32_t offset = 0;
+  unsigned char reg = 0;
+};
+
+enum class StackItemType: uint8_t {
+  NONE,
+  MARKER,
+  VARIABLE,
+};
+
+struct StackItem {
+  union {
+    StackVariable variable;
+    StackMarker marker;
+  };
+  StackItemType type = StackItemType::NONE;
+
 };
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
-  std::unordered_map<uint64_t, uint64_t> declarationAddressToByteCodeAddress;
+  std::unordered_map<uint64_t, uint64_t> declarationAddressToByteCodeIndex; // maps the address of an ast node to its index in the bytecode
   std::map<std::string, StructInformation> structNameToInfoMap;
-  std::map<std::string, uint64_t> functionNameToLocation;
+  std::map<std::string, uint32_t> variableNameToStackItemIndex;
   std::vector<unsigned char> byteCode;
   std::vector<JumpMarker> jumpMarkers;
-  // std::vector<StackObject> stack;
+  std::vector<StackItem> stack;
   Tokenizer *tk{nullptr};
   Program &program;
   std::map<std::string, GeneralDec *>& lookUp;
@@ -73,12 +99,20 @@ struct CodeGen {
   ExpressionResult generateExpression(const Expression&, bool = false);
   ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
   ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
-  ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
   ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
   ExpressionResult generateExpressionUnOp(const UnOp&);
+
+  // binary ops
+  ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
+  ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
+  ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
+  ExpressionResult booleanBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
+
   ExpressionResult loadValue(const Token&);
 
-  uint32_t generateVariableDeclaration(const VariableDec&, bool = true, bool = false);
+  void generateGeneralDeclaration(const GeneralDec&);
+  void generateFunctionDeclaration(const FunctionDec&);
+  uint32_t generateVariableDeclaration(const VariableDec&, bool = true);
   uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
   StructInformation& getStructInfo(const std::string&);
 
@@ -88,8 +122,14 @@ struct CodeGen {
   void updateJumpOpTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
   uint64_t addMarker(JumpMarkerType);
 
+  // scopes
   void generateScope(const Scope&);
+  void startSoftScope();
+  void endSoftScope();
+  void startHardScope();
+  void endHardScope();
 
+  // adding to the bytecode
   void addByteOp(OpCodes);
   void addByte(unsigned char);
   void addBytes(const std::vector<unsigned char>&);
@@ -100,15 +140,18 @@ struct CodeGen {
 
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
-  ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
-  ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
-  ExpressionResult booleanBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
+
   int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
   uint32_t sizeOfType(const Token);
 };
 
+OpCodes getLoadOpForSize(unsigned char);
+
+
 /*
+hard scope change: starting a new function (variables can take on any identifier not in the global scope)
+soft scope change: scope within a function (variables within cannot take the same identifier as variables outside)
 
 */

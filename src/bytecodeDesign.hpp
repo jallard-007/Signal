@@ -5,7 +5,7 @@
 #define stackPointerIndex NUM_REGISTERS - 2
 #define basePointerIndex NUM_REGISTERS - 3
 #define dataPointerIndex NUM_REGISTERS - 4
-#define miscIndex NUM_REGISTERS - 5
+#define miscIndex 0
 
 /*
 arguments are passed on the stack. before calling a function, space for the return value needs to be made

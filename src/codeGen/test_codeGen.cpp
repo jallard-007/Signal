@@ -81,8 +81,8 @@ TEST_CASE("variable creation", "[codeGen]") {
     CHECK(size == 4);
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 10, 0, 0, 0});
-    addBytes(expected, {(uc)OpCodes::PUSH_D, 0});
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 10, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::PUSH_D, 1});
     CHECK(codeGen.byteCode == expected);
   }
 }
@@ -226,8 +226,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement);
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 1, 0, 0, 0});
-    addBytes(expected, {(uc)OpCodes::SET_Z, 0});
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 1, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::SET_Z, 1});
 
     // short circuit
     alignForImm(expected, 1, 8);
@@ -235,8 +235,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
 
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 0, 0, 0, 0});
-    addBytes(expected, {(uc)OpCodes::LOGICAL_AND, 0, 1});
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 2, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::LOGICAL_AND, 1, 2});
     expected[indexOfShortCircuitJump] = expected.size();
     alignForImm(expected, 1, 8);
     const uint32_t indexOfSecondJump = expected.size() + 1;
@@ -258,8 +258,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement);
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCodes::MOVE_I, 0, 1, 0, 0, 0});
-    addBytes(expected, {(uc)OpCodes::SET_Z, 0});
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 1, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::SET_Z, 1});
 
     // short circuit
     alignForImm(expected, 1, 8);
@@ -267,8 +267,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::JUMP_NE, 0, 0, 0, 0, 0, 0, 0, 0});
 
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 0, 0, 0, 0});
-    addBytes(expected, {(uc)OpCodes::LOGICAL_OR, 0, 1});
+    addBytes(expected, {(uc)OpCodes::MOVE_I, 2, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::LOGICAL_OR, 1, 2});
     expected[indexOfShortCircuitJump] = expected.size();
     alignForImm(expected, 1, 8);
     const uint32_t indexOfSecondJump = expected.size() + 1;

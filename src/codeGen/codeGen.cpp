@@ -11,9 +11,6 @@
 
 #define uc unsigned char
 
-ExpressionResult::ExpressionResult(bool isReg, bool isTemp, uint64_t val):
-  val{val}, jumpOp{OpCodes::NOP}, isReg{isReg}, isTemp{isTemp} {}
-
 JumpMarker::JumpMarker(uint64_t index, JumpMarkerType type):
   index{index}, type{type} {}
 
@@ -44,16 +41,16 @@ be sure to free registers if they are no longer needed
 */
 ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAccess) {
   if (arrAccess.array.wrapped) {
-    return {false, false, 0};
+    return {};
   }
-  return {false, false, 0};
+  return {};
 }
 
 ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLiteral &arrOrStructLit) {
   if (arrOrStructLit.values.next) {
-    return {false, false, 0};
+    return {};
   }
-  return {false, false, 0};
+  return {};
 }
 
 /**
@@ -71,7 +68,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   add4ByteNum(sizeOfReturnType);
 
   // push arguments to stack
-
+  // need an identifier lookup
 
   // jump to function
   addByteOp(OpCodes::FUNC_CALL);
@@ -79,7 +76,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   // we can use this address to lookup the functions address later ("linker stage")
   // using map of uint64_t -> uint64_t, this is populated as generateFunction is called
   add8ByteNum((uint64_t)generalDec);
-  return {false, true, addressOfReturnValue};
+  return {.val = addressOfReturnValue};
 }
 
 
@@ -122,34 +119,34 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
       if (charLiteral.size() == 3) {
-        return {false, false, (uint64_t)charLiteral[1]};
+        return {.val = (uint64_t)charLiteral[1]};
       } else if (charLiteral.size() == 4) {
         if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          return {false, false, (uint64_t)(charLiteral[2] - '0')};
+          return {.val = (uint64_t)(charLiteral[2] - '0')};
         } else if (charLiteral[2] == 'n') {
-          return {false, false, '\n'};
+          return {.val = '\n'};
         } else if (charLiteral[2] == '\\') {
-          return {false, false, '\\'};
+          return {.val = '\\'};
         } else if (charLiteral[2] == '\'') {
-          return {false, false, '\''};
+          return {.val = '\''};
         }
       }
-      return {false, false, 0};
+      return {};
     }
     case TokenType::STRING_LITERAL: { 
       std::string stringLiteral = tk->extractToken(token);
-      return {false, false, 0};
+      return {};
       // place string literal in data section of bytecode string, return offset to start of string
     }
     case TokenType::DECIMAL_NUMBER: {
       std::string decimalNumber = tk->extractToken(token);
       uint64_t num = std::stoull(decimalNumber);
-      return {false, false, num};
+      return {.val = num};
     }
     case TokenType::BINARY_NUMBER: { 
       std::string binaryNumber = tk->extractToken(token);
       uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-      return {false, false, num};
+      return {.val = num};
     }
     case TokenType::HEX_NUMBER: { 
       std::string hexNumber = tk->extractToken(token);
@@ -158,25 +155,55 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::out_of_range
       */
       uint64_t num = std::stoull(hexNumber, nullptr, 16);
-      return {false, false, num};
+      return {.val = num};
     }
     case TokenType::FALSE: { 
-      return {false, false, 0};
+      return {};
     }
     case TokenType::TRUE: { 
-      return {false, false, 1};
+      return {.val = 1};
     }
     case TokenType::NULL_PTR: {
-      return {false, false, 0};
+      return {};
     }
     case TokenType::IDENTIFIER: {
-      // check if value is already in a reg. to do that we need a lookup. variable name to information regarding location, if its already in a register, etc.
+      std::string identifier = tk->extractToken(token);
+      uint32_t stackItemIndex = variableNameToStackItemIndex[identifier];
+      StackVariable &variableInfo = stack[stackItemIndex].variable;
+      if (variableInfo.size > 8) {
+        // too large to fit into a reg, just return offset
+        return {.val = variableInfo.offset};
+      }
+      if (!variableInfo.reg) {
+        variableInfo.reg = allocateRegister();
+        addBytes({(uc)OpCodes::MOVE, miscIndex, basePointerIndex});
+        alignForImm(2, 4);
+        addBytes({(uc)OpCodes::SUB_I, miscIndex});
+        add4ByteNum(variableInfo.offset);
+        OpCodes loadOp = getLoadOpForSize(variableInfo.size);
+        assert(loadOp != OpCodes::NOP);
+        addBytes({(uc)loadOp, variableInfo.reg, miscIndex});
+        // load value into the register
+      }
+      return {.val = variableInfo.reg, .isReg = true};
     }
     default: {
-      return {false, false, 0};
+      return {};
     }
   }
 }
+
+
+OpCodes getLoadOpForSize(const uc size) {
+  switch(size) {
+    case 1: return OpCodes::LOAD_B;
+    case 2: return OpCodes::LOAD_W;
+    case 4: return OpCodes::LOAD_D;
+    case 8: return OpCodes::LOAD_Q;
+    default: return OpCodes::NOP;
+  }
+}
+
 
 uc CodeGen::allocateRegister() {
   for (uc i = 0; i < NUM_REGISTERS; ++i) {
@@ -348,7 +375,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   // left imm, right imm
   if (leftImm && rightImm) {
     // both operands are immediate values, return the result
-    return {false, false, evaluateExpression(op, leftResult.val, rightResult.val)};
+    return {.val = evaluateExpression(op, leftResult.val, rightResult.val)};
   }
 
   // move any immediate values larger than 32 bits into registers so we don't have to worry about it later
@@ -376,7 +403,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       uc *split = (uc *)&rightResult.val;
       alignForImm(2, 4);
       addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
-      return {true, true, leftResult.val};
+      return {.val = leftResult.val, .isReg = true, .isTemp = true};
     }
     // right temp / var
     else {
@@ -384,7 +411,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       if (rightResult.isTemp) {
         freeRegister((uc)rightResult.val);
       }
-      return {true, true, leftResult.val};
+      return {.val = leftResult.val, .isReg = true, .isTemp = true};
     }
   }
   // left imm
@@ -395,7 +422,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
         uc *split = (uc *)&leftResult.val;
         alignForImm(2, 4);
         addBytes({(uc)opImm, (uc)rightResult.val, split[0], split[1], split[2], split[3]});
-        return {true, true, rightResult.val};
+        return {.val = rightResult.val, .isReg = true, .isTemp = true};
       }
       // cannot flip args
       else {
@@ -403,7 +430,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
         moveImmToReg(reg, leftResult.val);
         addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
         freeRegister((uc)rightResult.val);
-        return {true, true, reg};
+        return {.val = reg, .isReg = true, .isTemp = true};
       }
     }
     // right var
@@ -411,7 +438,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       uc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
       addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-      return {true, true, reg};
+      return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
   // left var
@@ -422,7 +449,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
       addBytes({(uc)op, (uc)reg});
       add4ByteNum(uint32_t(rightResult.val));
-      return {true, true, reg};
+      return {.val = reg, .isReg = true, .isTemp = true};
     }
     // right temp
     else if (rightResult.isTemp) {
@@ -434,7 +461,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
         addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
         addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
         freeRegister((uc)rightResult.val);
-        return {true, true, reg};
+        return {.val = reg, .isReg = true, .isTemp = true};
       }
     }
     // right var
@@ -442,7 +469,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
       uc reg = allocateRegister();
       addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
       addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-      return {true, true, reg};
+      return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
 }
@@ -747,16 +774,59 @@ uint32_t CodeGen::sizeOfType(const Token token) {
   }
 }
 
+
+void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
+  switch(genDec.type) {
+    case GeneralDecType::NONE: {
+      break;
+    }
+    case GeneralDecType::STRUCT: {
+      std::cerr << "Unsupported dec STRUCT\n";
+      exit(1);
+    }
+    case GeneralDecType::VARIABLE: {
+      generateVariableDeclaration(*genDec.varDec);
+      break;
+    }
+    case GeneralDecType::FUNCTION: {
+      generateFunctionDeclaration(*genDec.funcDec);
+      break;
+    }
+    case GeneralDecType::ENUM: {
+      std::cerr << "Unsupported dec ENUM\n";
+      exit(1);
+    }
+    case GeneralDecType::TEMPLATE: {
+      std::cerr << "Unsupported dec TEMPLATE\n";
+      exit(1);
+    }
+    case GeneralDecType::TEMPLATE_CREATE: {
+      std::cerr << "Unsupported dec TEMPLATE_CREATE\n";
+      exit(1);
+    }
+    case GeneralDecType::INCLUDE_DEC: {
+      break;
+    }
+  }
+}
+
+void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
+  startHardScope();
+  generateScope(funcDec.body);
+  endHardScope();
+  // jump to return address
+}
+
 /**
- * TODO: add each var dec to fake stack, then we tally everything and have one sub op at the top of the scope for all variables
- * and one add at the end to bring the sp back. wont need to use base pointer this way
+ * TODO: just use base pointer, on scope node generation, push base pointer, generate scope, pop base pointer
  * Makes rooms on the stack for the variable and assigns the initial assignment to it
  * \returns the size of the type
 */
-uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize, bool inStruct) {
-  int16_t reg = -1; 
+uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+  uc reg = 0;
   Token typeToken = varDec.type.token;
-  if (isBuiltInType(typeToken.type)) {
+  uint32_t size = 0;
+  if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
     if (initialize && varDec.initialAssignment) {
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
       if (!expRes.isReg) {
@@ -766,13 +836,13 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         reg = (uc)expRes.val;
       }
     }
-    const uint32_t size = sizeOfType(varDec.type.token);
+    size = sizeOfType(varDec.type.token);
     switch (size) {
       case 0: {
         break;
       }
       case 1: {
-        if (reg != -1) {
+        if (reg) {
           addBytes({(uc)OpCodes::PUSH_B, (uc)reg});
         } else {
           addBytes({(uc)OpCodes::DEC, stackPointerIndex});
@@ -780,7 +850,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         break;
       }
       case 2: {
-        if (reg != -1) {
+        if (reg) {
           addBytes({(uc)OpCodes::PUSH_W, (uc)reg});
         } else {
           addBytes({(uc)OpCodes::DEC, stackPointerIndex});
@@ -789,7 +859,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         break;
       }
       case 4: {
-        if (reg != -1) {
+        if (reg) {
           addBytes({(uc)OpCodes::PUSH_D, (uc)reg});
         } else {
           alignForImm(2, 4);
@@ -799,7 +869,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         break;
       }
       case 8: {
-        if (reg != -1) {
+        if (reg) {
           addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
         } else {
           alignForImm(2, 4);
@@ -809,24 +879,39 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         break;
       }
       default: {
-        std::cerr << "Invalid Size in generateVariableDeclaration\n";
+        std::cerr << "Invalid Size [" << size << "] in generateVariableDeclaration\n";
         exit(1);
       }
     }
-    return size;
-  }
-  else if (typeToken.type == TokenType::REFERENCE) {
-    if (!inStruct) {
-      return 0;
-    }
-    addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
-    return 8;
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
-    const uint32_t size = generateVariableDeclarationStructType(varDec, initialize);
-    return size;
+    size = generateVariableDeclarationStructType(varDec, initialize);
   }
-  exit(1);
+  else {
+    std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
+    exit(1);
+  }
+  uint32_t offset = size;
+  for (StackItem &item : stack) {
+    if (item.type == StackItemType::MARKER) {
+      if (item.marker.type == StackMarkerType::HARD_SCOPE_START) {
+        break;
+      }
+    } else if (item.type == StackItemType::VARIABLE) {
+      offset = item.variable.offset + size;
+      break;
+    }
+  }
+  StackItem stackItem {
+    .type = StackItemType::VARIABLE,
+    .variable = {
+      .size = size,
+      .varDec = varDec,
+      .offset = offset,
+    }
+  };
+  stack.emplace_back(stackItem);
+  return size;
 }
 
 StructInformation& CodeGen::getStructInfo(const std::string& structName) {
@@ -887,7 +972,7 @@ uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDe
   StructDecList *structDecList = &generalDec->structDec->decs;
   while (structDecList) {
     if (structDecList->type == StructDecType::VAR) {
-      generateVariableDeclaration(*structDecList->varDec, initialize, true);
+      generateVariableDeclaration(*structDecList->varDec, initialize);
     }
     structDecList = structDecList->next;
   }
@@ -1046,10 +1131,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
 }
 
 void CodeGen::generateScope(const Scope& scope) {
-  // need to simulate stack for each scope
-  // add flag to generate stack pointer code or not for loops (optimization)
-  // alignForImm(2, 4);
-  // addBytes({(uc)OpCodes::SUB_I, stackPointerIndex, 0, 0, 0, 0});
+  startSoftScope();
   for (
     const StatementList *statementList = &scope.scopeStatements;
     statementList;
@@ -1057,10 +1139,41 @@ void CodeGen::generateScope(const Scope& scope) {
   ) {
     generateStatement(statementList->curr);
   }
-  // move stack pointer back
-  // alignForImm(2, 4);
-  // addBytes({(uc)OpCodes::ADD_I, stackPointerIndex, 0, 0, 0, 0});
-  // update sub_i and add_i commands with stack usage
+  endSoftScope();
+}
+
+void CodeGen::startSoftScope() {
+}
+
+
+void CodeGen::endSoftScope() {
+}
+
+void CodeGen::startHardScope() {
+  StackItem stackItem {
+    .type = StackItemType::MARKER,
+    .marker.type = StackMarkerType::HARD_SCOPE_START
+  };
+  stack.emplace_back(stackItem);
+  addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
+  addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
+}
+
+
+void CodeGen::endHardScope() {
+  while (!stack.empty()) {
+    if (
+      stack.back().type == StackItemType::MARKER &&
+      stack.back().marker.type == StackMarkerType::HARD_SCOPE_START
+    ) {
+      stack.pop_back();
+      break;
+    }
+    // TODO: run destructor for each item within this scope
+    stack.pop_back();
+  }
+  addBytes({(uc)OpCodes::MOVE, stackPointerIndex, basePointerIndex});
+  addBytes({(uc)OpCodes::POP_Q, basePointerIndex});
 }
 
 void CodeGen::generateStatement(const Statement& statement) {

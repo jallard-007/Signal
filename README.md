@@ -8,8 +8,8 @@ Uses CMake as a build tool and Catch2 for testing
 
 TODO:
 - Code gen
+    - functions, scopes, nested scopes, breaking out of loops (Use stack markers)
     - unary operators
-    - functions
     - loading variables into registers, if it cannot fit in reg then pointer to variable (have to know if its a pointer to the value or the value itself, maybe based on size?)
     - freeing registers that contain variables with changed values (have to store offset info that is accessible from register value, regIndex to var name map)
     - what to do with registers that contain struct members (maybe "variableName.structVariableName" for its name to info map, then store offset info)
