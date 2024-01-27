@@ -65,13 +65,16 @@ struct Parser {
   bool parseStruct(StructDec&);
   bool parseTemplate(TemplateDec&);
   void swapTokenizer(Tokenizer&);
+
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseExpressionBeforeScope(Expression&);
   ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
-  ParseExpressionErrorType parseExpression(Expression&);
+  ParseExpressionErrorType parseExpression(Expression&, uint8_t = 0);
+  ParseExpressionErrorType parse_increasing_prec(Expression*& node, Expression& left, uint8_t minPrec);
+  ParseExpressionErrorType parseLeaf(Expression& expression);
   ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);
