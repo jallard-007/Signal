@@ -32,14 +32,12 @@ enum class ParseExpressionErrorType: uint8_t {
   NONE,
   REPORTED,
   EXPRESSION_AFTER_EXPRESSION,
-  NOT_EXPRESSION,
 };
 
 enum class ParseStatementErrorType: uint8_t {
   NONE,
   REPORTED,
   EXPRESSION_AFTER_EXPRESSION,
-  NOT_EXPRESSION,
 };
 
 enum class ParseTypeErrorType: uint8_t {
@@ -73,7 +71,8 @@ struct Parser {
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&, uint8_t = 0);
-  ParseExpressionErrorType parse_increasing_prec(Expression*& node, Expression& left, uint8_t minPrec);
+  ParseExpressionErrorType parseIncreasingPrecBinaryOp(Expression*& node, Expression& left, uint8_t minPrec);
+  ParseExpressionErrorType parseIncreasingPrecUnaryOp(Expression*& node, Expression& next, uint8_t minPrec);
   ParseExpressionErrorType parseLeaf(Expression& expression);
   ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);

@@ -173,6 +173,17 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(tokenizer.extractToken(binOp->rightSide.value) == "4");
   }
 
+  { // array index with postfix increment expression
+    const std::string str = "content[position++];";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    CHECK(errorType == ParseExpressionErrorType::NONE);
+    CHECK(parser.expected.size() == 0);
+    CHECK(parser.unexpected.size() == 0);
+  }
+
    // operator with higher precedence on right node
   {
     const std::string str = " x - function(var) * 9;";
@@ -285,7 +296,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     Expression expression;
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
-    CHECK(errorType == ParseExpressionErrorType::NONE);
+    CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].tokenWhereExpected.position == 2);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);
