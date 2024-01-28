@@ -262,9 +262,13 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     const std::string str = " var - 9 thing() ; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
-    Expression expression;
-    ParseExpressionErrorType errorType = parser.parseExpression(expression);
-    CHECK(errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+    CHECK(errorType == ParseStatementErrorType::REPORTED);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 9);
   }
 
   { // missing semicolon

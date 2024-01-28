@@ -13,6 +13,7 @@ bool notFirstOfExpression(TokenType type) {
 }
 
 Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
+Expression::Expression(ExpressionType type, void *ptr): binOp{(BinOp*)ptr}, type{type} {}
 Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
 Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
 Expression& Expression::operator=(const Expression&ref) {

@@ -77,6 +77,7 @@ public:
   ArrayAccess* makeArrayAccess(const ArrayAccess& ref) {return arrayAccesses.get(ref);}
   TokenList* makeTokenList() {return tokenLists.get();}
   Expression* makeExpression() {return expressions.get();}
+  Expression* makeExpression(const Expression &ref) {return expressions.get(ref);}
   ExpressionList* makeExpressionList() {return expressionLists.get();}
   Scope* makeScope() {return scopes.get();}
   StatementList* makeStatementList() {return statementLists.get();}

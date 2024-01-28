@@ -35,6 +35,7 @@ struct Expression {
   };
   ExpressionType type;
   Expression();
+  Expression(ExpressionType, void *);
   explicit Expression(Token);
   Expression(const Expression&);
   Expression& operator=(const Expression&);
@@ -148,8 +149,8 @@ struct ArrayAccess {
 
 // binOp:= expression binOpOperator expression
 struct BinOp {
-  Expression leftSide;
   Expression rightSide;
+  Expression leftSide;
   Token op;
   BinOp() = delete;
   explicit BinOp(const Token&);
