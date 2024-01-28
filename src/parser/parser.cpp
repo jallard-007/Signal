@@ -262,9 +262,6 @@ bool Parser::parseFunction(FunctionDec& dec) {
       paramList->curr.varDec = memPool.makeVariableDec(VariableDec{nextToken});
       ParseStatementErrorType errorType = parseVariableDec(*paramList->curr.varDec);
       if (errorType != ParseStatementErrorType::NONE) {
-        if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
-          expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::COMMA, tokenizer->tokenizerIndex);
-        }
         return false;
       }
       if (tokenizer->peekNext().type == TokenType::COMMA) {
@@ -327,9 +324,6 @@ bool Parser::parseStruct(StructDec& dec) {
         list->varDec = memPool.makeVariableDec(VariableDec{token});
         ParseStatementErrorType errorType = parseVariableDec(*list->varDec);
         if (errorType != ParseStatementErrorType::NONE) {
-          if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-          }
           return false;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -536,11 +530,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       else if (tokenizer->peeked.type != TokenType::SEMICOLON) {
         ParseExpressionErrorType errorType = parseExpression(returnValue);
         if (errorType != ParseExpressionErrorType::NONE) {
-          if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-            expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-          }
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -570,11 +559,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         tokenizer->consumePeek();
         ParseStatementErrorType errorType = parseIdentifierStatement(forLoop->initialize, next);
         if (errorType != ParseStatementErrorType::NONE) {
-          if (errorType == ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseStatementErrorType::NOT_EXPRESSION) {
-            unexpected.emplace_back(errorToken, tokenizer->tokenizerIndex);
-          }
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -586,11 +570,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         forLoop->initialize.expression = memPool.makeExpression();
         ParseExpressionErrorType errorType = parseExpression(*forLoop->initialize.expression);
         if (errorType != ParseExpressionErrorType::NONE) {
-          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-            unexpected.emplace_back(errorToken, tokenizer->tokenizerIndex);
-          }
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -604,11 +583,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
         ParseExpressionErrorType errorType = parseExpression(forLoop->condition);
         if (errorType != ParseExpressionErrorType::NONE) {
-          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-            unexpected.emplace_back(errorToken, tokenizer->tokenizerIndex);
-          }
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -622,11 +596,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
         ParseExpressionErrorType errorType = parseExpression(forLoop->iteration);
         if (errorType != ParseExpressionErrorType::NONE) {
-          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-            unexpected.emplace_back(errorToken, tokenizer->tokenizerIndex);
-          }
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
@@ -706,11 +675,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       auto& exitValue = statement.controlFlow->returnStatement->returnValue;
       ParseExpressionErrorType errorType = parseExpression(exitValue);
       if (errorType != ParseExpressionErrorType::NONE) {
-        if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-          expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-        } else if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-          expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-        }
         return ParseStatementErrorType::REPORTED;
       }
       if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
@@ -748,11 +712,6 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
     statement.expression = memPool.makeExpression();
     ParseExpressionErrorType errorType = parseExpression(*statement.expression);
     if (errorType != ParseExpressionErrorType::NONE) {
-      if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-        expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-      } else if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-        expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
-      }
       return ParseStatementErrorType::REPORTED;
     }
 
@@ -797,11 +756,6 @@ ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
       varDec.initialAssignment = memPool.makeExpression();
       ParseExpressionErrorType errorType = parseExpression(*varDec.initialAssignment);
       if (errorType != ParseExpressionErrorType::NONE) {
-        if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-          return ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION;
-        } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-          expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-        }
         return ParseStatementErrorType::REPORTED;
       }
     }
@@ -830,11 +784,6 @@ ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, T
   tokenizer->peeked.type = TokenType::NONE;
   ParseExpressionErrorType errorType = parseExpression(*statement.expression);
   if (errorType != ParseExpressionErrorType::NONE) {
-    if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-      return ParseStatementErrorType::EXPRESSION_AFTER_EXPRESSION;
-    } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-      return ParseStatementErrorType::NOT_EXPRESSION;
-    }
     return ParseStatementErrorType::REPORTED;
   }
   return ParseStatementErrorType::NONE;
@@ -858,11 +807,6 @@ ParseStatementErrorType Parser::parseIfStatement(IfStatement& condStatement) {
 ParseStatementErrorType Parser::parseExpressionBeforeScope(Expression& expression) {
   ParseExpressionErrorType errorType = parseExpression(expression);
   if (errorType != ParseExpressionErrorType::NONE) {
-    if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-      expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::OPERATOR, tokenizer->tokenizerIndex);
-    } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-      expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-    }
     return ParseStatementErrorType::REPORTED;
   }
   if (tokenizer->peekNext().type != TokenType::OPEN_BRACE) {
@@ -922,11 +866,6 @@ ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral&
       errorType = parseExpression(list->curr);
     }
     if (errorType != ParseExpressionErrorType::NONE) {
-      if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-        expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::COMMA, tokenizer->tokenizerIndex);
-      } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-        expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-      }
       return ParseExpressionErrorType::REPORTED;
     }
     if (tokenizer->peekNext().type != TokenType::COMMA) {
@@ -943,232 +882,175 @@ ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral&
  * Consumes the entire expression unless there was an error
 */
 ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
-  Expression *bottom = nullptr;
   Token token = tokenizer->peekNext();
+  Expression expression;
+  Expression *bottom = &rootExpression;
   while (true) {
-    bool binary = isBinaryOp(token.type);
-    if (binary || isUnaryOp(token.type)) {
-      tokenizer->consumePeek();
-      Expression expression;
-      if (binary) {
-        expression.type = ExpressionType::BINARY_OP;
-        expression.binOp = memPool.makeBinOp(BinOp{token});
-        if (!bottom) {
+    if (!isUnaryOp(token.type)) {
+      if (bottom->unOp) {
+        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
+        bottom = &bottom->unOp->operand;
+      }
+      const ParseExpressionErrorType errorType = parseLeaf(*bottom);
+      if (errorType != ParseExpressionErrorType::NONE) {
+        return errorType;
+      }
+      token = tokenizer->peekNext();
+    }
+OPERATOR_PARSE:
+    const bool binary = isBinaryOp(token.type);
+    if (!binary && !isUnaryOp(token.type)) {
+      return ParseExpressionErrorType::NONE;
+    }
+    tokenizer->consumePeek();
+    if (binary) {
+      expression.type = ExpressionType::BINARY_OP;
+      expression.binOp = memPool.makeBinOp(BinOp{token});
+      if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
+        expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
+        return ParseExpressionErrorType::REPORTED;
+      }
+    } else {
+      expression.type = ExpressionType::UNARY_OP;
+      expression.unOp = memPool.makeUnOp(UnOp{token});
+      if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
+        if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP || bottom->type == ExpressionType::NONE) {
           // expected expression
           expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
-          rootExpression = expression;
-          bottom = &rootExpression;
-          tokenizer->consumePeek();
-          token = tokenizer->peekNext();
-          continue;
-        } else if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
-          expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
           return ParseExpressionErrorType::REPORTED;
-        }
-      }
-      else {
-        expression.type = ExpressionType::UNARY_OP;
-        expression.unOp = memPool.makeUnOp(UnOp{token});
-        if (!bottom) {
-          if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
-            // expected expression
-            expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
-          }
-          rootExpression = expression;
-          bottom = &rootExpression;
+        } else {
+          expression.unOp->operand = *bottom;
           tokenizer->consumePeek();
           token = tokenizer->peekNext();
-          continue;
-        } else if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
-          if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
-            // expected expression
-            expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
-            return ParseExpressionErrorType::REPORTED;
-          }
-        }
-      }
-      if (rootExpression.type != ExpressionType::BINARY_OP && rootExpression.type != ExpressionType::UNARY_OP) {
-        if (binary) {
-          expression.binOp->leftSide = rootExpression;
-        } else {
-          expression.unOp->operand = rootExpression;
-        }
-        rootExpression = expression;
-      }
-      else {
-        Expression* prev = nullptr;
-        Expression* listIter = nullptr;
-        Expression* next = &rootExpression;
-        while (next) {
-          listIter = next;
-          TokenType op;
-          if (listIter->type == ExpressionType::BINARY_OP) {
-            op = listIter->binOp->op.type;
-            next = &listIter->binOp->rightSide;
-          } else if (listIter->type == ExpressionType::UNARY_OP) {
-            op = listIter->unOp->op.type;
-            next = &listIter->unOp->operand;
-          } else {
-            break;
-          }
-          if (operatorPrecedence[(uint_fast8_t)token.type] <= operatorPrecedence[(uint_fast8_t)op]) {
-            break;
-          }
-          prev = listIter;
-        }
-
-        if (prev) {
-          if (binary) {
-            expression.binOp->leftSide = *listIter;
-          } else {
-            expression.unOp->operand = *listIter;
-          }
-          if (prev->type == ExpressionType::BINARY_OP) {
-            prev->binOp->rightSide = expression;
-            bottom = &prev->binOp->rightSide;
-          } else {
-            prev->unOp->operand = expression;
-            bottom = &prev->unOp->operand;
-          }
-        }
-        else {
-          if (binary) {
-            expression.binOp->leftSide = rootExpression;
-            bottom = &rootExpression;
-          } else {
-            expression.unOp->operand = rootExpression;
-            bottom = &expression.unOp->operand;
-          }
-          // move the statement to the root
-          rootExpression = expression;
+          /* have to do a jump since postfix operators
+          are followed by an operator or end the expression */
+          goto OPERATOR_PARSE;
         }
       }
     }
+    if (rootExpression.type != ExpressionType::BINARY_OP && rootExpression.type != ExpressionType::UNARY_OP) {
+      if (binary) {
+        expression.binOp->leftSide = rootExpression;
+      } else {
+        expression.unOp->operand = rootExpression;
+      }
+      rootExpression = expression;
+    }
     else {
-      Expression expression;
-      if (isLiteral(token.type)) {
-        tokenizer->consumePeek();
-        expression.type = ExpressionType::VALUE;
-        expression.value = token;
+      // place expression in right spot within tree based on precedence
+      Expression* prev = nullptr;
+      Expression* curr = &rootExpression;
+      // iterate down and to the right of the tree until we find precedence match
+      while (curr->unOp) { // this condition checks that there is a 'next'
+        TokenType op;
+        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
+        Expression* next = &curr->unOp->operand;
+        if (curr->type == ExpressionType::BINARY_OP) {
+          op = curr->binOp->op.type;
+        } else if (curr->type == ExpressionType::UNARY_OP) {
+          op = curr->unOp->op.type;
+        } else {
+          break;
+        }
+        if (operatorPrecedence[(uint8_t)token.type] <= operatorPrecedence[(uint8_t)op]) {
+          break;
+        }
+        prev = curr;
+        curr = next;
       }
-      else if (token.type == TokenType::OPEN_PAREN) {
-        tokenizer->consumePeek();
-        expression.type = ExpressionType::WRAPPED;
-        expression.wrapped = memPool.makeExpression();
-        ParseExpressionErrorType errorType = parseExpression(*expression.wrapped);
-        if (errorType != ParseExpressionErrorType::NONE) {
-          if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-            expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-          } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-            expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-          }
-          return ParseExpressionErrorType::REPORTED;
+
+      if (prev) {
+        if (binary) {
+          expression.binOp->leftSide = *curr;
+        } else {
+          expression.unOp->operand = *curr;
         }
-        if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-          return ParseExpressionErrorType::REPORTED;
-        }
-        tokenizer->consumePeek();
-      }
-      else if (token.type == TokenType::IDENTIFIER) {
-        tokenizer->consumePeek();
-        Token next = tokenizer->peekNext();
-        if (next.type == TokenType::OPEN_PAREN) {
-          tokenizer->consumePeek();
-          expression.type = ExpressionType::FUNCTION_CALL;
-          expression.funcCall = memPool.makeFunctionCall(FunctionCall{token});
-          ParseExpressionErrorType errorType = getExpressions(expression.funcCall->args, TokenType::CLOSE_PAREN);
-          if (errorType != ParseExpressionErrorType::NONE) {
-            if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-              expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-            } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-              expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-            }
-            return ParseExpressionErrorType::REPORTED;
-          }
-          if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
-            if (tokenizer->peeked.type == TokenType::COMMA) {
-              expected.emplace_back(ExpectedType::EXPRESSION, tokenizer->peeked, tokenizer->tokenizerIndex);
-            } else {
-              expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-            }
-            return ParseExpressionErrorType::REPORTED;
-          }
-          tokenizer->consumePeek();
-        }
-        else if (next.type == TokenType::OPEN_BRACKET) {
-          tokenizer->consumePeek();
-          expression.type = ExpressionType::ARRAY_ACCESS;
-          expression.arrAccess = memPool.makeArrayAccess(ArrayAccess{token});
-          ParseExpressionErrorType errorType = parseExpression(expression.arrAccess->offset);
-          if (errorType != ParseExpressionErrorType::NONE) {
-            if (errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION) {
-              expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
-            } else if (errorType == ParseExpressionErrorType::NOT_EXPRESSION) {
-              expected.emplace_back(ExpectedType::EXPRESSION, errorToken, tokenizer->tokenizerIndex);
-            }
-            return ParseExpressionErrorType::REPORTED;
-          }
-          if (tokenizer->peekNext().type != TokenType::CLOSE_BRACKET) {
-            expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
-            return ParseExpressionErrorType::REPORTED;
-          }
-          tokenizer->consumePeek();
-        }
-        else {
-          expression.type = ExpressionType::VALUE;
-          expression.value = token;
-        }
+        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
+        prev->unOp->operand = expression;
+        bottom = &prev->binOp->rightSide;
       }
       else {
-        break;
-      }
-      if (bottom) {
-        if (bottom->type == ExpressionType::BINARY_OP) {
-          if (bottom->binOp->rightSide.type != ExpressionType::NONE) {
-            errorToken = token;
-            return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
-          }
-          bottom->binOp->rightSide = expression;
-          bottom = &bottom->binOp->rightSide;
-        } else if (bottom->type == ExpressionType::UNARY_OP) {
-          if (bottom->unOp->operand.type != ExpressionType::NONE) {
-            errorToken = token;
-            return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
-          }
-          bottom->unOp->operand = expression;
-          bottom = &bottom->unOp->operand;
+        if (binary) {
+          expression.binOp->leftSide = rootExpression;
+          bottom = &rootExpression;
         } else {
-          errorToken = token;
-          return ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION;
+          expression.unOp->operand = rootExpression;
+          bottom = &expression.unOp->operand;
         }
-      } else {
+        // move the statement to the root
         rootExpression = expression;
-        bottom = &rootExpression;
       }
     }
     token = tokenizer->peekNext();
   }
-  if (bottom) {
-    if (bottom->type == ExpressionType::BINARY_OP) {
-      if (bottom->binOp->rightSide.type == ExpressionType::NONE) {
-        expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
+  return ParseExpressionErrorType::NONE;
+}
+
+ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
+  const Token token = tokenizer->peekNext();
+  if (isLiteral(token.type)) {
+    tokenizer->consumePeek();
+    expression.type = ExpressionType::VALUE;
+    expression.value = token;
+  }
+  else if (token.type == TokenType::OPEN_PAREN) {
+    tokenizer->consumePeek();
+    expression.type = ExpressionType::WRAPPED;
+    expression.wrapped = memPool.makeExpression();
+    ParseExpressionErrorType errorType = parseExpression(*expression.wrapped);
+    if (errorType != ParseExpressionErrorType::NONE) {
+      return ParseExpressionErrorType::REPORTED;
+    }
+    if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
+      expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
+      return ParseExpressionErrorType::REPORTED;
+    }
+    tokenizer->consumePeek();
+  }
+  else if (token.type == TokenType::IDENTIFIER) {
+    tokenizer->consumePeek();
+    Token next = tokenizer->peekNext();
+    if (next.type == TokenType::OPEN_PAREN) {
+      tokenizer->consumePeek();
+      expression.type = ExpressionType::FUNCTION_CALL;
+      expression.funcCall = memPool.makeFunctionCall(FunctionCall{token});
+      ParseExpressionErrorType errorType = getExpressions(expression.funcCall->args, TokenType::CLOSE_PAREN);
+      if (errorType != ParseExpressionErrorType::NONE) {
         return ParseExpressionErrorType::REPORTED;
       }
-      return ParseExpressionErrorType::NONE;
-    } else if (bottom->type == ExpressionType::UNARY_OP) {
-      if (bottom->unOp->operand.type == ExpressionType::NONE) {
-        expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
+      if (tokenizer->peekNext().type != TokenType::CLOSE_PAREN) {
+        if (tokenizer->peeked.type == TokenType::COMMA) {
+          expected.emplace_back(ExpectedType::EXPRESSION, tokenizer->peeked, tokenizer->tokenizerIndex);
+        } else {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
+        }
         return ParseExpressionErrorType::REPORTED;
       }
-      return ParseExpressionErrorType::NONE;
-    } else {
-      return ParseExpressionErrorType::NONE;
+      tokenizer->consumePeek();
+    }
+    else if (next.type == TokenType::OPEN_BRACKET) {
+      tokenizer->consumePeek();
+      expression.type = ExpressionType::ARRAY_ACCESS;
+      expression.arrAccess = memPool.makeArrayAccess(ArrayAccess{token});
+      ParseExpressionErrorType errorType = parseExpression(expression.arrAccess->offset);
+      if (errorType != ParseExpressionErrorType::NONE) {
+        return ParseExpressionErrorType::REPORTED;
+      }
+      if (tokenizer->peekNext().type != TokenType::CLOSE_BRACKET) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
+        return ParseExpressionErrorType::REPORTED;
+      }
+      tokenizer->consumePeek();
+    }
+    else {
+      expression.type = ExpressionType::VALUE;
+      expression.value = token;
     }
   } else {
-    errorToken = token;
-    return ParseExpressionErrorType::NOT_EXPRESSION;
+    expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
+    return ParseExpressionErrorType::REPORTED;
   }
+  return ParseExpressionErrorType::NONE;
 }
 
 /**

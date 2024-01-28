@@ -209,6 +209,32 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(tokenizer.extractToken(rr.value) == "9");
   }
 
+  { // array access with postfix index expression
+    const std::string str = "content[position++];";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    CHECK(parser.unexpected.empty());
+    CHECK(parser.expected.empty());
+  }
+
+  { // not
+    const std::string str = "!content";
+    Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
+    Parser parser{tokenizer, memPool};
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    CHECK(parser.unexpected.empty());
+    CHECK(parser.expected.empty());
+    CHECK(expression.type == ExpressionType::UNARY_OP);
+    REQUIRE(expression.unOp);
+    CHECK(expression.unOp->operand.type == ExpressionType::VALUE);
+    CHECK(expression.unOp->operand.value.type == TokenType::IDENTIFIER);
+  }
+
    // operator with higher precedence on left node
   {
     const std::string str = " x * function(var) - 9;";
@@ -251,9 +277,13 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     const std::string str = " var - 9 thing() ; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
-    Expression expression;
-    ParseExpressionErrorType errorType = parser.parseExpression(expression);
-    CHECK(errorType == ParseExpressionErrorType::EXPRESSION_AFTER_EXPRESSION);
+    Statement statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement);
+    CHECK(errorType == ParseStatementErrorType::REPORTED);
+    REQUIRE(parser.expected.size() == 1);
+    CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
+    CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 9);
   }
 
   { // missing semicolon
@@ -285,7 +315,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     Expression expression;
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
-    CHECK(errorType == ParseExpressionErrorType::NONE);
+    CHECK(errorType == ParseExpressionErrorType::REPORTED);
     REQUIRE(parser.expected.size() == 1);
     CHECK(parser.expected[0].tokenWhereExpected.position == 2);
     CHECK(parser.expected[0].expectedType == ExpectedType::EXPRESSION);

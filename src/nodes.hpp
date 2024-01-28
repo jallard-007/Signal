@@ -148,8 +148,8 @@ struct ArrayAccess {
 
 // binOp:= expression binOpOperator expression
 struct BinOp {
-  Expression leftSide;
   Expression rightSide;
+  Expression leftSide;
   Token op;
   BinOp() = delete;
   explicit BinOp(const Token&);

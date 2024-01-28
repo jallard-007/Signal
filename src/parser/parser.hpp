@@ -31,15 +31,11 @@ struct Expected {
 enum class ParseExpressionErrorType: uint8_t {
   NONE,
   REPORTED,
-  EXPRESSION_AFTER_EXPRESSION,
-  NOT_EXPRESSION,
 };
 
 enum class ParseStatementErrorType: uint8_t {
   NONE,
   REPORTED,
-  EXPRESSION_AFTER_EXPRESSION,
-  NOT_EXPRESSION,
 };
 
 enum class ParseTypeErrorType: uint8_t {
@@ -72,6 +68,7 @@ struct Parser {
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&);
+  ParseExpressionErrorType parseLeaf(Expression&);
   ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);

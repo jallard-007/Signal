@@ -941,7 +941,7 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
       alignTo = size;
     } else {
       std::cerr << "Invalid token type with enum value: " << (uint32_t)typeToken.type << '\n';
-      assert(false);
+      exit(1);
     }
     uint32_t paddingRequired = size - ((info.size) % size);
     if (paddingRequired == size) {

@@ -71,10 +71,8 @@ Token Tokenizer::peekNext() {
 }
 
 void Tokenizer::consumePeek() {
-  if (peeked.type != TokenType::NONE) {
-    peeked.type = TokenType::NONE;
-    position = peeked.position + peeked.length;
-  }
+  peeked.type = TokenType::NONE;
+  position = peeked.position + peeked.length;
 }
 
 Token Tokenizer::tokenizeNext() {
