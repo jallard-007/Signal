@@ -18,7 +18,6 @@ struct ExpressionResult {
   OpCodes jumpOp {OpCodes::NOP};
   bool isReg {false};
   bool isTemp {false};
-  ExpressionResult() = default;
 };
 
 struct StructInformation {
@@ -54,10 +53,6 @@ enum class StackMarkerType: uint8_t {
   SOFT_SCOPE_START,
 };
 
-struct StackMarker {
-  StackMarkerType type = StackMarkerType::NONE;
-};
-
 struct StackVariable {
   const VariableDec &varDec;
   uint32_t size = 0;
@@ -74,10 +69,9 @@ enum class StackItemType: uint8_t {
 struct StackItem {
   union {
     StackVariable variable;
-    StackMarker marker;
+    StackMarkerType marker;
   };
   StackItemType type = StackItemType::NONE;
-
 };
 
 struct CodeGen {

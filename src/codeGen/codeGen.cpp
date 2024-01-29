@@ -894,7 +894,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
   uint32_t offset = size;
   for (StackItem &item : stack) {
     if (item.type == StackItemType::MARKER) {
-      if (item.marker.type == StackMarkerType::HARD_SCOPE_START) {
+      if (item.marker == StackMarkerType::HARD_SCOPE_START) {
         break;
       }
     } else if (item.type == StackItemType::VARIABLE) {
@@ -903,12 +903,12 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
     }
   }
   StackItem stackItem {
-    .type = StackItemType::VARIABLE,
     .variable = {
-      .size = size,
       .varDec = varDec,
+      .size = size,
       .offset = offset,
-    }
+    },
+    .type = StackItemType::VARIABLE,
   };
   stack.emplace_back(stackItem);
   return size;
@@ -1151,8 +1151,8 @@ void CodeGen::endSoftScope() {
 
 void CodeGen::startHardScope() {
   StackItem stackItem {
-    .type = StackItemType::MARKER,
-    .marker.type = StackMarkerType::HARD_SCOPE_START
+    .marker = StackMarkerType::HARD_SCOPE_START,
+    .type = StackItemType::MARKER
   };
   stack.emplace_back(stackItem);
   addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
@@ -1164,7 +1164,7 @@ void CodeGen::endHardScope() {
   while (!stack.empty()) {
     if (
       stack.back().type == StackItemType::MARKER &&
-      stack.back().marker.type == StackMarkerType::HARD_SCOPE_START
+      stack.back().marker == StackMarkerType::HARD_SCOPE_START
     ) {
       stack.pop_back();
       break;
