@@ -4,7 +4,7 @@
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
 
 Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
-  newlinePositions{}, filePath{std::move(filePath)}, content{std::move(fileContent)}, peeked{0, 0, TokenType::NONE}
+  filePath{std::move(filePath)}, content{std::move(fileContent)}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -13,7 +13,7 @@ Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
   newlinePositions.emplace_back(0);
 }
 Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
-  newlinePositions{}, filePath{std::move(filePath)}, content{fileContent}, peeked{0, 0, TokenType::NONE}
+  filePath{std::move(filePath)}, content{fileContent}
 {
   if (fileContent.length() > UINT32_MAX) {
     exit(1);
@@ -65,21 +65,18 @@ Token Tokenizer::peekNext() {
     return peeked;
   }
   peeked = tokenizeNext();
-  // put position back
-  position = peeked.position;
   return peeked;
 }
 
 void Tokenizer::consumePeek() {
   peeked.type = TokenType::NONE;
-  position = peeked.position + peeked.length;
 }
 
 Token Tokenizer::tokenizeNext() {
   if (peeked.type != TokenType::NONE) {
     const Token temp = peeked;
+    consumePeek();
     peeked.type = TokenType::NONE;
-    position = peeked.position + peeked.length;
     return temp;
   }
   moveToNextNonWhiteSpaceChar();
@@ -693,6 +690,8 @@ void Tokenizer::movePastNewLine() {
   }
 }
 
-std::string Tokenizer::extractToken(const Token &token) {
-  return content.substr(token.position, token.length);
+const std::string& Tokenizer::extractToken(const Token &token) {
+  extracted.resize(token.length);
+  content.copy(extracted.data(), token.length, token.position);
+  return extracted;
 }

@@ -15,6 +15,7 @@ struct Tokenizer {
   std::vector<uint32_t> newlinePositions;
   const std::string filePath;
   const std::string content;
+  std::string extracted;
   Token peeked;
   uint32_t position{0};
   uint32_t tokenizerIndex{0};
@@ -29,7 +30,7 @@ struct Tokenizer {
   Token tokenizeNext();
   Token peekNext();
   void consumePeek();
-  std::string extractToken(const Token&);
+  const std::string& extractToken(const Token&);
   TokenPositionInfo getTokenPositionInfo(const Token&);
 
 private:
