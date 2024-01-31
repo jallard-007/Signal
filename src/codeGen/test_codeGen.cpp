@@ -280,3 +280,58 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     CHECK(codeGen.byteCode == expected);
   }
 }
+
+TEST_CASE("standardizeFunctionCall", "[codeGen]") {
+  {
+    const std::string str = "func testFunction(): void { } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionCallMemoryOffsets memOffsets;
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.standardizeFunctionCall(funcDec, memOffsets);
+    CHECK(memOffsets.returnAddress == 0);
+    CHECK(memOffsets.returnValue == 8);
+    CHECK(memOffsets.totalSize == 8);
+    CHECK(memOffsets.parameters.empty());
+  }
+  {
+    const std::string str = "func testFunction(): int32 { return 10; } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionCallMemoryOffsets memOffsets;
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.standardizeFunctionCall(funcDec, memOffsets);
+    CHECK(memOffsets.returnAddress == 0);
+    CHECK(memOffsets.returnValue == 8);
+    CHECK(memOffsets.totalSize == 12);
+    CHECK(memOffsets.parameters.empty());
+  }
+  {
+    const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionCallMemoryOffsets memOffsets;
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.standardizeFunctionCall(funcDec, memOffsets);
+    CHECK(memOffsets.returnAddress == 8);
+    CHECK(memOffsets.returnValue == 16);
+    CHECK(memOffsets.totalSize == 20);
+    REQUIRE(memOffsets.parameters.size() == 1);
+    CHECK(memOffsets.parameters[0] == 0);
+  }
+}

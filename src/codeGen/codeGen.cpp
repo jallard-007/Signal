@@ -57,15 +57,28 @@ ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLi
  * Generates a function call expression
  * \param functionCall the function call node
  * \returns an ExpressionResult object, with val containing the address of the returned value
+ * 
 */
 ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
+
   GeneralDec const *const &generalDec = lookUp[tk->extractToken(functionCall.name)];
+  if (!functionNameToMemoryOffsets.contains(generalDec->funcDec)) {
+    standardizeFunctionCall(*generalDec->funcDec, functionNameToMemoryOffsets[generalDec->funcDec]);
+  }
+  const FunctionCallMemoryOffsets& memOffsets = functionNameToMemoryOffsets[generalDec->funcDec];
+  (void)memOffsets;
   const uint64_t addressOfReturnValue = byteCode.size();
 
   // make room for return value
-  const uint32_t sizeOfReturnType = sizeOfType(generalDec->funcDec->returnType.token);
+  const Token returnType = getTypeFromTokenList(generalDec->funcDec->returnType);
+  const uint32_t sizeOfReturnType = sizeOfType(returnType);
   addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
   add4ByteNum(sizeOfReturnType);
+
+  // 
+  addBytes({(uc)OpCodes::RETURN_ADDRESS});
+  add8ByteNum(0);
+
 
   // push arguments to stack
   // need an identifier lookup
@@ -263,6 +276,11 @@ void CodeGen::add4ByteNum(const uint32_t num) {
 
 void CodeGen::add8ByteNum(const uint64_t num) {
   addBytesBasedOnEndianess(&num, sizeof(num));
+}
+
+void CodeGen::addPointer() {
+  void *p = 0;
+  addBytesBasedOnEndianess(&p, sizeof p);
 }
 
 /**
@@ -753,7 +771,7 @@ uint32_t CodeGen::sizeOfType(const Token token) {
       return 8;
     }
     case TokenType::POINTER: {
-      return 8;
+      return sizeof (void *);
     }
     case TokenType::DOUBLE_TYPE: {
       return 8;
@@ -810,21 +828,14 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
   }
 }
 
-void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
-  startHardScope();
-  generateScope(funcDec.body);
-  endHardScope();
-  // jump to return address
-}
 
 /**
- * TODO: just use base pointer, on scope node generation, push base pointer, generate scope, pop base pointer
- * Makes rooms on the stack for the variable and assigns the initial assignment to it
+ * Have to figure out stack alignment
  * \returns the size of the type
 */
 uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
   uc reg = 0;
-  Token typeToken = varDec.type.token;
+  const Token typeToken = getTypeFromTokenList(varDec.type);
   uint32_t size = 0;
   if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
     if (initialize && varDec.initialAssignment) {
@@ -836,7 +847,7 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
         reg = (uc)expRes.val;
       }
     }
-    size = sizeOfType(varDec.type.token);
+    size = sizeOfType(typeToken);
     switch (size) {
       case 0: {
         break;
@@ -928,7 +939,7 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
     if (structDecList->type != StructDecType::VAR) {
       continue;
     }
-    Token typeToken = structDecList->varDec->type.token;
+    Token typeToken = getTypeFromTokenList(structDecList->varDec->type);
     uint32_t& offset = info.offsetMap[tk->extractToken(structDecList->varDec->name)];
     uint32_t size, alignTo;
     if (typeToken.type == TokenType::IDENTIFIER) {
@@ -963,7 +974,10 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
   return info;
 }
 
-// TODO:
+/**
+ * TODO:
+ * 
+*/
 uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
   std::string structName = tk->extractToken(varDec.type.token);
   GeneralDec const * const &generalDec = lookUp[structName];
@@ -977,7 +991,7 @@ uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDe
     structDecList = structDecList->next;
   }
   tk = oldTk;
-  return 999; // need to update
+  return 999;
 }
 
 uint64_t CodeGen::addMarker(JumpMarkerType type) {
@@ -1142,35 +1156,66 @@ void CodeGen::generateScope(const Scope& scope) {
   endSoftScope();
 }
 
+void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
+  // we want callee to handle unwinding arguments from stack
+  startFunctionScope(funcDec);
+  generateScope(funcDec.body);
+  endFunctionScope(funcDec);
+}
+
 void CodeGen::startSoftScope() {
-}
-
-
-void CodeGen::endSoftScope() {
-}
-
-void CodeGen::startHardScope() {
   StackItem stackItem {
-    .marker = StackMarkerType::HARD_SCOPE_START,
+    .marker = StackMarkerType::SOFT_SCOPE_START,
     .type = StackItemType::MARKER
   };
   stack.emplace_back(stackItem);
-  addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
-  addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
 }
 
-
-void CodeGen::endHardScope() {
-  while (!stack.empty()) {
+void CodeGen::endSoftScope() {
+    while (!stack.empty()) {
+    // shouldn't need this marker as this *should* always be the first item in the stack
+    // for now we'll leave it in
     if (
       stack.back().type == StackItemType::MARKER &&
-      stack.back().marker == StackMarkerType::HARD_SCOPE_START
+      stack.back().marker == StackMarkerType::SOFT_SCOPE_START
     ) {
       stack.pop_back();
       break;
     }
     // TODO: run destructor for each item within this scope
     stack.pop_back();
+    assert(!stack.empty()); // paired with marker comment above
+  }
+}
+
+void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
+  StackItem stackItem {
+    .marker = StackMarkerType::HARD_SCOPE_START,
+    .type = StackItemType::MARKER
+  };
+  (void)funcDec;
+  stack.emplace_back(stackItem);
+  addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
+  addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
+}
+
+void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
+  endSoftScope();
+  (void)funcDec;
+  while (!stack.empty()) {
+    // shouldn't need this marker as this *should* always be the first item in the stack
+    // for now we'll leave it in
+    if (
+      stack.back().type == StackItemType::MARKER &&
+      stack.back().marker == StackMarkerType::HARD_SCOPE_START
+    ) {
+      stack.pop_back();
+      assert(stack.empty());
+      break;
+    }
+    // TODO: run destructor for each item within this scope
+    stack.pop_back();
+    assert(!stack.empty()); // paired with marker comment above
   }
   addBytes({(uc)OpCodes::MOVE, stackPointerIndex, basePointerIndex});
   addBytes({(uc)OpCodes::POP_Q, basePointerIndex});
@@ -1215,5 +1260,53 @@ void CodeGen::generateStatement(const Statement& statement) {
       }
       break;
     }
+  }
+}
+
+/**
+ * Returns the actual type from a token list
+ * Once type qualifiers or similar things are supported, this will be handy
+*/
+Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
+  return tokenList.token;
+}
+
+/**
+ * TODO:
+*/
+void CodeGen::standardizeFunctionCall(const FunctionDec& funcDec, FunctionCallMemoryOffsets& memOffsets) {
+  /*
+   * Memory layout information needs to be standardized before hand per function,
+   * but generally, memory layout for a function call:
+   *    HIGH ADDRESS                                              LOW ADDRESS
+   * Return Value | Return Address | Argument 1 | Argument 2 | ... | Argument N
+   * Stack Pointer is at low address (start of argument N) when the function is called
+  */
+
+
+  // need to figure out aligning items on the stack
+
+  memOffsets.totalSize = 0;
+  // first is size, second is alignment
+  std::vector<std::pair<uint32_t, uint32_t>> items;
+
+
+  if (funcDec.params.curr.type != StatementType::NONE) {
+    const StatementList *parameterList = &funcDec.params;
+    do {
+      const Token typeToken = getTypeFromTokenList(parameterList->curr.varDec->type);
+      uint32_t sizeOfParameter = 0;
+      uint32_t alignTo = 0;
+      if (typeToken.type == TokenType::IDENTIFIER) {
+        StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
+        sizeOfParameter = structInfo.size;
+        alignTo = structInfo.alignTo;
+      } else {
+        sizeOfParameter = sizeOfType(typeToken);
+        alignTo = sizeOfParameter;
+      }
+      items.emplace_back(sizeOfParameter, alignTo);
+      parameterList = parameterList->next;
+    } while (parameterList);
   }
 }

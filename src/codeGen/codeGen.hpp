@@ -74,10 +74,17 @@ struct StackItem {
   StackItemType type = StackItemType::NONE;
 };
 
+struct FunctionCallMemoryOffsets {
+  std::vector<uint32_t> parameters;
+  uint32_t returnValue = 0;
+  uint32_t returnAddress = 0;
+  uint32_t totalSize = 0;
+};
+
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
-  std::unordered_map<uint64_t, uint64_t> declarationAddressToByteCodeIndex; // maps the address of an ast node to its index in the bytecode
   std::map<std::string, StructInformation> structNameToInfoMap;
+  std::unordered_map<FunctionDec *, FunctionCallMemoryOffsets> functionNameToMemoryOffsets;
   std::map<std::string, uint32_t> variableNameToStackItemIndex;
   std::vector<unsigned char> byteCode;
   std::vector<JumpMarker> jumpMarkers;
@@ -118,10 +125,11 @@ struct CodeGen {
 
   // scopes
   void generateScope(const Scope&);
+  void standardizeFunctionCall(const FunctionDec&, FunctionCallMemoryOffsets&);
   void startSoftScope();
   void endSoftScope();
-  void startHardScope();
-  void endHardScope();
+  void startFunctionScope(const FunctionDec&);
+  void endFunctionScope(const FunctionDec&);
 
   // adding to the bytecode
   void addByteOp(OpCodes);
@@ -131,6 +139,8 @@ struct CodeGen {
   void add4ByteNum(const uint32_t);
   void add8ByteNum(const uint64_t);
   void addBytesBasedOnEndianess(const void *, uint64_t);
+  void addPointer();
+
 
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
@@ -138,7 +148,8 @@ struct CodeGen {
   int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
-  uint32_t sizeOfType(const Token);
+  uint32_t sizeOfType(Token);
+  Token getTypeFromTokenList(const TokenList&);
 };
 
 OpCodes getLoadOpForSize(unsigned char);

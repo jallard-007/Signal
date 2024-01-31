@@ -145,7 +145,8 @@ enum class OpCodes: unsigned char {
   // this marks the end of ops that should be in the executable
   // any ops below are temporary ops that should be changed before code gen process is done
   END_OF_VALID_OPS,
-  FUNC_CALL,
+  FUNC_CALL, // FUNC_CALL, 8 byte value. Gets replaced with a JUMP
+  RETURN_ADDRESS, // RETURN_ADDRESS, 8 byte unsigned offset from current position. Gets replaced with a PUSH_Q
 };
 
 /*
