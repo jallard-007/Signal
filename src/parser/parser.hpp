@@ -64,12 +64,12 @@ struct Parser {
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseExpressionBeforeScope(Expression&);
-  ParseStatementErrorType parseIfStatement(IfStatement& condStatement);
+  ParseStatementErrorType parseIfStatement(IfStatement&);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&);
   ParseExpressionErrorType parseLeaf(Expression&);
-  ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&);
+  ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&, TokenType);
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);
 };

@@ -6,7 +6,8 @@ Token getTokenOfExpression(Expression& exp) {
     case ExpressionType::ARRAY_ACCESS: {
       return getTokenOfExpression(exp.arrAccess->array);
     }
-    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
+    case ExpressionType::ARRAY_LITERAL: 
+    case ExpressionType::STRUCT_LITERAL: {
       return getTokenOfExpression(exp.arrayOrStruct->values.curr);
     }
     case ExpressionType::BINARY_OP: {
@@ -901,7 +902,8 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
       return checkExpression(tk, *expression.wrapped);
     }
     
-    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
+    case ExpressionType::ARRAY_LITERAL:
+    case ExpressionType::STRUCT_LITERAL: {
       return {&badValue, false};
     }
 

@@ -1,5 +1,7 @@
 #include "parser.hpp"
 
+TokenType closingOfOpening(TokenType);
+
 Unexpected::Unexpected(const Token& token, uint32_t tkIndex): token{token}, tkIndex{tkIndex} {}
 std::string Unexpected::getErrorMessage(std::vector<Tokenizer>& tks) {
   auto& tk = tks[tkIndex];
@@ -513,17 +515,16 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       statement.controlFlow->type = ControlFlowStatementType::RETURN_STATEMENT;
       statement.controlFlow->returnStatement = memPool.makeReturnStatement();
       auto& returnValue = statement.controlFlow->returnStatement->returnValue;
-      if (tokenizer->peekNext().type == TokenType::OPEN_BRACKET) {
+      if (tokenizer->peekNext().type == TokenType::OPEN_BRACE) {
         tokenizer->consumePeek();
-        returnValue.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
+        returnValue.type = ExpressionType::STRUCT_LITERAL;
         returnValue.arrayOrStruct = memPool.makeArrayOrStruct();
-        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*returnValue.arrayOrStruct);
-        if (tokenizer->peekNext().type != TokenType::CLOSE_BRACKET) {
-          expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
+        ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*returnValue.arrayOrStruct, TokenType::CLOSE_BRACE);
+        if (errorType != ParseExpressionErrorType::NONE) {
           return ParseStatementErrorType::REPORTED;
         }
-        tokenizer->consumePeek();
-        if (errorType != ParseExpressionErrorType::NONE) {
+        if (tokenizer->peekNext().type != TokenType::CLOSE_BRACE) {
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACE, tokenizer->tokenizerIndex);
           return ParseStatementErrorType::REPORTED;
         }
       }
@@ -533,7 +534,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
           return ParseStatementErrorType::REPORTED;
         }
         if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
-          expected.emplace_back(ExpectedType::TOKEN, tokenizer->peekNext(), TokenType::SEMICOLON, tokenizer->tokenizerIndex);
+          expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
           return ParseStatementErrorType::REPORTED;
         }
       }
@@ -739,13 +740,18 @@ ParseStatementErrorType Parser::parseVariableDec(VariableDec& varDec) {
     varDec.initialAssignment = memPool.makeExpression();
     tokenizer->consumePeek();
     // initialize
-    if (tokenizer->peekNext().type == TokenType::OPEN_BRACKET) {
+    if (tokenizer->peekNext().type == TokenType::OPEN_BRACKET || tokenizer->peeked.type == TokenType::OPEN_BRACE) {
+      TokenType closing = closingOfOpening(tokenizer->peeked.type);
       tokenizer->consumePeek();
-      varDec.initialAssignment->type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
+      if (closing == TokenType::CLOSE_BRACE) {
+        varDec.initialAssignment->type = ExpressionType::STRUCT_LITERAL;
+      } else {
+        varDec.initialAssignment->type = ExpressionType::ARRAY_LITERAL;
+      }
       varDec.initialAssignment->arrayOrStruct = memPool.makeArrayOrStruct();
-      ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*varDec.initialAssignment->arrayOrStruct);
-      if (tokenizer->peekNext().type != TokenType::CLOSE_BRACKET) {
-        expected.emplace_back(ExpectedType::TOKEN, errorToken, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
+      ParseExpressionErrorType errorType = parseArrayOrStructLiteral(*varDec.initialAssignment->arrayOrStruct, closing);
+      if (tokenizer->peekNext().type != closing) {
+        expected.emplace_back(ExpectedType::TOKEN, errorToken, closing, tokenizer->tokenizerIndex);
         return ParseStatementErrorType::REPORTED;
       }
       tokenizer->consumePeek();
@@ -841,24 +847,33 @@ ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions, Tok
   }
 }
 
+TokenType closingOfOpening(TokenType type) {
+  assert(type == TokenType::OPEN_BRACE || type == TokenType::OPEN_BRACKET || type == TokenType::OPEN_PAREN);
+  #define DIFF_TO_MATCHING_CLOSE ((uint8_t)TokenType::CLOSE_BRACKET - (uint8_t)TokenType::OPEN_BRACKET)
+  assert((uint8_t)TokenType::CLOSE_BRACE - (uint8_t)TokenType::OPEN_BRACE == DIFF_TO_MATCHING_CLOSE);
+  assert((uint8_t)TokenType::CLOSE_PAREN - (uint8_t)TokenType::OPEN_PAREN == DIFF_TO_MATCHING_CLOSE);
+  return (TokenType)((uint8_t)type + DIFF_TO_MATCHING_CLOSE);
+  #undef DIFF_TO_MATCHING_CLOSE
+}
+
 /**
  * the open bracket should be consumed before calling this. does not consume the final close bracket, similar to getExpressions
- * actual expressions cannot have an array/struct literal since it only really makes sense to initialize with / return them.
+ * actual expressions cannot have an array/struct literal since it only really makes sense to initialize with / return them, so this is not part of parseExpression
 */
-ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral& arrayOrStruct) {
-  if (tokenizer->peekNext().type == TokenType::CLOSE_BRACKET) {
+ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral& arrayOrStruct, TokenType closing) {
+  if (tokenizer->peekNext().type == closing) {
     return ParseExpressionErrorType::NONE;
   }
   ExpressionList *list = &arrayOrStruct.values;
   while (true) {
     ParseExpressionErrorType errorType;
-    if (tokenizer->peekNext().type == TokenType::OPEN_BRACKET) {
+    if (tokenizer->peekNext().type == TokenType::OPEN_BRACE) {
       tokenizer->consumePeek();
-      list->curr.type = ExpressionType::ARRAY_OR_STRUCT_LITERAL;
+      list->curr.type = ExpressionType::STRUCT_LITERAL;
       list->curr.arrayOrStruct = memPool.makeArrayOrStruct();
-      errorType = parseArrayOrStructLiteral(*list->curr.arrayOrStruct);
-      if (tokenizer->peekNext().type != TokenType::CLOSE_BRACKET) {
-        expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
+      errorType = parseArrayOrStructLiteral(*list->curr.arrayOrStruct,TokenType::CLOSE_BRACE);
+      if (tokenizer->peekNext().type != TokenType::CLOSE_BRACE) {
+        expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACE, tokenizer->tokenizerIndex);
         return ParseExpressionErrorType::REPORTED;
       }
       tokenizer->consumePeek();
@@ -1046,7 +1061,8 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
       expression.type = ExpressionType::VALUE;
       expression.value = token;
     }
-  } else {
+  }
+  else {
     expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
     return ParseExpressionErrorType::REPORTED;
   }

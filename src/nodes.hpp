@@ -20,7 +20,8 @@ enum class ExpressionType: uint8_t {
   FUNCTION_CALL,
   ARRAY_ACCESS,
   WRAPPED,
-  ARRAY_OR_STRUCT_LITERAL
+  ARRAY_LITERAL,
+  STRUCT_LITERAL,
 };
 
 struct Expression {
@@ -180,7 +181,8 @@ struct FunctionCall {
   FunctionCall *deepCopy(NodeMemPool&);
 };
 
-// arrayOrStructLiteral:= [ expressionList ]
+// arrayLiteral:= [ expressionList ]
+// structLiteral:= { expressionList }
 struct ArrayOrStructLiteral {
   ExpressionList values;
   ArrayOrStructLiteral() = default;
@@ -191,7 +193,7 @@ struct ArrayOrStructLiteral {
 
 // CONDITIONAL STATEMENTS
 
-// ifStatement:= if (expression) scope
+// ifStatement:= if expression scope
 struct IfStatement {
   Scope body;
   Expression condition;

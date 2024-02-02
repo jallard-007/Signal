@@ -268,7 +268,8 @@ void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
   }
   switch (type) {
     case ExpressionType::ARRAY_ACCESS: arrAccess->prettyPrint(tk ,str); break;
-    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: arrayOrStruct->prettyPrint(tk, str); break;
+    case ExpressionType::ARRAY_LITERAL:
+    case ExpressionType::STRUCT_LITERAL: arrayOrStruct->prettyPrint(tk, str); break;
     case ExpressionType::BINARY_OP: binOp->prettyPrint(tk, str); break;
     case ExpressionType::FUNCTION_CALL: funcCall->prettyPrint(tk, str); break;
     case ExpressionType::UNARY_OP: unOp->prettyPrint(tk, str); break;

@@ -218,7 +218,7 @@ func prettyPrint(tk: Tokenizer ref, str: string ref, indentation: uint32): void 
     body.prettyPrint(tk, str, indentation);
   }
 
-  ### another func's content ###
+  ### // another  func's content ###
 
   movePastKeywordOrIdentifier();
   if (length >= MIN_CHARS_TO_DISAMBIG) {

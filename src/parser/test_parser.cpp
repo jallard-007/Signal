@@ -726,7 +726,7 @@ TEST_CASE("Keywords", "[parser]") {
   }
 
   {
-    const std::string str = "return [thing, 0]; ";
+    const std::string str = "return {thing, 0}; ";
     Tokenizer tokenizer{"./src/parser/test_parser.cpp",  str};
     Parser parser{tokenizer, memPool};
     Statement statement;
@@ -736,8 +736,8 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(statement.type == StatementType::CONTROL_FLOW);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::RETURN_STATEMENT);
-    CHECK(statement.controlFlow->returnStatement->returnValue.type == ExpressionType::ARRAY_OR_STRUCT_LITERAL);
-    REQUIRE(statement.controlFlow->returnStatement->returnValue.arrAccess);
+    CHECK(statement.controlFlow->returnStatement->returnValue.type == ExpressionType::STRUCT_LITERAL);
+    REQUIRE(statement.controlFlow->returnStatement->returnValue.arrayOrStruct);
   }
 
   {

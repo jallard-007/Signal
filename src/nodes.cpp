@@ -244,7 +244,8 @@ Expression Expression::deepCopy(NodeMemPool& mem) {
   copy.type = type;
   switch (type) {
     case ExpressionType::ARRAY_ACCESS: copy.arrAccess = arrAccess->deepCopy(mem); break;
-    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: copy.arrayOrStruct = arrayOrStruct->deepCopy(mem); break;
+    case ExpressionType::ARRAY_LITERAL:
+    case ExpressionType::STRUCT_LITERAL: copy.arrayOrStruct = arrayOrStruct->deepCopy(mem); break;
     case ExpressionType::BINARY_OP: copy.binOp = binOp->deepCopy(mem); break;
     case ExpressionType::FUNCTION_CALL: copy.funcCall = funcCall->deepCopy(mem); break;
     case ExpressionType::UNARY_OP: copy.unOp = unOp->deepCopy(mem); break;

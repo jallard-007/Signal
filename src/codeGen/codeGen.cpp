@@ -98,7 +98,10 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool con
     case ExpressionType::ARRAY_ACCESS: {
       return generateExpressionArrAccess(*currExp.arrAccess);
     }
-    case ExpressionType::ARRAY_OR_STRUCT_LITERAL: {
+    case ExpressionType::ARRAY_LITERAL: {
+      return generateExpressionArrOrStructLit(*currExp.arrayOrStruct);
+    }
+    case ExpressionType::STRUCT_LITERAL: {
       return generateExpressionArrOrStructLit(*currExp.arrayOrStruct);
     }
     case ExpressionType::BINARY_OP: {
