@@ -897,103 +897,59 @@ ParseExpressionErrorType Parser::parseArrayOrStructLiteral(ArrayOrStructLiteral&
  * Consumes the entire expression unless there was an error
 */
 ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
+  // ensures each part of the BinOp and UnOp lines
+  assert(&((BinOp *)nullptr)->rightSide == &((UnOp *)nullptr)->operand);
+  assert(&((BinOp *)nullptr)->op == &((UnOp *)nullptr)->op);
   Token token = tokenizer->peekNext();
-  Expression expression;
+  // bottom should always point to the leaf node
   Expression *bottom = &rootExpression;
   while (true) {
     if (!isUnaryOp(token.type)) {
-      if (bottom->unOp) {
-        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
-        bottom = &bottom->unOp->operand;
-      }
-      const ParseExpressionErrorType errorType = parseLeaf(*bottom);
+      ParseExpressionErrorType errorType = parseLeaf(*bottom);
       if (errorType != ParseExpressionErrorType::NONE) {
         return errorType;
       }
       token = tokenizer->peekNext();
     }
-OPERATOR_PARSE:
-    const bool binary = isBinaryOp(token.type);
-    if (!binary && !isUnaryOp(token.type)) {
+    OPERATOR_PARSE:
+    const ExpressionType expressionType = isBinaryOp(token.type) ? ExpressionType::BINARY_OP : isUnaryOp(token.type) ? ExpressionType::UNARY_OP : ExpressionType::NONE;
+    if (expressionType == ExpressionType::NONE) {
       return ParseExpressionErrorType::NONE;
     }
     tokenizer->consumePeek();
-    if (binary) {
-      expression.type = ExpressionType::BINARY_OP;
-      expression.binOp = memPool.makeBinOp(BinOp{token});
-      if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP) {
-        expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
-        return ParseExpressionErrorType::REPORTED;
+    // place expression in right spot within tree based on precedence
+    Expression* curr = &rootExpression;
+    // iterate down and to the right of the tree until we find precedence match
+    while (curr != bottom) { // this condition checks that curr has not reached the last leaf node
+      // reliant on BinOp.op and UnOp.op being the same spot in their structs (assertion at start)
+      if (operatorPrecedence[(uint8_t)token.type] <= operatorPrecedence[(uint8_t)curr->binOp->op.type]) {
+        break;
       }
+      // reliant on BinOp.rightSide and UnOp.operand being the same spot in their structs (assertion at start)
+      curr = &curr->binOp->rightSide;
+    }
+    BinOp *ref = memPool.makeBinOp(BinOp{token});
+    if (expressionType == ExpressionType::BINARY_OP) {
+      ref->leftSide = *curr;
     } else {
-      expression.type = ExpressionType::UNARY_OP;
-      expression.unOp = memPool.makeUnOp(UnOp{token});
+      ((UnOp *)ref)->operand = *curr;
+    }
+    curr->binOp = ref;
+    curr->type = expressionType;
+    bottom = &ref->rightSide;
+    // have to consider postfix operators
+    if (expressionType == ExpressionType::UNARY_OP) {
       if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
-        if (bottom->type == ExpressionType::BINARY_OP || bottom->type == ExpressionType::UNARY_OP || bottom->type == ExpressionType::NONE) {
+        if (curr->type == ExpressionType::NONE) {
           // expected expression
           expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
           return ParseExpressionErrorType::REPORTED;
         } else {
-          expression.unOp->operand = *bottom;
-          tokenizer->consumePeek();
           token = tokenizer->peekNext();
           /* have to do a jump since postfix operators
           are followed by an operator or end the expression */
           goto OPERATOR_PARSE;
         }
-      }
-    }
-    if (rootExpression.type != ExpressionType::BINARY_OP && rootExpression.type != ExpressionType::UNARY_OP) {
-      if (binary) {
-        expression.binOp->leftSide = rootExpression;
-      } else {
-        expression.unOp->operand = rootExpression;
-      }
-      rootExpression = expression;
-    }
-    else {
-      // place expression in right spot within tree based on precedence
-      Expression* prev = nullptr;
-      Expression* curr = &rootExpression;
-      // iterate down and to the right of the tree until we find precedence match
-      while (curr->unOp) { // this condition checks that there is a 'next'
-        TokenType op;
-        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
-        Expression* next = &curr->unOp->operand;
-        if (curr->type == ExpressionType::BINARY_OP) {
-          op = curr->binOp->op.type;
-        } else if (curr->type == ExpressionType::UNARY_OP) {
-          op = curr->unOp->op.type;
-        } else {
-          break;
-        }
-        if (operatorPrecedence[(uint8_t)token.type] <= operatorPrecedence[(uint8_t)op]) {
-          break;
-        }
-        prev = curr;
-        curr = next;
-      }
-
-      if (prev) {
-        if (binary) {
-          expression.binOp->leftSide = *curr;
-        } else {
-          expression.unOp->operand = *curr;
-        }
-        // reliant on BinOp.rightSide and UnOp.operand being the first item in their structs
-        prev->unOp->operand = expression;
-        bottom = &prev->binOp->rightSide;
-      }
-      else {
-        if (binary) {
-          expression.binOp->leftSide = rootExpression;
-          bottom = &rootExpression;
-        } else {
-          expression.unOp->operand = rootExpression;
-          bottom = &expression.unOp->operand;
-        }
-        // move the statement to the root
-        rootExpression = expression;
       }
     }
     token = tokenizer->peekNext();

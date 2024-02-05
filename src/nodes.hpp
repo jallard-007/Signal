@@ -162,6 +162,10 @@ struct BinOp {
 // unaryOp:= unaryOpOperator expression | expression postFixUnaryOpOperator
 struct UnOp {
   Expression operand;
+  private:
+  // to make the memory layout the same as binOp
+  uint64_t padding[2];
+  public:
   Token op;
   UnOp() = delete;
   explicit UnOp(const Token&);

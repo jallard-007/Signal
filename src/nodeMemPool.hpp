@@ -7,7 +7,7 @@
  * Memory pool for all nodes that require dynamic allocations
 */
 class NodeMemPool {
-  MemPool<UnOp> unOps;
+  MemPool<UnOp> unOps; // only being used for deep copies
   MemPool<BinOp> binOps;
   MemPool<GeneralDec> decs;
   MemPool<GeneralDecList> decLists;
