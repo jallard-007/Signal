@@ -928,28 +928,36 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
       // reliant on BinOp.rightSide and UnOp.operand being the same spot in their structs (assertion at start)
       curr = &curr->binOp->rightSide;
     }
-    BinOp *ref = memPool.makeBinOp(BinOp{token});
     if (expressionType == ExpressionType::BINARY_OP) {
-      ref->leftSide = *curr;
+      BinOp *binOp = memPool.makeBinOp(BinOp{token});
+      // set bottom to next empty expression
+      bottom = &binOp->rightSide;
+      // copy curr into this binary op
+      binOp->leftSide = *curr;
+      // change curr to point to the new binary op
+      curr->binOp = binOp;
+      curr->type = expressionType;
     } else {
-      ((UnOp *)ref)->operand = *curr;
-    }
-    curr->binOp = ref;
-    curr->type = expressionType;
-    bottom = &ref->rightSide;
-    // have to consider postfix operators
-    if (expressionType == ExpressionType::UNARY_OP) {
+      UnOp *unOp = memPool.makeUnOp(UnOp{token});
+      // set bottom to next empty expression
+      bottom = &unOp->operand;
+      // have to consider postfix operators
       if (token.type == TokenType::DECREMENT_POSTFIX || token.type == TokenType::INCREMENT_POSTFIX) {
-        if (curr->type == ExpressionType::NONE) {
-          // expected expression
-          expected.emplace_back(ExpectedType::EXPRESSION, token, tokenizer->tokenizerIndex);
-          return ParseExpressionErrorType::REPORTED;
-        } else {
-          token = tokenizer->peekNext();
-          /* have to do a jump since postfix operators
-          are followed by an operator or end the expression */
-          goto OPERATOR_PARSE;
-        }
+        // copy curr into this unary op
+        unOp->operand = *curr;
+        // change curr to point to the new unary op
+        curr->unOp = unOp;
+        curr->type = expressionType;
+        token = tokenizer->peekNext();
+        /* have to do a jump since postfix operators
+        are followed by an operator or end the expression.
+        bottom is already used up */
+        goto OPERATOR_PARSE;
+      } else {
+        // we dont need to copy curr since curr is empty
+        // change curr to point to the new unary op
+        curr->unOp = unOp;
+        curr->type = expressionType;
       }
     }
     token = tokenizer->peekNext();
