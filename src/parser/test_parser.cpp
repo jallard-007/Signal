@@ -69,10 +69,11 @@ TEST_CASE("Function Call - Base", "[parser]") {
   CHECK(parser.expected.empty());
   REQUIRE(statement.type == StatementType::EXPRESSION);
   REQUIRE(statement.expression);
-  REQUIRE(statement.expression->type == ExpressionType::FUNCTION_CALL);
-  REQUIRE(statement.expression->funcCall);
-  CHECK(tokenizer.extractToken(statement.expression->funcCall->name) == "functionName");
-  CHECK(statement.expression->funcCall->args.curr.type == ExpressionType::NONE);
+  REQUIRE(statement.expression->getType() == ExpressionType::FUNCTION_CALL);
+  REQUIRE(statement.expression->getFunctionCall());
+  FunctionCall& funcCall = *statement.expression->getFunctionCall();
+  CHECK(tokenizer.extractToken(funcCall.name) == "functionName");
+  CHECK(funcCall.args.curr.getType() == ExpressionType::NONE);
 }
 
 TEST_CASE("Function Call - Single Arg", "[parser]") {
@@ -86,14 +87,14 @@ TEST_CASE("Function Call - Single Arg", "[parser]") {
   CHECK(parser.expected.empty());
   REQUIRE(statement.type == StatementType::EXPRESSION);
   REQUIRE(statement.expression);
-  REQUIRE(statement.expression->type == ExpressionType::FUNCTION_CALL);
-  REQUIRE(statement.expression->funcCall);
+  REQUIRE(statement.expression->getType() == ExpressionType::FUNCTION_CALL);
+  REQUIRE(statement.expression->getFunctionCall());
 
-  auto& argsList = statement.expression->funcCall->args;
+  auto& argsList = statement.expression->getFunctionCall()->args;
   REQUIRE(argsList.next == nullptr);
   auto& arg1 = argsList.curr;
-  REQUIRE(arg1.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(arg1.value) == "arg1");
+  REQUIRE(arg1.getType() == ExpressionType::VALUE);
+  CHECK(tokenizer.extractToken(arg1.getToken()) == "arg1");
 }
 
 TEST_CASE("Function Call - Multi Arg", "[parser]") {
@@ -107,18 +108,18 @@ TEST_CASE("Function Call - Multi Arg", "[parser]") {
   CHECK(parser.expected.empty());
   REQUIRE(statement.type == StatementType::EXPRESSION);
   REQUIRE(statement.expression);
-  REQUIRE(statement.expression->type == ExpressionType::FUNCTION_CALL);
-  REQUIRE(statement.expression->funcCall);
+  REQUIRE(statement.expression->getType() == ExpressionType::FUNCTION_CALL);
+  REQUIRE(statement.expression->getFunctionCall());
 
-  auto& argsList = statement.expression->funcCall->args;
+  auto& argsList = statement.expression->getFunctionCall()->args;
   auto& arg1 = argsList.curr;
-  REQUIRE(arg1.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(arg1.value) == "arg1");
+  REQUIRE(arg1.getType() == ExpressionType::VALUE);
+  CHECK(tokenizer.extractToken(arg1.getToken()) == "arg1");
 
   REQUIRE(argsList.next);
   auto& arg2 = *argsList.next;
-  REQUIRE(arg2.curr.type == ExpressionType::VALUE);
-  CHECK(tokenizer.extractToken(arg2.curr.value) == "arg2");
+  REQUIRE(arg2.curr.getType() == ExpressionType::VALUE);
+  CHECK(tokenizer.extractToken(arg2.curr.getToken()) == "arg2");
 }
 
 TEST_CASE("Function Call - Nested", "[parser]") {
@@ -132,20 +133,20 @@ TEST_CASE("Function Call - Nested", "[parser]") {
   CHECK(parser.expected.empty());
   REQUIRE(statement.type == StatementType::EXPRESSION);
   REQUIRE(statement.expression);
-  REQUIRE(statement.expression->type == ExpressionType::FUNCTION_CALL);
-  REQUIRE(statement.expression->funcCall);
+  REQUIRE(statement.expression->getType() == ExpressionType::FUNCTION_CALL);
+  REQUIRE(statement.expression->getFunctionCall());
 
-  auto& argsList = statement.expression->funcCall->args;
+  auto& argsList = statement.expression->getFunctionCall()->args;
   auto& arg1 = argsList.curr;
-  REQUIRE(arg1.type == ExpressionType::ARRAY_ACCESS);
-  REQUIRE(arg1.arrAccess);
-  CHECK(tokenizer.extractToken(arg1.arrAccess->array.value) == "arg1");
+  REQUIRE(arg1.getType() == ExpressionType::ARRAY_ACCESS);
+  REQUIRE(arg1.getArrayAccess());
+  CHECK(tokenizer.extractToken(arg1.getArrayAccess()->array.getToken()) == "arg1");
 
-  REQUIRE(arg1.arrAccess->offset.type == ExpressionType::FUNCTION_CALL);
-  auto& arg1_arg1 = arg1.arrAccess->offset.funcCall;
+  REQUIRE(arg1.getArrayAccess()->offset.getType() == ExpressionType::FUNCTION_CALL);
+  auto arg1_arg1 = arg1.getArrayAccess()->offset.getFunctionCall();
   REQUIRE(arg1_arg1);
   CHECK(tokenizer.extractToken(arg1_arg1->name) == "nested");
-  CHECK(arg1_arg1->args.curr.type == ExpressionType::NONE);
+  CHECK(arg1_arg1->args.curr.getType() == ExpressionType::NONE);
 }
 
 TEST_CASE("Expressions", "[parser]") {
@@ -159,18 +160,18 @@ TEST_CASE("Expressions", "[parser]") {
     REQUIRE(errorType == ParseExpressionErrorType::NONE);
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
-    REQUIRE(expression.type == ExpressionType::BINARY_OP);
-    CHECK(expression.binOp->op.type == TokenType::ADDITION);
-    auto &binOp = expression.binOp;
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    CHECK(expression.getBinOp()->op.type == TokenType::ADDITION);
+    auto binOp = expression.getBinOp();
     REQUIRE(binOp);
     CHECK(binOp->op.type == TokenType::ADDITION);
-    REQUIRE(binOp->leftSide.type == ExpressionType::VALUE);
-    CHECK(binOp->leftSide.value.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->leftSide.value) == "4");
+    REQUIRE(binOp->leftSide.getType() == ExpressionType::VALUE);
+    CHECK(binOp->leftSide.getToken().type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->leftSide.getToken()) == "4");
 
-    REQUIRE(binOp->rightSide.type == ExpressionType::VALUE);
-    CHECK(binOp->rightSide.value.type == TokenType::DECIMAL_NUMBER);
-    CHECK(tokenizer.extractToken(binOp->rightSide.value) == "4");
+    REQUIRE(binOp->rightSide.getType() == ExpressionType::VALUE);
+    CHECK(binOp->rightSide.getToken().type == TokenType::DECIMAL_NUMBER);
+    CHECK(tokenizer.extractToken(binOp->rightSide.getToken()) == "4");
   }
 
    // operator with higher precedence on right node
@@ -184,29 +185,29 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
 
-    REQUIRE(expression.type == ExpressionType::BINARY_OP);
-    auto &binOp = expression.binOp;
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    auto binOp = expression.getBinOp();
     REQUIRE(binOp);
     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
-    REQUIRE(binOp->leftSide.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(binOp->leftSide.value) == "x");
+    REQUIRE(binOp->leftSide.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(binOp->leftSide.getToken()) == "x");
 
-    REQUIRE(binOp->rightSide.type == ExpressionType::BINARY_OP);
-    REQUIRE(binOp->rightSide.binOp);
-    CHECK(binOp->rightSide.binOp->op.type == TokenType::MULTIPLICATION);
+    REQUIRE(binOp->rightSide.getType() == ExpressionType::BINARY_OP);
+    REQUIRE(binOp->rightSide.getBinOp());
+    CHECK(binOp->rightSide.getBinOp()->op.type == TokenType::MULTIPLICATION);
 
-    auto& rl = binOp->rightSide.binOp->leftSide;
-    REQUIRE(rl.type == ExpressionType::FUNCTION_CALL);
-    REQUIRE(rl.funcCall);
-    REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
-    CHECK(rl.funcCall->args.next == nullptr);
-    REQUIRE(rl.funcCall->args.curr.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(rl.funcCall->args.curr.value) == "var");
+    auto& rl = binOp->rightSide.getBinOp()->leftSide;
+    REQUIRE(rl.getType() == ExpressionType::FUNCTION_CALL);
+    REQUIRE(rl.getFunctionCall());
+    REQUIRE(tokenizer.extractToken(rl.getFunctionCall()->name) == "function");
+    CHECK(rl.getFunctionCall()->args.next == nullptr);
+    REQUIRE(rl.getFunctionCall()->args.curr.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(rl.getFunctionCall()->args.curr.getToken()) == "var");
 
-    auto& rr = binOp->rightSide.binOp->rightSide;
-    CHECK(rr.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(rr.value) == "9");
+    auto& rr = binOp->rightSide.getBinOp()->rightSide;
+    CHECK(rr.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(rr.getToken()) == "9");
   }
 
   { // array access with postfix index expression
@@ -229,10 +230,10 @@ TEST_CASE("Expressions", "[parser]") {
     REQUIRE(errorType == ParseExpressionErrorType::NONE);
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
-    CHECK(expression.type == ExpressionType::UNARY_OP);
-    REQUIRE(expression.unOp);
-    CHECK(expression.unOp->operand.type == ExpressionType::VALUE);
-    CHECK(expression.unOp->operand.value.type == TokenType::IDENTIFIER);
+    CHECK(expression.getType() == ExpressionType::UNARY_OP);
+    REQUIRE(expression.getUnOp());
+    CHECK(expression.getUnOp()->operand.getType() == ExpressionType::VALUE);
+    CHECK(expression.getUnOp()->operand.getToken().type == TokenType::IDENTIFIER);
   }
 
    // operator with higher precedence on left node
@@ -246,29 +247,29 @@ TEST_CASE("Expressions", "[parser]") {
     CHECK(parser.unexpected.empty());
     CHECK(parser.expected.empty());
 
-    REQUIRE(expression.type == ExpressionType::BINARY_OP);
-    auto &binOp = expression.binOp;
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    auto binOp = expression.getBinOp();
     REQUIRE(binOp);
     CHECK(binOp->op.type == TokenType::SUBTRACTION);
 
-    REQUIRE(binOp->rightSide.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(binOp->rightSide.value) == "9");
+    REQUIRE(binOp->rightSide.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(binOp->rightSide.getToken()) == "9");
 
-    REQUIRE(binOp->leftSide.type == ExpressionType::BINARY_OP);
-    REQUIRE(binOp->leftSide.binOp);
-    CHECK(binOp->leftSide.binOp->op.type == TokenType::MULTIPLICATION);
+    REQUIRE(binOp->leftSide.getType() == ExpressionType::BINARY_OP);
+    REQUIRE(binOp->leftSide.getBinOp());
+    CHECK(binOp->leftSide.getBinOp()->op.type == TokenType::MULTIPLICATION);
 
-    auto& rl = binOp->leftSide.binOp->rightSide;
-    REQUIRE(rl.type == ExpressionType::FUNCTION_CALL);
-    REQUIRE(rl.funcCall);
-    REQUIRE(tokenizer.extractToken(rl.funcCall->name) == "function");
-    CHECK(rl.funcCall->args.next == nullptr);
-    REQUIRE(rl.funcCall->args.curr.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(rl.funcCall->args.curr.value) == "var");
+    auto& rl = binOp->leftSide.getBinOp()->rightSide;
+    REQUIRE(rl.getType() == ExpressionType::FUNCTION_CALL);
+    REQUIRE(rl.getFunctionCall());
+    REQUIRE(tokenizer.extractToken(rl.getFunctionCall()->name) == "function");
+    CHECK(rl.getFunctionCall()->args.next == nullptr);
+    REQUIRE(rl.getFunctionCall()->args.curr.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(rl.getFunctionCall()->args.curr.getToken()) == "var");
 
-    auto& rr = binOp->leftSide.binOp->leftSide;
-    CHECK(rr.type == ExpressionType::VALUE);
-    CHECK(tokenizer.extractToken(rr.value) == "x");
+    auto& rr = binOp->leftSide.getBinOp()->leftSide;
+    CHECK(rr.getType() == ExpressionType::VALUE);
+    CHECK(tokenizer.extractToken(rr.getToken()) == "x");
   }
 }
 
@@ -720,7 +721,7 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(statement.type == StatementType::CONTROL_FLOW);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
-    CHECK(statement.controlFlow->conditional->ifStatement.condition.type == ExpressionType::VALUE);
+    CHECK(statement.controlFlow->conditional->ifStatement.condition.getType() == ExpressionType::VALUE);
     CHECK(statement.controlFlow->conditional->elifStatement == nullptr);
     CHECK(statement.controlFlow->conditional->elseStatement == nullptr);
   }
@@ -736,8 +737,8 @@ TEST_CASE("Keywords", "[parser]") {
     CHECK(statement.type == StatementType::CONTROL_FLOW);
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::RETURN_STATEMENT);
-    CHECK(statement.controlFlow->returnStatement->returnValue.type == ExpressionType::STRUCT_LITERAL);
-    REQUIRE(statement.controlFlow->returnStatement->returnValue.arrayOrStruct);
+    CHECK(statement.controlFlow->returnStatement->returnValue.getType() == ExpressionType::STRUCT_LITERAL);
+    REQUIRE(statement.controlFlow->returnStatement->returnValue.getArrayOrStructLiteral());
   }
 
   {
@@ -753,8 +754,8 @@ TEST_CASE("Keywords", "[parser]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     auto& forLoop = statement.controlFlow->forLoop;
     CHECK(forLoop->initialize.type == StatementType::VARIABLE_DEC);
-    CHECK(forLoop->condition.type == ExpressionType::BINARY_OP);
-    CHECK(forLoop->iteration.type == ExpressionType::UNARY_OP);
+    CHECK(forLoop->condition.getType() == ExpressionType::BINARY_OP);
+    CHECK(forLoop->iteration.getType() == ExpressionType::UNARY_OP);
     CHECK(forLoop->body.scopeStatements.curr.type == StatementType::EXPRESSION);
     CHECK(forLoop->body.scopeStatements.next == nullptr);
   }

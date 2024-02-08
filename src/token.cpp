@@ -32,8 +32,15 @@ bool isAssignment(TokenType type) {
   return type >= TokenType::ASSIGNMENT && type <= TokenType::SHIFT_RIGHT_ASSIGNMENT;
 }
 
+Token::Token(const Token& tk): type{tk.type}, length{tk.length}, position{tk.position} {}
 bool Token::operator==(const Token& tk) const {
   return position == tk.position && length == tk.length && type == tk.type;
+}
+Token& Token::operator=(const Token& tk) {
+  type = tk.type;
+  length = tk.length;
+  position = tk.position;
+  return *this;
 }
 
 const TokenType numToType [128] {

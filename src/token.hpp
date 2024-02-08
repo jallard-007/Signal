@@ -134,13 +134,19 @@ enum class TokenType : uint8_t {
 };
 
 struct Token {
-  uint32_t position{0};
-  uint16_t length{0};
+  private:
+  char padding __attribute__((__unused__));
+  public:
   TokenType type{TokenType::NONE};
+  uint16_t length{0};
+  uint32_t position{0};
   Token() = default;
-  Token(uint32_t pos, uint16_t len, TokenType t): position{pos}, length{len}, type{t} {}
+  Token(const Token&);
+  Token(uint32_t pos, uint16_t len, TokenType t): type{t}, length{len}, position{pos} {}
   bool operator==(const Token&) const;
+  Token& operator=(const Token&);
 };
+
 
 bool isBuiltInType(TokenType);
 bool isConcreteType(TokenType);

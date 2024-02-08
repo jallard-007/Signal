@@ -19,28 +19,47 @@ enum class ExpressionType: uint8_t {
   VALUE,
   FUNCTION_CALL,
   ARRAY_ACCESS,
-  WRAPPED,
   ARRAY_LITERAL,
   STRUCT_LITERAL,
 };
 
 struct Expression {
+  private:
   union {
+    uint64_t type;
     BinOp *binOp;
     UnOp *unOp;
     Token value;
     FunctionCall *funcCall;
     ArrayAccess *arrAccess;
-    Expression *wrapped;
     ArrayOrStructLiteral *arrayOrStruct;
   };
-  ExpressionType type;
+  public:
   Expression();
   explicit Expression(Token);
   Expression(const Expression&);
   Expression& operator=(const Expression&);
   void prettyPrint(Tokenizer&, std::string&);
   Expression deepCopy(NodeMemPool&);
+  #define EXPRESSION_MASK 0x7
+  inline BinOp* getBinOp() const { return (BinOp *)((uint64_t)binOp & ~EXPRESSION_MASK); } 
+  inline UnOp* getUnOp() const { return (UnOp *)((uint64_t)unOp & ~EXPRESSION_MASK); }
+  inline Token getToken() const { return value; }
+  inline FunctionCall* getFunctionCall() const { return (FunctionCall *)((uint64_t)funcCall & ~EXPRESSION_MASK); }
+  inline ArrayAccess* getArrayAccess() const { return (ArrayAccess *)((uint64_t)arrAccess & ~EXPRESSION_MASK); }
+  inline ArrayOrStructLiteral* getArrayOrStructLiteral() const { return (ArrayOrStructLiteral *)((uint64_t)arrayOrStruct & ~EXPRESSION_MASK); }
+  inline ExpressionType getType() const { return (ExpressionType)(type & EXPRESSION_MASK); }
+
+  #define SET_EXP binOp = (BinOp *)((type & EXPRESSION_MASK) | ((uint64_t)ref & ~EXPRESSION_MASK))
+  inline void setBinOp(BinOp *ref) { SET_EXP; }
+  inline void setUnOp(UnOp *ref) { SET_EXP; }
+  inline void setToken(Token ref) { value = ref; }
+  inline void setFunctionCall(FunctionCall *ref) { SET_EXP; }
+  inline void setArrayAccess(ArrayAccess *ref) { SET_EXP; }
+  inline void setArrayOrStructLiteral(ArrayOrStructLiteral *ref) { SET_EXP; }
+  inline void setType(ExpressionType ref) { type = (type & ~EXPRESSION_MASK) | ((char)ref & EXPRESSION_MASK); }
+  #undef SET_EXP
+  #undef EXPRESSION_MASK
 };
 
 struct ExpressionList {
@@ -164,7 +183,7 @@ struct UnOp {
   Expression operand;
   private:
   // to make the memory layout the same as binOp
-  uint64_t padding[2];
+  Expression padding;
   public:
   Token op;
   UnOp() = delete;

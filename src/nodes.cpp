@@ -12,12 +12,11 @@ bool notFirstOfExpression(TokenType type) {
     type != TokenType::HEX_NUMBER;
 }
 
-Expression::Expression(): binOp{nullptr}, type{ExpressionType::NONE} {}
-Expression::Expression(const Expression& ref): binOp{ref.binOp}, type{ref.type} {}
-Expression::Expression(Token tk): value{tk}, type{ExpressionType::VALUE} {}
+Expression::Expression(): binOp{nullptr} {}
+Expression::Expression(const Expression& ref): binOp{ref.binOp} {}
+Expression::Expression(Token tk): value{tk} {}
 Expression& Expression::operator=(const Expression&ref) {
   binOp = ref.binOp;
-  type = ref.type;
   return *this;
 }
 
@@ -241,8 +240,8 @@ SwitchScopeStatementList SwitchScopeStatementList::deepCopy(NodeMemPool& mem) {
 
 Expression Expression::deepCopy(NodeMemPool& mem) {
   Expression copy;
-  copy.type = type;
-  switch (type) {
+  copy.setType(getType());
+  switch (getType()) {
     case ExpressionType::ARRAY_ACCESS: copy.arrAccess = arrAccess->deepCopy(mem); break;
     case ExpressionType::ARRAY_LITERAL:
     case ExpressionType::STRUCT_LITERAL: copy.arrayOrStruct = arrayOrStruct->deepCopy(mem); break;
@@ -250,7 +249,6 @@ Expression Expression::deepCopy(NodeMemPool& mem) {
     case ExpressionType::FUNCTION_CALL: copy.funcCall = funcCall->deepCopy(mem); break;
     case ExpressionType::UNARY_OP: copy.unOp = unOp->deepCopy(mem); break;
     case ExpressionType::VALUE: copy.value = value; break;
-    case ExpressionType::WRAPPED: copy.wrapped = mem.makeExpression(); *copy.wrapped = wrapped->deepCopy(mem); break;
     case ExpressionType::NONE: break;
   }
   return copy;
@@ -289,7 +287,7 @@ WhileLoop* WhileLoop::deepCopy(NodeMemPool& mem) {
 }
 
 ArrayAccess* ArrayAccess::deepCopy(NodeMemPool& mem) {
-  ArrayAccess* copy = mem.makeArrayAccess(ArrayAccess{array.value});
+  ArrayAccess* copy = mem.makeArrayAccess(ArrayAccess{array.getToken()});
   copy->offset = offset.deepCopy(mem);
   return copy;
 }

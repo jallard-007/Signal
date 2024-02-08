@@ -72,7 +72,7 @@ void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) {
 
 void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {
   str += tk.extractToken(name) + '(';
-  if (args.curr.type != ExpressionType::NONE) {
+  if (args.curr.getType() != ExpressionType::NONE) {
     ExpressionList * iter = &args;
     for (; iter->next; iter = iter->next) {
       iter->curr.prettyPrint(tk, str);
@@ -84,7 +84,7 @@ void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {
 }
 
 void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str) {
-  str += tk.extractToken(array.value) + '[';
+  str += tk.extractToken(array.getToken()) + '[';
   offset.prettyPrint(tk, str);
   str += ']';
 }
@@ -263,18 +263,17 @@ void Program::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
 }
 
 void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
-  if (type == ExpressionType::NONE) {
+  if (getType() == ExpressionType::NONE) {
     return;
   }
-  switch (type) {
-    case ExpressionType::ARRAY_ACCESS: arrAccess->prettyPrint(tk ,str); break;
+  switch (getType()) {
+    case ExpressionType::ARRAY_ACCESS: getArrayAccess()->prettyPrint(tk ,str); break;
     case ExpressionType::ARRAY_LITERAL:
-    case ExpressionType::STRUCT_LITERAL: arrayOrStruct->prettyPrint(tk, str); break;
-    case ExpressionType::BINARY_OP: binOp->prettyPrint(tk, str); break;
-    case ExpressionType::FUNCTION_CALL: funcCall->prettyPrint(tk, str); break;
-    case ExpressionType::UNARY_OP: unOp->prettyPrint(tk, str); break;
-    case ExpressionType::VALUE: str += tk.extractToken(value); break;
-    case ExpressionType::WRAPPED: str += '('; wrapped->prettyPrint(tk, str); str += ')'; break;
+    case ExpressionType::STRUCT_LITERAL: getArrayOrStructLiteral()->prettyPrint(tk, str); break;
+    case ExpressionType::BINARY_OP: getBinOp()->prettyPrint(tk, str); break;
+    case ExpressionType::FUNCTION_CALL: getFunctionCall()->prettyPrint(tk, str); break;
+    case ExpressionType::UNARY_OP: getUnOp()->prettyPrint(tk, str); break;
+    case ExpressionType::VALUE: str += tk.extractToken(getToken()); break;
     case ExpressionType::NONE: break;
     default: str += "{not yet implemented in pretty printer}"; break;
   }
@@ -309,13 +308,13 @@ void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
 void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::FOR) + '(';
   initialize.prettyPrint(tk, str, indentation);
-  if (condition.type == ExpressionType::NONE) {
+  if (condition.getType() == ExpressionType::NONE) {
     str += ';';
   } else {
     str += "; ";
   }
   condition.prettyPrint(tk, str);
-  if (iteration.type == ExpressionType::NONE) {
+  if (iteration.getType() == ExpressionType::NONE) {
     str += ';';
   } else {
     str += "; ";
@@ -327,7 +326,7 @@ void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
 
 void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
   str += typeToString.at(TokenType::RETURN);
-  if (returnValue.type != ExpressionType::NONE) {
+  if (returnValue.getType() != ExpressionType::NONE) {
     str += ' ';
     returnValue.prettyPrint(tk, str);
   }

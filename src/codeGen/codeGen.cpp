@@ -40,7 +40,7 @@ be sure to free registers if they are no longer needed
 
 */
 ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAccess) {
-  if (arrAccess.array.wrapped) {
+  if (arrAccess.array.getBinOp()) {
     return {};
   }
   return {};
@@ -94,33 +94,28 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
 
 
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
-  switch (currExp.type) {
+  switch (currExp.getType()) {
     case ExpressionType::ARRAY_ACCESS: {
-      return generateExpressionArrAccess(*currExp.arrAccess);
+      return generateExpressionArrAccess(*currExp.getArrayAccess());
     }
-    case ExpressionType::ARRAY_LITERAL: {
-      return generateExpressionArrOrStructLit(*currExp.arrayOrStruct);
-    }
+    case ExpressionType::ARRAY_LITERAL:
     case ExpressionType::STRUCT_LITERAL: {
-      return generateExpressionArrOrStructLit(*currExp.arrayOrStruct);
+      return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
     }
     case ExpressionType::BINARY_OP: {
-      return generateExpressionBinOp(*currExp.binOp, controlFlow);
+      return generateExpressionBinOp(*currExp.getBinOp(), controlFlow);
     }
     case ExpressionType::FUNCTION_CALL: {
-      return generateExpressionFunctionCall(*currExp.funcCall);
+      return generateExpressionFunctionCall(*currExp.getFunctionCall());
     }
     case ExpressionType::NONE: {
       return {};
     }
     case ExpressionType::UNARY_OP: {
-      return generateExpressionUnOp(*currExp.unOp);
+      return generateExpressionUnOp(*currExp.getUnOp());
     }
     case ExpressionType::VALUE: {
-      return loadValue(currExp.value);
-    }
-    case ExpressionType::WRAPPED: {
-      return generateExpression(*currExp.wrapped, controlFlow);
+      return loadValue(currExp.getToken());
     }
     default: {
       std::cerr << "Code generation not implemented for this expression type\n";
@@ -1050,7 +1045,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     case ControlFlowStatementType::FOR_LOOP: {
       generateStatement(controlFlowStatement.forLoop->initialize);
       const uint64_t startOfLoopIndex = addMarker(JumpMarkerType::START_LOOP);
-      if (controlFlowStatement.forLoop->condition.type != ExpressionType::NONE) {
+      if (controlFlowStatement.forLoop->condition.getType() != ExpressionType::NONE) {
         ExpressionResult expRes = generateExpression(controlFlowStatement.forLoop->condition);
         if (expRes.jumpOp == OpCodes::NOP) {
           if (!expRes.isReg) {
