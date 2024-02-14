@@ -145,6 +145,7 @@ struct CodeGen {
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
 
+  int alignItemOnStack(uint32_t, Token);
   int getStackOffset(const std::string&);
   unsigned char allocateRegister();
   void freeRegister(unsigned char);

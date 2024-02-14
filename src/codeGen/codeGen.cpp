@@ -1270,41 +1270,55 @@ Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
 }
 
 /**
- * TODO:
+ * 
+ * \returns offset of item based on
+*/
+int CodeGen::alignItemOnStack(uint32_t curr_bp_offset, Token typeToken) {
+  uint32_t sizeOfParameter = 0;
+  uint32_t alignTo = 0;
+  if (typeToken.type == TokenType::IDENTIFIER) {
+    StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
+    sizeOfParameter = structInfo.size;
+    alignTo = structInfo.alignTo;
+  } else {
+    sizeOfParameter = sizeOfType(typeToken);
+    alignTo = sizeOfParameter;
+  }
+  assert(alignTo);
+  const uint32_t mod = curr_bp_offset % alignTo;
+  const uint32_t paddingNeeded = mod != 0 ? alignTo - mod : 0;
+  return curr_bp_offset + paddingNeeded + sizeOfParameter;
+}
+
+/*
+  * Memory layout information needs to be standardized before hand per function,
+  * but generally, memory layout for a function call:
+  *    HIGH ADDRESS                                              LOW ADDRESS
+  * Return Value | Return Address | Argument 1 | Argument 2 | ... | Argument N
+  * 
+  * - Base Pointer is between 'Return Value' and 'Return Address', done by caller.
+  * - Stack Pointer must be 8 byte aligned before calling this, as this function assumes it is
+  * - 'Return Address' can always be accessed at base pointer - 8 since it is the first item to be pushed
+  * - Callee unwinds and destructs all variables below base pointer on return
+  * - 'Return Value' offset is set by caller, and not included in total size
 */
 void CodeGen::standardizeFunctionCall(const FunctionDec& funcDec, FunctionCallMemoryOffsets& memOffsets) {
-  /*
-   * Memory layout information needs to be standardized before hand per function,
-   * but generally, memory layout for a function call:
-   *    HIGH ADDRESS                                              LOW ADDRESS
-   * Return Value | Return Address | Argument 1 | Argument 2 | ... | Argument N
-   * Stack Pointer is at low address (start of argument N) when the function is called
-  */
+  // add return address
+  int bpOffset = sizeof (void *);
+  memOffsets.returnAddress = sizeof (void *);
 
-
-  // need to figure out aligning items on the stack
-
-  memOffsets.totalSize = 0;
-  // first is size, second is alignment
-  std::vector<std::pair<uint32_t, uint32_t>> items;
-
-
+  // add parameters
   if (funcDec.params.curr.type != StatementType::NONE) {
     const StatementList *parameterList = &funcDec.params;
     do {
       const Token typeToken = getTypeFromTokenList(parameterList->curr.varDec->type);
-      uint32_t sizeOfParameter = 0;
-      uint32_t alignTo = 0;
-      if (typeToken.type == TokenType::IDENTIFIER) {
-        StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
-        sizeOfParameter = structInfo.size;
-        alignTo = structInfo.alignTo;
-      } else {
-        sizeOfParameter = sizeOfType(typeToken);
-        alignTo = sizeOfParameter;
-      }
-      items.emplace_back(sizeOfParameter, alignTo);
+      bpOffset = alignItemOnStack(bpOffset, typeToken);
+      memOffsets.parameters.emplace_back(bpOffset);
+      memOffsets.totalSize += bpOffset;
       parameterList = parameterList->next;
     } while (parameterList);
   }
+
+  // set total size based on bpOffset
+  memOffsets.totalSize = bpOffset;
 }

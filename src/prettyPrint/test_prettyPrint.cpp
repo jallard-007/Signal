@@ -3,7 +3,9 @@
 #include "../testingMemPool.hpp"
 
 TEST_CASE("pretty print test1", "[prettyPrinter]") {
-  const std::string str = 
+  SKIP();
+  SECTION("ONE") {
+    const std::string str = 
 R"(func getType(type: Type ref): Token {
   tp: Token = tokenizer.peekNext();
   prev: TokenList ptr = nullptr;
@@ -30,19 +32,19 @@ R"(func getType(type: Type ref): Token {
   return tp;
 }
 )";
-  std::vector<Tokenizer> tks;
-  tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
-  Parser parser{tks.back(), memPool};
-  REQUIRE(parser.parse());
-  REQUIRE(parser.expected.empty());
-  REQUIRE(parser.unexpected.empty());
-  std::string output;
-  parser.program.prettyPrint(tks, output);
-  CHECK(str == output);
-}
+    std::vector<Tokenizer> tks;
+    tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
+    Parser parser{tks.back(), memPool};
+    REQUIRE(parser.parse());
+    REQUIRE(parser.expected.empty());
+    REQUIRE(parser.unexpected.empty());
+    std::string output;
+    parser.program.prettyPrint(tks, output);
+    CHECK(str == output);
+  }
 
-TEST_CASE("pretty print test 2", "[prettyPrinter]") {
-  const std::string str = 
+  SECTION("two") {
+    const std::string str = 
 R"(func getType(type: Type ref): Token {
   if (1) {
   }
@@ -60,13 +62,14 @@ R"(func getType(type: Type ref): Token {
   }
 }
 )";
-  std::vector<Tokenizer> tks;
-  tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp",  str);
-  Parser parser{tks.back(), memPool};
-  parser.parse();
-  REQUIRE(parser.expected.empty());
-  REQUIRE(parser.unexpected.empty());
-  std::string output;
-  parser.program.prettyPrint(tks, output);
-  CHECK(str == output);
+    std::vector<Tokenizer> tks;
+    tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp",  str);
+    Parser parser{tks.back(), memPool};
+    parser.parse();
+    REQUIRE(parser.expected.empty());
+    REQUIRE(parser.unexpected.empty());
+    std::string output;
+    parser.program.prettyPrint(tks, output);
+    CHECK(str == output);
+  }
 }

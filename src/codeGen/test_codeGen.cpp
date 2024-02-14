@@ -155,57 +155,53 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
   }
 }
 
-TEST_CASE("struct info generation", "[codeGen]") {
-  {
-    const std::string str = "struct Thing { x: uint32; }";
+class TestFixture_GetStructInfo {
+  public:
+  StructInformation structInfo;
+  void setUp(const std::string &str) {
     testBoilerPlate(str);
     REQUIRE(parser.parse());
     REQUIRE(checker.check());
-    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+    structInfo = codeGen.getStructInfo("StructName");
+  }
+};
+
+TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
+  SECTION("one") {
+    const std::string str = "struct StructName { x: uint32; }";
+    setUp(str);
     CHECK(structInfo.size == 4);
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["x"] == 0);
   }
-  {
-    const std::string str = "struct Thing { y:bool; x: uint32; }";
-    testBoilerPlate(str);
-    REQUIRE(parser.parse());
-    REQUIRE(checker.check());
-    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+  SECTION("one") {
+    const std::string str = "struct StructName { y:bool; x: uint32; }";
+    setUp(str);
     CHECK(structInfo.size == 8);
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["y"] == 0);
     CHECK(structInfo.offsetMap["x"] == 4);
   }
-  {
-    const std::string str = "struct Thing { x: uint32; y:bool; }";
-    testBoilerPlate(str);
-    REQUIRE(parser.parse());
-    REQUIRE(checker.check());
-    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+  SECTION("one") {
+    const std::string str = "struct StructName { x: uint32; y:bool; }";
+    setUp(str);
     CHECK(structInfo.size == 8);
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["y"] == 4);
     CHECK(structInfo.offsetMap["x"] == 0);
   }
-  {
-    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; }";
-    testBoilerPlate(str);
-    REQUIRE(parser.parse());
-    REQUIRE(checker.check());
-    StructInformation& structInfo = codeGen.getStructInfo("Thing");
+  SECTION("one") {
+    const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
+    setUp(str);
     CHECK(structInfo.size == 12);
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["y"] == 0);
     CHECK(structInfo.offsetMap["x"] == 4);
     CHECK(structInfo.offsetMap["j"] == 8);
   }
-  {
-    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct Thing1 { y:Thing; x: bool; j:uint32 ptr; }";
-    testBoilerPlate(str);
-    REQUIRE(parser.parse());
-    REQUIRE(checker.check());
-    StructInformation& structInfo = codeGen.getStructInfo("Thing1");
+  SECTION("one") {
+    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
+    setUp(str);
     CHECK(structInfo.size == 24);
     CHECK(structInfo.alignTo == 8);
     CHECK(structInfo.offsetMap["y"] == 0);
@@ -281,57 +277,43 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
   }
 }
 
-// TEST_CASE("standardizeFunctionCall", "[codeGen]") {
-//   {
-//     const std::string str = "func testFunction(): void { } ";
-//     testBoilerPlate(str);
-//     REQUIRE(parser.parse());
-//     REQUIRE(checker.check());
-//     auto genDec = checker.lookUp["testFunction"];
-//     REQUIRE(genDec);
-//     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
-//     REQUIRE(genDec->funcDec);
-//     FunctionCallMemoryOffsets memOffsets;
-//     FunctionDec& funcDec = *genDec->funcDec;
-//     codeGen.standardizeFunctionCall(funcDec, memOffsets);
-//     CHECK(memOffsets.returnAddress == 0);
-//     CHECK(memOffsets.returnValue == 8);
-//     CHECK(memOffsets.totalSize == 8);
-//     CHECK(memOffsets.parameters.empty());
-//   }
-//   {
-//     const std::string str = "func testFunction(): int32 { return 10; } ";
-//     testBoilerPlate(str);
-//     REQUIRE(parser.parse());
-//     REQUIRE(checker.check());
-//     auto genDec = checker.lookUp["testFunction"];
-//     REQUIRE(genDec);
-//     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
-//     REQUIRE(genDec->funcDec);
-//     FunctionCallMemoryOffsets memOffsets;
-//     FunctionDec& funcDec = *genDec->funcDec;
-//     codeGen.standardizeFunctionCall(funcDec, memOffsets);
-//     CHECK(memOffsets.returnAddress == 0);
-//     CHECK(memOffsets.returnValue == 8);
-//     CHECK(memOffsets.totalSize == 12);
-//     CHECK(memOffsets.parameters.empty());
-//   }
-//   {
-//     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
-//     testBoilerPlate(str);
-//     REQUIRE(parser.parse());
-//     REQUIRE(checker.check());
-//     auto genDec = checker.lookUp["testFunction"];
-//     REQUIRE(genDec);
-//     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
-//     REQUIRE(genDec->funcDec);
-//     FunctionCallMemoryOffsets memOffsets;
-//     FunctionDec& funcDec = *genDec->funcDec;
-//     codeGen.standardizeFunctionCall(funcDec, memOffsets);
-//     CHECK(memOffsets.returnAddress == 8);
-//     CHECK(memOffsets.returnValue == 16);
-//     CHECK(memOffsets.totalSize == 20);
-//     REQUIRE(memOffsets.parameters.size() == 1);
-//     CHECK(memOffsets.parameters[0] == 0);
-//   }
-// }
+class TestFixture_StandardizeFunctionCall {
+  public:
+  FunctionCallMemoryOffsets memOffsets;
+  void setUp(const std::string &str) {
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.standardizeFunctionCall(funcDec, memOffsets);
+  }
+};
+
+TEST_CASE_METHOD(TestFixture_StandardizeFunctionCall, "standardizeFunctionCall", "[codeGen]") {
+  SECTION("one") {
+    const std::string str = "func testFunction(): void { } ";
+    setUp(str);
+    CHECK(memOffsets.returnAddress == 8);
+    CHECK(memOffsets.totalSize == 8);
+    CHECK(memOffsets.parameters.empty());
+  }
+  SECTION("two") {
+    const std::string str = "func testFunction(): int32 { return 10; } ";
+    setUp(str);
+    CHECK(memOffsets.returnAddress == 8);
+    CHECK(memOffsets.totalSize == 8);
+    CHECK(memOffsets.parameters.empty());
+  }
+  SECTION("two") {
+    const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
+    setUp(str);
+    CHECK(memOffsets.returnAddress == 8);
+    REQUIRE(memOffsets.parameters.size() == 1);
+    CHECK(memOffsets.parameters[0] == 16);
+    CHECK(memOffsets.totalSize == 16);
+  }
+}
