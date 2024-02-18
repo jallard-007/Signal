@@ -1,8 +1,8 @@
 #include <iostream>
 #include <catch2/catch_test_macros.hpp>
 #include "codeGen.hpp"
-#include "../parser/parser.hpp"
-#include "../testingMemPool.hpp"
+#include "../../parser/parser.hpp"
+#include "../../testingMemPool.hpp"
 
 #define uc unsigned char
 
@@ -174,7 +174,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     CHECK(structInfo.alignTo == 4);
     CHECK(structInfo.offsetMap["x"] == 0);
   }
-  SECTION("one") {
+  SECTION("two") {
     const std::string str = "struct StructName { y:bool; x: uint32; }";
     setUp(str);
     CHECK(structInfo.size == 8);
@@ -182,7 +182,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     CHECK(structInfo.offsetMap["y"] == 0);
     CHECK(structInfo.offsetMap["x"] == 4);
   }
-  SECTION("one") {
+  SECTION("three") {
     const std::string str = "struct StructName { x: uint32; y:bool; }";
     setUp(str);
     CHECK(structInfo.size == 8);
@@ -190,7 +190,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     CHECK(structInfo.offsetMap["y"] == 4);
     CHECK(structInfo.offsetMap["x"] == 0);
   }
-  SECTION("one") {
+  SECTION("four") {
     const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
     setUp(str);
     CHECK(structInfo.size == 12);
@@ -199,7 +199,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     CHECK(structInfo.offsetMap["x"] == 4);
     CHECK(structInfo.offsetMap["j"] == 8);
   }
-  SECTION("one") {
+  SECTION("five") {
     const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
     setUp(str);
     CHECK(structInfo.size == 24);
@@ -297,21 +297,18 @@ TEST_CASE_METHOD(TestFixture_StandardizeFunctionCall, "standardizeFunctionCall",
   SECTION("one") {
     const std::string str = "func testFunction(): void { } ";
     setUp(str);
-    CHECK(memOffsets.returnAddress == 8);
     CHECK(memOffsets.totalSize == 8);
     CHECK(memOffsets.parameters.empty());
   }
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
     setUp(str);
-    CHECK(memOffsets.returnAddress == 8);
     CHECK(memOffsets.totalSize == 8);
     CHECK(memOffsets.parameters.empty());
   }
   SECTION("two") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
     setUp(str);
-    CHECK(memOffsets.returnAddress == 8);
     REQUIRE(memOffsets.parameters.size() == 1);
     CHECK(memOffsets.parameters[0] == 16);
     CHECK(memOffsets.totalSize == 16);

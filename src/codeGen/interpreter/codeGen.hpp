@@ -3,10 +3,10 @@
 #include <map>
 #include <array>
 #include <cstdint>
-#include "../nodes.hpp"
-#include "../tokenizer/tokenizer.hpp"
-#include "../bytecodeDesign.hpp"
-#include "../checker/checker.hpp"
+#include "../../nodes.hpp"
+#include "../../tokenizer/tokenizer.hpp"
+#include "../../bytecodeDesign.hpp"
+#include "../../checker/checker.hpp"
 
 struct RegisterInfo {
   bool inUse {false};
@@ -27,7 +27,7 @@ struct StructInformation {
   StructInformation() = default;
 };
 
-enum class JumpMarkerType: uint8_t {
+enum class MarkerType: uint8_t {
   NONE,
   START_IF,
   IF_STATEMENT,
@@ -37,14 +37,15 @@ enum class JumpMarkerType: uint8_t {
   BREAK,
   CONTINUE,
   SHORT_CIRCUIT,
+  RETURN_ADDRESS,
 };
 
-struct JumpMarker {
+struct Marker {
   uint64_t index;
-  JumpMarkerType type;
-  JumpMarker() = delete;
-  JumpMarker(uint64_t, JumpMarkerType);
-  bool operator==(const JumpMarker) const;
+  MarkerType type;
+  Marker() = delete;
+  Marker(uint64_t, MarkerType);
+  bool operator==(const Marker) const;
 };
 
 enum class StackMarkerType: uint8_t {
@@ -76,8 +77,6 @@ struct StackItem {
 
 struct FunctionCallMemoryOffsets {
   std::vector<uint32_t> parameters;
-  uint32_t returnValue = 0;
-  uint32_t returnAddress = 0;
   uint32_t totalSize = 0;
 };
 
@@ -87,7 +86,7 @@ struct CodeGen {
   std::unordered_map<FunctionDec *, FunctionCallMemoryOffsets> functionNameToMemoryOffsets;
   std::map<std::string, uint32_t> variableNameToStackItemIndex;
   std::vector<unsigned char> byteCode;
-  std::vector<JumpMarker> jumpMarkers;
+  std::vector<Marker> jumpMarkers;
   std::vector<StackItem> stack;
   Tokenizer *tk{nullptr};
   Program &program;
@@ -120,8 +119,8 @@ struct CodeGen {
   void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
   void generateIfStatement(const IfStatement&);
-  void updateJumpOpTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE);
-  uint64_t addMarker(JumpMarkerType);
+  void updateJumpOpTo(uint64_t, MarkerType, MarkerType = MarkerType::NONE);
+  uint64_t addMarker(MarkerType);
 
   // scopes
   void generateScope(const Scope&);
