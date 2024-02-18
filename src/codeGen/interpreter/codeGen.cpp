@@ -56,42 +56,27 @@ ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLi
 /**
  * Generates a function call expression
  * \param functionCall the function call node
- * \returns an ExpressionResult object, with val containing the address of the returned value
+ * \returns an ExpressionResult object
  * 
 */
 ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
-
+  // need to lookup return type so we can make room for it
   GeneralDec const *const &generalDec = lookUp[tk->extractToken(functionCall.name)];
-  if (!functionNameToMemoryOffsets.contains(generalDec->funcDec)) {
-    standardizeFunctionCall(*generalDec->funcDec, functionNameToMemoryOffsets[generalDec->funcDec]);
-  }
-  const FunctionCallMemoryOffsets& memOffsets = functionNameToMemoryOffsets[generalDec->funcDec];
-  (void)memOffsets;
-  const uint64_t addressOfReturnValue = byteCode.size();
+  Token returnType = getTypeFromTokenList(generalDec->funcDec->returnType);
+  makeRoomOnStack(returnType, 8);
 
-  // make room for return value
-  const Token returnType = getTypeFromTokenList(generalDec->funcDec->returnType);
-  const uint32_t sizeOfReturnType = sizeOfType(returnType);
-  if (sizeOfReturnType) {
-    addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
-    add4ByteNum(sizeOfReturnType);
+  // add arguments to stack
+  if (functionCall.args.curr.getType() != ExpressionType::NONE) {
+    const ExpressionList *expressionList = &functionCall.args;
+    do {
+      ExpressionResult expRes = generateExpression(expressionList->curr);
+      addExpressionResToStack(expRes);
+    } while (expressionList);
   }
 
-  // add spot for return address
-  addMarker(MarkerType::RETURN_ADDRESS);
-  add8ByteNum(0);
-
-
-  // push arguments to stack
-  // need an identifier lookup
-
-  // jump to function
+  // add function call
   addByteOp(OpCodes::FUNC_CALL);
-  // using the address of the declaration node as a temp,
-  // we can use this address to lookup the functions address later ("linker stage")
-  // using map of uint64_t -> uint64_t, this is populated as generateFunction is called
-  add8ByteNum((uint64_t)generalDec);
-  return {.val = addressOfReturnValue};
+  return {};
 }
 
 
@@ -183,20 +168,21 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string identifier = tk->extractToken(token);
       uint32_t stackItemIndex = variableNameToStackItemIndex[identifier];
       StackVariable &variableInfo = stack[stackItemIndex].variable;
-      if (variableInfo.size > 8) {
+      const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
+      if (sizeOfVar > 8) {
         // too large to fit into a reg, just return offset
         return {.val = variableInfo.offset};
       }
       if (!variableInfo.reg) {
+        // load value into a register
         variableInfo.reg = allocateRegister();
         addBytes({(uc)OpCodes::MOVE, miscIndex, basePointerIndex});
         alignForImm(2, 4);
         addBytes({(uc)OpCodes::SUB_I, miscIndex});
         add4ByteNum(variableInfo.offset);
-        OpCodes loadOp = getLoadOpForSize(variableInfo.size);
+        OpCodes loadOp = getLoadOpForSize(sizeOfVar);
         assert(loadOp != OpCodes::NOP);
         addBytes({(uc)loadOp, variableInfo.reg, miscIndex});
-        // load value into the register
       }
       return {.val = variableInfo.reg, .isReg = true};
     }
@@ -916,7 +902,6 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
   StackItem stackItem {
     .variable = {
       .varDec = varDec,
-      .size = size,
       .offset = offset,
     },
     .type = StackItemType::VARIABLE,
@@ -1197,6 +1182,7 @@ void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
   stack.emplace_back(stackItem);
   addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
   addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
+  // add all params to virtual stack, use/rework 'standardizeFunctionCall'
 }
 
 void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
@@ -1273,18 +1259,19 @@ Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
 
 /**
  * 
- * \returns offset of item based on
+ * \returns offset of item
 */
-int CodeGen::alignItemOnStack(uint32_t curr_bp_offset, Token typeToken) {
+uint32_t CodeGen::getOffsetPushingItemToStack(uint32_t curr_bp_offset, Token typeToken, uint32_t alignTo) {
   uint32_t sizeOfParameter = 0;
-  uint32_t alignTo = 0;
   if (typeToken.type == TokenType::IDENTIFIER) {
-    StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
+    const StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
     sizeOfParameter = structInfo.size;
-    alignTo = structInfo.alignTo;
+    if (!alignTo)
+      alignTo = structInfo.alignTo;
   } else {
     sizeOfParameter = sizeOfType(typeToken);
-    alignTo = sizeOfParameter;
+    if (!alignTo)
+      alignTo = sizeOfParameter;
   }
   assert(alignTo);
   const uint32_t mod = curr_bp_offset % alignTo;
@@ -1292,33 +1279,81 @@ int CodeGen::alignItemOnStack(uint32_t curr_bp_offset, Token typeToken) {
   return curr_bp_offset + paddingNeeded + sizeOfParameter;
 }
 
+void CodeGen::addVarDecToStack(const VariableDec& varDec) {
+  const uint32_t currOffset = getOffsetPushingItemToStack(getCurrOffset(), getTypeFromTokenList(varDec.type));
+  StackItem stackItem {
+    .variable = {
+      .varDec = varDec,
+      .offset = currOffset,
+    },
+    .type = StackItemType::VARIABLE,
+  };
+  stack.emplace_back(stackItem);
+}
+
+uint32_t CodeGen::getCurrOffset() {
+  auto iter = stack.rbegin();
+  while (iter != stack.rend()) {
+    if (iter->type == StackItemType::VARIABLE) {
+      return iter->variable.offset;
+    }
+  }
+  return 0;
+}
+
+void CodeGen::makeRoomOnStack(Token token, uint32_t alignTo) {
+  (void)token;
+  (void)alignTo;
+}
+
+void CodeGen::addExpressionResToStack(const ExpressionResult& expRes) {
+  (void)expRes;
+}
+
 /*
+  * This doesn't actually need to be known before hand, maybe just add to stack of each function...
+  * Naturally, generate each function independently
+  * 
+  * 
   * Memory layout information needs to be standardized before hand per function,
   * but generally, memory layout for a function call:
   *    HIGH ADDRESS                                              LOW ADDRESS
-  * Return Value | Return Address | Argument 1 | Argument 2 | ... | Argument N
+  *  Return Value | Argument 1 | Argument 2 | ... | Argument N | Return Address
   * 
-  * - base pointer is between 'Return Value' and 'Return Address', done by caller.
-  * - 'Return Address' can always be accessed at base pointer - 8 since it is the first item to be pushed
-  * - 'Return Value' offset accessed at base pointer, and not included in total size
-  * - Callee unwinds and destructs all variables below base pointer on return
+  * - Caller needs to 8 byte align 'Return Value'
+  * - Callee unwinds and destructs all variables after 'Return Value' on return
 */
-void CodeGen::standardizeFunctionCall(const FunctionDec& funcDec, FunctionCallMemoryOffsets& memOffsets) {
-  // add space for return address
-  int bpOffset = sizeof (void *);
-
+const FunctionCallMemoryOffsets& CodeGen::standardizeFunctionCall(const FunctionDec& funcDec) {
+  FunctionCallMemoryOffsets& memOffsets = functionNameToMemoryOffsets[&funcDec];
+  if (memOffsets.totalSize) {
+    return memOffsets;
+  }
   // add parameters
+  uint32_t bpOffset = 0;
   if (funcDec.params.curr.type != StatementType::NONE) {
     const StatementList *parameterList = &funcDec.params;
     do {
       const Token typeToken = getTypeFromTokenList(parameterList->curr.varDec->type);
-      bpOffset = alignItemOnStack(bpOffset, typeToken);
+      bpOffset = getOffsetPushingItemToStack(bpOffset, typeToken);
       memOffsets.parameters.emplace_back(bpOffset);
-      memOffsets.totalSize += bpOffset;
       parameterList = parameterList->next;
     } while (parameterList);
   }
+  // add return address
+  bpOffset = getOffsetPushingItemToStack(bpOffset, Token{0, 0, TokenType::POINTER});
+  // set total size based on bpOffset and size of return value
+  memOffsets.totalSize = bpOffset + sizeOfType(getTypeFromTokenList(funcDec.returnType));
 
-  // set total size based on bpOffset
-  memOffsets.totalSize = bpOffset;
+  // want to rotate the offsets such that return address is at 0 (sp)
+  // since it is the last value to be pushed to the stack
+  //                                        sp
+  //                | <- bp started
+  //                |-------bpOffset--------|
+  // |---------memOffsets.totalSize---------|
+  // | return value | args | return address |
+  memOffsets.returnValue = bpOffset;
+  for (uint32_t i = 0; i < memOffsets.parameters.size(); ++i) {
+    memOffsets.parameters[i] = bpOffset - memOffsets.parameters[i];
+  }
+  return memOffsets;
 }

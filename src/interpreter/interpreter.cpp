@@ -74,7 +74,7 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::REALLOCATE: {
-          valAtSP(16) = (u64)realloc((void *)valAtSP(8), *(u64 *)valAtSP(0));
+          valAtSP(16) = (u64)realloc((void *)valAtSP(0), *(u64 *)valAtSP(8));
           sp += 16;
           break;
         }
@@ -84,27 +84,27 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::PRINT_STRING: {
-          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%s", (char *)valAtSP(0));
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(0), "%s", (char *)valAtSP(8));
           sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_CHAR: {
-          *(int32_t *)(sp + 13) = fprintf((FILE *)valAtSP(1), "%c", *(char *)sp);
+          *(int32_t *)(sp + 13) = fprintf((FILE *)valAtSP(0), "%c", *(char *)(sp + 9));
           sp += 13;
           break;
         }
         case BuiltInFunctions::PRINT_SIGNED: {
-          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%" PRId64, (int64_t)valAtSP(0));
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(0), "%" PRId64, (int64_t)valAtSP(8));
           sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_UNSIGNED: {
-          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "%" PRIu64, valAtSP(0));
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(0), "%" PRIu64, valAtSP(8));
           sp += 20;
           break;
         }
         case BuiltInFunctions::PRINT_HEX: {
-          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(8), "0x%08" PRIx64, valAtSP(0));
+          *(int32_t *)(sp + 20) = fprintf((FILE *)valAtSP(0), "0x%08" PRIx64, valAtSP(8));
           sp += 20;
           break;
         }
@@ -119,7 +119,7 @@ void Interpreter::executeNextInstruction() {
           break;
         }
         case BuiltInFunctions::MEM_COPY: {
-          std::memcpy((void *)valAtSP(16), (void *)valAtSP(8), valAtSP(0));
+          std::memcpy((void *)valAtSP(8), (void *)valAtSP(16), valAtSP(0));
           sp += 24;
           break;
         }

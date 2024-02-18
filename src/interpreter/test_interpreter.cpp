@@ -60,8 +60,8 @@ TEST_CASE("print \"Hello World!\"", "[interpreter]") {
   (uc)OpCodes::NOP, (uc)OpCodes::NOP,
   (uc)OpCodes::ADD_I, 11, split[0], split[1], split[2], split[3],
   (uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0,
-  (uc)OpCodes::PUSH_Q, 11,
   (uc)OpCodes::PUSH_Q, dataPointerIndex,
+  (uc)OpCodes::PUSH_Q, 11,
   (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::PRINT_STRING,
   (uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0,
   (uc)OpCodes::PUSH_Q, 11,
@@ -144,12 +144,8 @@ TEST_CASE("jump", "[interpreter]") {
     (uc)OpCodes::CMP, 0, 1,
     (uc)OpCodes::XOR, 3, 3, // set exit reg to 0
     // index 26:
-    (uc)OpCodes::RB_JUMP_E, 24, // jumps to exit
+    (uc)OpCodes::RB_JUMP_E, 8, // jumps to exit
     (uc)OpCodes::MOVE_I, 3, 1, 0, 0, 0, // set exit reg to 1, this is how the test case is checked
-    (uc)OpCodes::MOVE_I, 12, 'P', '\n', 0, 0,
-    (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::PRINT_CHAR,
-    (uc)OpCodes::SHIFT_R_I, 12, 8, 0, 0, 0,// shift reg 12 over so that '\n' is the lsb
-    (uc)OpCodes::CALL_B, (uc)BuiltInFunctions::PRINT_CHAR,
     // index 50:
     (uc)OpCodes::EXIT, 3
   };

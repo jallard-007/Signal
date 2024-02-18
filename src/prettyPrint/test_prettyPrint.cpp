@@ -2,7 +2,7 @@
 #include "../parser/parser.hpp"
 #include "../testingMemPool.hpp"
 
-TEST_CASE("pretty print test1", "[prettyPrinter]") {
+TEST_CASE("pretty print test", "[prettyPrinter]") {
   SKIP();
   SECTION("ONE") {
     const std::string str = 

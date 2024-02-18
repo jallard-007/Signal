@@ -289,7 +289,7 @@ class TestFixture_StandardizeFunctionCall {
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
-    codeGen.standardizeFunctionCall(funcDec, memOffsets);
+    memOffsets = codeGen.standardizeFunctionCall(funcDec);
   }
 };
 
@@ -303,14 +303,16 @@ TEST_CASE_METHOD(TestFixture_StandardizeFunctionCall, "standardizeFunctionCall",
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
     setUp(str);
-    CHECK(memOffsets.totalSize == 8);
+    CHECK(memOffsets.totalSize == 12);
+    CHECK(memOffsets.returnValue == 8);
     CHECK(memOffsets.parameters.empty());
   }
-  SECTION("two") {
+  SECTION("three") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
     setUp(str);
+    CHECK(memOffsets.totalSize == 20);
+    CHECK(memOffsets.returnValue == 16);
     REQUIRE(memOffsets.parameters.size() == 1);
-    CHECK(memOffsets.parameters[0] == 16);
-    CHECK(memOffsets.totalSize == 16);
+    CHECK(memOffsets.parameters[0] == 8);
   }
 }

@@ -56,7 +56,6 @@ enum class StackMarkerType: uint8_t {
 
 struct StackVariable {
   const VariableDec &varDec;
-  uint32_t size = 0;
   uint32_t offset = 0;
   unsigned char reg = 0;
 };
@@ -77,13 +76,14 @@ struct StackItem {
 
 struct FunctionCallMemoryOffsets {
   std::vector<uint32_t> parameters;
+  uint32_t returnValue = 0;
   uint32_t totalSize = 0;
 };
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
-  std::unordered_map<FunctionDec *, FunctionCallMemoryOffsets> functionNameToMemoryOffsets;
+  std::unordered_map<const FunctionDec *, FunctionCallMemoryOffsets> functionNameToMemoryOffsets;
   std::map<std::string, uint32_t> variableNameToStackItemIndex;
   std::vector<unsigned char> byteCode;
   std::vector<Marker> jumpMarkers;
@@ -124,7 +124,7 @@ struct CodeGen {
 
   // scopes
   void generateScope(const Scope&);
-  void standardizeFunctionCall(const FunctionDec&, FunctionCallMemoryOffsets&);
+  const FunctionCallMemoryOffsets& standardizeFunctionCall(const FunctionDec&);
   void startSoftScope();
   void endSoftScope();
   void startFunctionScope(const FunctionDec&);
@@ -144,8 +144,15 @@ struct CodeGen {
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, uint64_t);
 
-  int alignItemOnStack(uint32_t, Token);
+  // stack stuff
+  uint32_t getCurrOffset();
+  void makeRoomOnStack(Token, uint32_t = 0);
+  void addVarDecToStack(const VariableDec&);
+  void addExpressionResToStack(const ExpressionResult&);
+  void addTokenToStack(Token);
+  uint32_t getOffsetPushingItemToStack(uint32_t, Token, uint32_t = 0);
   int getStackOffset(const std::string&);
+
   unsigned char allocateRegister();
   void freeRegister(unsigned char);
   uint32_t sizeOfType(Token);
