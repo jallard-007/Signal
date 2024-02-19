@@ -3,19 +3,28 @@
 
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
 
-Tokenizer::Tokenizer(std::string&& filePath, std::string&& fileContent):
+Tokenizer::Tokenizer(std::string&& filePath, std::vector<unsigned char>&& fileContent):
   filePath{std::move(filePath)}, content{std::move(fileContent)}
 {
-  if (fileContent.length() > UINT32_MAX) {
+  if (fileContent.size() > UINT32_MAX) {
+    exit(1);
+  }
+  newlinePositions.reserve(fileContent.size() / 40);
+  newlinePositions.emplace_back(0);
+}
+Tokenizer::Tokenizer(std::string&& filePath, const std::vector<unsigned char>& fileContent):
+  filePath{std::move(filePath)}, content{fileContent}
+{
+  if (fileContent.size() > UINT32_MAX) {
     exit(1);
   }
   newlinePositions.reserve(fileContent.size() / 40);
   newlinePositions.emplace_back(0);
 }
 Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
-  filePath{std::move(filePath)}, content{fileContent}
+  filePath{std::move(filePath)}, content{fileContent.begin(), fileContent.end() + 1}
 {
-  if (fileContent.length() > UINT32_MAX) {
+  if (fileContent.size() > UINT32_MAX) {
     exit(1);
   }
   newlinePositions.reserve(fileContent.size() / 40);
@@ -692,6 +701,7 @@ void Tokenizer::movePastNewLine() {
 
 const std::string& Tokenizer::extractToken(const Token &token) {
   extracted.resize(token.length);
-  content.copy(extracted.data(), token.length, token.position);
+  ::memcpy(extracted.data(), content.data() + token.position, token.length);
+  // content.copy(extracted.data(), token.length, token.position);
   return extracted;
 }

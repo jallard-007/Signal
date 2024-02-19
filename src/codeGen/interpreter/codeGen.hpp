@@ -37,7 +37,6 @@ enum class MarkerType: uint8_t {
   BREAK,
   CONTINUE,
   SHORT_CIRCUIT,
-  RETURN_ADDRESS,
 };
 
 struct Marker {
@@ -64,27 +63,24 @@ enum class StackItemType: uint8_t {
   NONE,
   MARKER,
   VARIABLE,
+  RETURN_ADDRESS,
+  RETURN_VALUE,
+  BASE_POINTER
 };
 
 struct StackItem {
   union {
     StackVariable variable;
     StackMarkerType marker;
+    uint32_t offset;
   };
   StackItemType type = StackItemType::NONE;
-};
-
-struct FunctionCallMemoryOffsets {
-  std::vector<uint32_t> parameters;
-  uint32_t returnValue = 0;
-  uint32_t totalSize = 0;
 };
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
-  std::unordered_map<const FunctionDec *, FunctionCallMemoryOffsets> functionNameToMemoryOffsets;
-  std::map<std::string, uint32_t> variableNameToStackItemIndex;
+  std::map<std::string, uint32_t> nameToStackItemIndex;
   std::vector<unsigned char> byteCode;
   std::vector<Marker> jumpMarkers;
   std::vector<StackItem> stack;
@@ -110,10 +106,11 @@ struct CodeGen {
 
   ExpressionResult loadValue(const Token&);
 
-  void generateGeneralDeclaration(const GeneralDec&);
-  void generateFunctionDeclaration(const FunctionDec&);
-  uint32_t generateVariableDeclaration(const VariableDec&, bool = true);
-  uint32_t generateVariableDeclarationStructType(const VariableDec&, bool);
+  bool generate();
+  bool generateGeneralDeclaration(const GeneralDec&);
+  bool generateFunctionDeclaration(const FunctionDec&);
+  bool generateVariableDeclaration(const VariableDec&, bool = true);
+  void generateVariableDeclarationStructType(const VariableDec&, bool);
   StructInformation& getStructInfo(const std::string&);
 
   void generateStatement(const Statement&);
@@ -124,7 +121,7 @@ struct CodeGen {
 
   // scopes
   void generateScope(const Scope&);
-  const FunctionCallMemoryOffsets& standardizeFunctionCall(const FunctionDec&);
+  void addFunctionSignatureToVirtualStack(const FunctionDec&);
   void startSoftScope();
   void endSoftScope();
   void startFunctionScope(const FunctionDec&);
@@ -145,9 +142,9 @@ struct CodeGen {
   void moveImmToReg(uint8_t, uint64_t);
 
   // stack stuff
-  uint32_t getCurrOffset();
-  void makeRoomOnStack(Token, uint32_t = 0);
-  void addVarDecToStack(const VariableDec&);
+  uint32_t getCurrStackPointerOffset();
+  void makeRoomOnVirtualStack(Token, uint32_t = 0);
+  StackVariable& addVarDecToVirtualStack(const VariableDec&);
   void addExpressionResToStack(const ExpressionResult&);
   void addTokenToStack(Token);
   uint32_t getOffsetPushingItemToStack(uint32_t, Token, uint32_t = 0);

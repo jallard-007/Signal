@@ -1,0 +1,10 @@
+
+
+func main(): int64 {
+	num1: int64 = 0;
+	if (!num1) {
+		num1 = 1;
+	}
+	exit num1;
+}
+

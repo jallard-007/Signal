@@ -2,9 +2,13 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 #include "../bytecodeDesign.hpp"
 
 struct Interpreter {
+  private:
+  std::vector<unsigned char> __stack;
+  public:
   uint64_t registers [NUM_REGISTERS] {0};
   unsigned char *stack {0};
   unsigned char const * const program;
@@ -18,7 +22,5 @@ struct Interpreter {
     unsigned char *programData,
     uint64_t stackSize
   );
-  ~Interpreter();
   int64_t runProgram();
-  void executeNextInstruction();
 };

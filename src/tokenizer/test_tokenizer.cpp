@@ -1,13 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include "tokenizer.hpp"
 
-TokenType firstToken(const char* c) {
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  c};
+TokenType firstToken(const std::string& str) {
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", str};
    return tokenizer.tokenizeNext().type;
 }
 
-TokenType tokenAtN(const char* c, uint32_t n) {
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp",  c};
+TokenType tokenAtN(const std::string& str, uint32_t n) {
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", str};
    for (uint32_t i = 0; i < n; ++i) {
       tokenizer.tokenizeNext();
    }
@@ -140,8 +140,8 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    std::vector<Token> tokens;
    {
-   std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", std::move(str)};
+   const std::string str = "func functionName(content:char ptr, size:int)\n# this is a comment\nnotAComment  ";
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", str};
    tokens.clear();
    tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 14);
@@ -155,8 +155,8 @@ TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {
    }
 
    {
-   std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
-   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", std::move(str)};
+   const std::string str = "0xFFF 0b10101101 0xFABDECAAaaffbceda1010199747393";
+   Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", str};
    tokens.clear();
    tokenizer.tokenizeAll(tokens);
    REQUIRE(tokens.size() == 4);

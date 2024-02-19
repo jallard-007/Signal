@@ -19,23 +19,11 @@ Interpreter::Interpreter(
   uc *programData,
   uint64_t stackSize
 ): program{programInstructions} {
-  stack = new uc [stackSize];
+  __stack.resize(stackSize);
+  stack = __stack.data();
   sp = (uint64_t)stack + stackSize;
   bp = sp;
   dp = (uint64_t)programData;
-}
-
-Interpreter::~Interpreter() {
-  if (stack) {
-    delete[] stack;
-  }
-}
-
-int64_t Interpreter::runProgram() {
-  while (running) {
-    executeNextInstruction();
-  }
-  return exitCode;
 }
 
 #define arithmeticOp(op) \
@@ -54,8 +42,16 @@ int64_t Interpreter::runProgram() {
   *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(program+ip+2); \
   ip += 10
 
-void Interpreter::executeNextInstruction() {
+int64_t Interpreter::runProgram() {
+  while (running) {
   OpCodes op = (OpCodes)program[ip++];
+  #define MY_DEBUG
+  #ifdef MY_DEBUG
+  uint32_t arg1 = program[ip];
+  (void)arg1;
+  uint32_t arg2 = program[ip+1];
+  (void)arg2;
+  #endif
   switch (op) {
     case OpCodes::NOP: {
       break;
@@ -146,7 +142,7 @@ void Interpreter::executeNextInstruction() {
       break;
     }
     case OpCodes::SET_Z: {
-      z = registers[program[ip++]];
+      z = !registers[program[ip++]];
       break;
     }
     case OpCodes::SET_P: {
@@ -514,4 +510,6 @@ void Interpreter::executeNextInstruction() {
       break;
     }
   }
+  }
+  return exitCode;
 }

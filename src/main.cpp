@@ -6,21 +6,8 @@
 #include <chrono>
 #include "./parser/parser.hpp"
 #include "./checker/checker.hpp"
-
-bool openAndReadFile(const std::string& file, std::string& buffer) {
-  std::ifstream t(file);
-  if (!t.is_open()) {
-    std::cerr << "Could not open file: " << file << '\n';
-    return false;
-  }
-  t.seekg(0, std::ios::end);
-  size_t size = t.tellg();
-  buffer.resize(size);
-  t.seekg(0);
-  t.read(&buffer[0], size);
-  t.close();
-  return true;
-}
+#include "./codeGen/interpreter/codeGen.hpp"
+#include "./utils.hpp"
 
 /**
  * Splits a file path by /, separating the directories
@@ -53,7 +40,7 @@ int main(int argc, char **argv) {
   // try to open the cl argument
   std::string mainFile = argv[1];
   std::cout << "Filepath: " << mainFile << '\n';
-  std::string buffer;
+  std::vector<unsigned char> buffer;
   if (!openAndReadFile(mainFile, buffer)) {
     return 1;
   }
@@ -179,5 +166,19 @@ int main(int argc, char **argv) {
   if (checker.errors.size() == MAX_ERRORS) {
     std::cout << "Max errors reached\n";
   }
-  return !checker.errors.empty();
+  if (!checker.errors.empty()) {
+    return 1;
+  }
+  CodeGen codeGen{parser.program, tokenizers, checker.lookUp};
+  if (parser.program.decs.curr.type == GeneralDecType::NONE) {
+    return 1;
+  }
+  codeGen.tk = &tokenizers[parser.program.decs.curr.tokenizerIndex];
+  if (!codeGen.generate()) {
+    return 1;
+  }
+  if (!openAndWriteFile("out.bin", codeGen.byteCode)) {
+    return 1;
+  }
+  return 0;
 }

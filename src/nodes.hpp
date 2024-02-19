@@ -19,8 +19,8 @@ enum class ExpressionType: uint8_t {
   VALUE,
   FUNCTION_CALL,
   ARRAY_ACCESS,
-  ARRAY_LITERAL,
-  STRUCT_LITERAL,
+  // ARRAY_LITERAL,
+  // STRUCT_LITERAL,
 };
 
 struct Expression {

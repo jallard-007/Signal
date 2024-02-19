@@ -86,9 +86,9 @@ func functionName(param1: int32, param2: customType): bool {
 }
 
 struct customType {
-  size: uint64 = 0;
-  position: uint64 = 0;
-  data: char ptr = nullptr;
+  size: uint64;
+  position: uint64;
+  data: char ptr;
 }
 
 )";
@@ -126,9 +126,9 @@ func functionName(param1: int32, param2: customType): bool {
 }
 
 struct customType {
-  size: uint64 = 0;
-  position: uint64 = 0;
-  data: char ptr = nullptr;
+  size: uint64;
+  position: uint64;
+  data: char ptr;
 }
 
 )";

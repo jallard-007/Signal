@@ -63,8 +63,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     ParseStatementErrorType errorType = parser.parseStatement(statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
-    uint32_t size = codeGen.generateVariableDeclaration(*statement.varDec);
-    CHECK(size == 4);
+    codeGen.generateVariableDeclaration(*statement.varDec);
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
@@ -77,8 +76,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     ParseStatementErrorType errorType = parser.parseStatement(statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
-    uint32_t size = codeGen.generateVariableDeclaration(*statement.varDec);
-    CHECK(size == 4);
+    codeGen.generateVariableDeclaration(*statement.varDec);
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::MOVE_I, 1, 10, 0, 0, 0});
@@ -277,10 +275,9 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
   }
 }
 
-class TestFixture_StandardizeFunctionCall {
-  public:
-  FunctionCallMemoryOffsets memOffsets;
-  void setUp(const std::string &str) {
+TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
+  SECTION("one") {
+    const std::string str = "func testFunction(): void { } ";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
     REQUIRE(checker.check());
@@ -289,30 +286,47 @@ class TestFixture_StandardizeFunctionCall {
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
-    memOffsets = codeGen.standardizeFunctionCall(funcDec);
-  }
-};
-
-TEST_CASE_METHOD(TestFixture_StandardizeFunctionCall, "standardizeFunctionCall", "[codeGen]") {
-  SECTION("one") {
-    const std::string str = "func testFunction(): void { } ";
-    setUp(str);
-    CHECK(memOffsets.totalSize == 8);
-    CHECK(memOffsets.parameters.empty());
+    codeGen.addFunctionSignatureToVirtualStack(funcDec);
+    REQUIRE(codeGen.stack.size() == 1);
+    CHECK(codeGen.stack[0].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stack[0].offset == 8);
   }
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
-    setUp(str);
-    CHECK(memOffsets.totalSize == 12);
-    CHECK(memOffsets.returnValue == 8);
-    CHECK(memOffsets.parameters.empty());
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.addFunctionSignatureToVirtualStack(funcDec);
+    REQUIRE(codeGen.stack.size() == 2);
+    CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
+    CHECK(codeGen.stack[0].offset == 8);
+    CHECK(codeGen.stack[1].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stack[1].offset == 16);
   }
   SECTION("three") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
-    setUp(str);
-    CHECK(memOffsets.totalSize == 20);
-    CHECK(memOffsets.returnValue == 16);
-    REQUIRE(memOffsets.parameters.size() == 1);
-    CHECK(memOffsets.parameters[0] == 8);
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.addFunctionSignatureToVirtualStack(funcDec);
+    REQUIRE(codeGen.stack.size() == 3);
+    CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
+    CHECK(codeGen.stack[0].offset == 8);
+    CHECK(codeGen.stack[1].type == StackItemType::VARIABLE);
+    CHECK(codeGen.stack[1].variable.offset == 16);
+    CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
+    CHECK(codeGen.stack[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
+    CHECK(codeGen.stack[2].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stack[2].offset == 24);
   }
 }

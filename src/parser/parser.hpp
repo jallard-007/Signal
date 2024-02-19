@@ -3,9 +3,15 @@
 #include "../tokenizer/tokenizer.hpp"
 #include "../nodeMemPool.hpp"
 
+enum class UnexpectedType : uint8_t {
+  NONE,
+  STRUCT_MEMBER_INITIALIZE_UNSUPPORTED,
+};
+
 struct Unexpected {
   Token token;
   uint32_t tkIndex;
+  UnexpectedType unexpectedType = UnexpectedType::NONE;
   Unexpected() = delete;
   explicit Unexpected(const Token&, uint32_t);
   std::string getErrorMessage(std::vector<Tokenizer>&);

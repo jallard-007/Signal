@@ -6,10 +6,10 @@ Token getTokenOfExpression(Expression& exp) {
     case ExpressionType::ARRAY_ACCESS: {
       return getTokenOfExpression(exp.getArrayAccess()->array);
     }
-    case ExpressionType::ARRAY_LITERAL: 
-    case ExpressionType::STRUCT_LITERAL: {
-      return getTokenOfExpression(exp.getArrayOrStructLiteral()->values.curr);
-    }
+    // case ExpressionType::ARRAY_LITERAL: 
+    // case ExpressionType::STRUCT_LITERAL: {
+    //   return getTokenOfExpression(exp.getArrayOrStructLiteral()->values.curr);
+    // }
     case ExpressionType::BINARY_OP: {
       return exp.getBinOp()->op;
     }
@@ -895,10 +895,10 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
       return {arrayType.type->next, true};
     }
     
-    case ExpressionType::ARRAY_LITERAL:
-    case ExpressionType::STRUCT_LITERAL: {
-      return {&badValue, false};
-    }
+    // case ExpressionType::ARRAY_LITERAL:
+    // case ExpressionType::STRUCT_LITERAL: {
+    //   return {&badValue, false};
+    // }
 
     case ExpressionType::NONE: {
       return {&noneValue, false};

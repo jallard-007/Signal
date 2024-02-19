@@ -63,7 +63,7 @@ R"(func getType(type: Type ref): Token {
 }
 )";
     std::vector<Tokenizer> tks;
-    tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp",  str);
+    tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
     Parser parser{tks.back(), memPool};
     parser.parse();
     REQUIRE(parser.expected.empty());

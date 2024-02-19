@@ -63,8 +63,9 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   // need to lookup return type so we can make room for it
   GeneralDec const *const &generalDec = lookUp[tk->extractToken(functionCall.name)];
   Token returnType = getTypeFromTokenList(generalDec->funcDec->returnType);
-  makeRoomOnStack(returnType, 8);
-
+  (void)returnType;
+  // 8 byte align return type since function assumes it is
+  // makeRoomOnStack(returnType, 8);
   // add arguments to stack
   if (functionCall.args.curr.getType() != ExpressionType::NONE) {
     const ExpressionList *expressionList = &functionCall.args;
@@ -79,16 +80,30 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   return {};
 }
 
+bool CodeGen::generate() {
+  const GeneralDecList* decList = &program.decs;
+  if (decList->curr.type == GeneralDecType::NONE) {
+    return false;
+  }
+  do {
+    if (!generateGeneralDeclaration(decList->curr)) {
+      return false;
+    }
+    decList = decList->next;
+  } while (decList);
+  return true;
+}
+
 
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
   switch (currExp.getType()) {
     case ExpressionType::ARRAY_ACCESS: {
       return generateExpressionArrAccess(*currExp.getArrayAccess());
     }
-    case ExpressionType::ARRAY_LITERAL:
-    case ExpressionType::STRUCT_LITERAL: {
-      return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
-    }
+    // case ExpressionType::ARRAY_LITERAL:
+    // case ExpressionType::STRUCT_LITERAL: {
+    //   return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
+    // }
     case ExpressionType::BINARY_OP: {
       return generateExpressionBinOp(*currExp.getBinOp(), controlFlow);
     }
@@ -166,20 +181,25 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::IDENTIFIER: {
       std::string identifier = tk->extractToken(token);
-      uint32_t stackItemIndex = variableNameToStackItemIndex[identifier];
+      uint32_t stackItemIndex = nameToStackItemIndex[identifier];
       StackVariable &variableInfo = stack[stackItemIndex].variable;
       const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
+      // |                   | <- sp
+      // |       | <- offset
+      // | value |
+      const uint32_t spOffset = getCurrStackPointerOffset();
+      const uint32_t varOffset = spOffset - variableInfo.offset;
       if (sizeOfVar > 8) {
         // too large to fit into a reg, just return offset
-        return {.val = variableInfo.offset};
+        return {.val = varOffset};
       }
       if (!variableInfo.reg) {
         // load value into a register
         variableInfo.reg = allocateRegister();
-        addBytes({(uc)OpCodes::MOVE, miscIndex, basePointerIndex});
+        addBytes({(uc)OpCodes::MOVE, miscIndex, stackPointerIndex});
         alignForImm(2, 4);
-        addBytes({(uc)OpCodes::SUB_I, miscIndex});
-        add4ByteNum(variableInfo.offset);
+        addBytes({(uc)OpCodes::ADD_I, miscIndex});
+        add4ByteNum(varOffset);
         OpCodes loadOp = getLoadOpForSize(sizeOfVar);
         assert(loadOp != OpCodes::NOP);
         addBytes({(uc)loadOp, variableInfo.reg, miscIndex});
@@ -451,6 +471,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     if (!rightResult.isReg) {
       uc reg = allocateRegister();
       addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+      alignForImm(2, 4);
       addBytes({(uc)op, (uc)reg});
       add4ByteNum(uint32_t(rightResult.val));
       return {.val = reg, .isReg = true, .isTemp = true};
@@ -684,6 +705,12 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
         expRes.val = reg;
         expRes.isReg = true;
         expRes.isTemp = true;
+      } else if (!expRes.isTemp) {
+        const uc reg = allocateRegister();
+        addBytes({(uc)OpCodes::MOVE, reg, (uc)expRes.val});
+        expRes.val = reg;
+        expRes.isReg = true;
+        expRes.isTemp = true;
       }
       addBytes({(uc)OpCodes::NOT, (uc)expRes.val});
       return expRes;
@@ -779,7 +806,7 @@ uint32_t CodeGen::sizeOfType(const Token token) {
 }
 
 
-void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
+bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
   switch(genDec.type) {
     case GeneralDecType::NONE: {
       break;
@@ -789,12 +816,10 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
       exit(1);
     }
     case GeneralDecType::VARIABLE: {
-      generateVariableDeclaration(*genDec.varDec);
-      break;
+      return generateVariableDeclaration(*genDec.varDec);
     }
     case GeneralDecType::FUNCTION: {
-      generateFunctionDeclaration(*genDec.funcDec);
-      break;
+      return generateFunctionDeclaration(*genDec.funcDec);
     }
     case GeneralDecType::ENUM: {
       std::cerr << "Unsupported dec ENUM\n";
@@ -812,6 +837,7 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
       break;
     }
   }
+  return true;
 }
 
 
@@ -819,10 +845,15 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * Have to figure out stack alignment
  * \returns the size of the type
 */
-uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
   uc reg = 0;
   const Token typeToken = getTypeFromTokenList(varDec.type);
-  uint32_t size = 0;
+  const uint32_t size = sizeOfType(typeToken);
+  const uint32_t preAddStackPointerOffset = getCurrStackPointerOffset();
+  StackVariable& stackVar = addVarDecToVirtualStack(varDec);
+  const uint32_t diff = stackVar.offset - preAddStackPointerOffset;
+  const uint32_t padding = diff - size;
+  assert(padding < size);
   if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
     if (initialize && varDec.initialAssignment) {
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
@@ -832,12 +863,9 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
       } else {
         reg = (uc)expRes.val;
       }
+      stackVar.reg = reg;
     }
-    size = sizeOfType(typeToken);
     switch (size) {
-      case 0: {
-        break;
-      }
       case 1: {
         if (reg) {
           addBytes({(uc)OpCodes::PUSH_B, (uc)reg});
@@ -848,30 +876,46 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
       }
       case 2: {
         if (reg) {
+          if (padding) {
+            addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+          }
           addBytes({(uc)OpCodes::PUSH_W, (uc)reg});
         } else {
-          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
-          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+          alignForImm(2, 4);
+          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          add4ByteNum(size + padding);
         }
         break;
       }
       case 4: {
         if (reg) {
+          // add padding to align
+          if (padding) {
+            alignForImm(2, 4);
+            addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+            add4ByteNum(padding);
+          }
+          // push value to stack
           addBytes({(uc)OpCodes::PUSH_D, (uc)reg});
         } else {
           alignForImm(2, 4);
           addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
-          add4ByteNum(size);
+          add4ByteNum(size + padding);
         }
         break;
       }
       case 8: {
         if (reg) {
+          if (padding) {
+            alignForImm(2, 4);
+            addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+            add4ByteNum(padding);
+          }
           addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
         } else {
           alignForImm(2, 4);
           addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
-          add4ByteNum(size);
+          add4ByteNum(size + padding);
         }
         break;
       }
@@ -882,32 +926,36 @@ uint32_t CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool in
     }
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
-    size = generateVariableDeclarationStructType(varDec, initialize);
+    alignForImm(2, 4);
+    addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+    add4ByteNum(size + padding);
+    // generateVariableDeclarationStructType(varDec, initialize);
   }
   else {
     std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
     exit(1);
   }
-  uint32_t offset = size;
-  for (StackItem &item : stack) {
-    if (item.type == StackItemType::MARKER) {
-      if (item.marker == StackMarkerType::HARD_SCOPE_START) {
-        break;
-      }
-    } else if (item.type == StackItemType::VARIABLE) {
-      offset = item.variable.offset + size;
-      break;
-    }
-  }
-  StackItem stackItem {
-    .variable = {
-      .varDec = varDec,
-      .offset = offset,
-    },
-    .type = StackItemType::VARIABLE,
-  };
-  stack.emplace_back(stackItem);
-  return size;
+  // adding to stack
+  // uint32_t offset = size;
+  // for (StackItem &item : stack) {
+  //   if (item.type == StackItemType::MARKER) {
+  //     if (item.marker == StackMarkerType::HARD_SCOPE_START) {
+  //       break;
+  //     }
+  //   } else if (item.type == StackItemType::VARIABLE) {
+  //     offset = item.variable.offset + size;
+  //     break;
+  //   }
+  // }
+  // StackItem stackItem {
+  //   .variable = {
+  //     .varDec = varDec,
+  //     .offset = offset,
+  //   },
+  //   .type = StackItemType::VARIABLE,
+  // };
+  // stack.emplace_back(stackItem);
+  return true;
 }
 
 StructInformation& CodeGen::getStructInfo(const std::string& structName) {
@@ -960,10 +1008,10 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
 }
 
 /**
- * TODO:
- * 
+ * UNUSED
 */
-uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
+void CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
+  assert (false);
   std::string structName = tk->extractToken(varDec.type.token);
   GeneralDec const * const &generalDec = lookUp[structName];
   Tokenizer *oldTk = tk;
@@ -976,7 +1024,6 @@ uint32_t CodeGen::generateVariableDeclarationStructType(const VariableDec& varDe
     structDecList = structDecList->next;
   }
   tk = oldTk;
-  return 999;
 }
 
 uint64_t CodeGen::addMarker(MarkerType type) {
@@ -1114,9 +1161,16 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
-      break;
+
     }
     case ControlFlowStatementType::EXIT_STATEMENT: {
+      ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
+      if (!expRes.isReg) {
+        const uc reg = allocateRegister();
+        moveImmToReg(reg, expRes.val);
+        expRes.val = reg;
+      }
+      addBytes({(uc)OpCodes::EXIT, (uc)expRes.val});
       break;
     }
     case ControlFlowStatementType::SWITCH_STATEMENT: {
@@ -1141,11 +1195,12 @@ void CodeGen::generateScope(const Scope& scope) {
   endSoftScope();
 }
 
-void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
+bool CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
   // we want callee to handle unwinding arguments from stack
   startFunctionScope(funcDec);
   generateScope(funcDec.body);
   endFunctionScope(funcDec);
+  return true;
 }
 
 void CodeGen::startSoftScope() {
@@ -1174,19 +1229,22 @@ void CodeGen::endSoftScope() {
 }
 
 void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
-  StackItem stackItem {
+  StackItem scopeMarker {
     .marker = StackMarkerType::HARD_SCOPE_START,
     .type = StackItemType::MARKER
   };
-  (void)funcDec;
-  stack.emplace_back(stackItem);
-  addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
-  addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
-  // add all params to virtual stack, use/rework 'standardizeFunctionCall'
+  stack.emplace_back(scopeMarker);
+  addFunctionSignatureToVirtualStack(funcDec);
+  // StackItem basePointerMarker {
+  //   .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), Token{0, 0, TokenType::POINTER}),
+  //   .type = StackItemType::BASE_POINTER
+  // };
+  // stack.emplace_back(basePointerMarker);
+  // addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
+  // addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
 }
 
 void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
-  endSoftScope();
   (void)funcDec;
   while (!stack.empty()) {
     // shouldn't need this marker as this *should* always be the first item in the stack
@@ -1273,35 +1331,42 @@ uint32_t CodeGen::getOffsetPushingItemToStack(uint32_t curr_bp_offset, Token typ
     if (!alignTo)
       alignTo = sizeOfParameter;
   }
+  if (alignTo > sizeOfParameter) {
+    sizeOfParameter = alignTo;
+  }
   assert(alignTo);
   const uint32_t mod = curr_bp_offset % alignTo;
   const uint32_t paddingNeeded = mod != 0 ? alignTo - mod : 0;
   return curr_bp_offset + paddingNeeded + sizeOfParameter;
 }
 
-void CodeGen::addVarDecToStack(const VariableDec& varDec) {
-  const uint32_t currOffset = getOffsetPushingItemToStack(getCurrOffset(), getTypeFromTokenList(varDec.type));
+StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
   StackItem stackItem {
     .variable = {
       .varDec = varDec,
-      .offset = currOffset,
+      .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), getTypeFromTokenList(varDec.type)),
     },
     .type = StackItemType::VARIABLE,
   };
+  nameToStackItemIndex[tk->extractToken(varDec.name)] = stack.size();
   stack.emplace_back(stackItem);
+  return stack.back().variable;
 }
 
-uint32_t CodeGen::getCurrOffset() {
+uint32_t CodeGen::getCurrStackPointerOffset() {
   auto iter = stack.rbegin();
   while (iter != stack.rend()) {
     if (iter->type == StackItemType::VARIABLE) {
       return iter->variable.offset;
+    } else if (iter->type != StackItemType::MARKER) {
+      return iter->offset;
     }
+    ++iter;
   }
   return 0;
 }
 
-void CodeGen::makeRoomOnStack(Token token, uint32_t alignTo) {
+void CodeGen::makeRoomOnVirtualStack(Token token, uint32_t alignTo) {
   (void)token;
   (void)alignTo;
 }
@@ -1323,37 +1388,31 @@ void CodeGen::addExpressionResToStack(const ExpressionResult& expRes) {
   * - Caller needs to 8 byte align 'Return Value'
   * - Callee unwinds and destructs all variables after 'Return Value' on return
 */
-const FunctionCallMemoryOffsets& CodeGen::standardizeFunctionCall(const FunctionDec& funcDec) {
-  FunctionCallMemoryOffsets& memOffsets = functionNameToMemoryOffsets[&funcDec];
-  if (memOffsets.totalSize) {
-    return memOffsets;
+void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
+  // add return value, 8 byte aligned
+  if (funcDec.returnType.token.type != TokenType::VOID) {
+    StackItem returnValue {
+      .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), getTypeFromTokenList(funcDec.returnType), 8),
+      .type = StackItemType::RETURN_VALUE,
+    };
+    nameToStackItemIndex["-rv"] = stack.size();
+    stack.emplace_back(returnValue);
   }
+
   // add parameters
-  uint32_t bpOffset = 0;
   if (funcDec.params.curr.type != StatementType::NONE) {
     const StatementList *parameterList = &funcDec.params;
     do {
-      const Token typeToken = getTypeFromTokenList(parameterList->curr.varDec->type);
-      bpOffset = getOffsetPushingItemToStack(bpOffset, typeToken);
-      memOffsets.parameters.emplace_back(bpOffset);
+      addVarDecToVirtualStack(*parameterList->curr.varDec);
       parameterList = parameterList->next;
     } while (parameterList);
   }
-  // add return address
-  bpOffset = getOffsetPushingItemToStack(bpOffset, Token{0, 0, TokenType::POINTER});
-  // set total size based on bpOffset and size of return value
-  memOffsets.totalSize = bpOffset + sizeOfType(getTypeFromTokenList(funcDec.returnType));
 
-  // want to rotate the offsets such that return address is at 0 (sp)
-  // since it is the last value to be pushed to the stack
-  //                                        sp
-  //                | <- bp started
-  //                |-------bpOffset--------|
-  // |---------memOffsets.totalSize---------|
-  // | return value | args | return address |
-  memOffsets.returnValue = bpOffset;
-  for (uint32_t i = 0; i < memOffsets.parameters.size(); ++i) {
-    memOffsets.parameters[i] = bpOffset - memOffsets.parameters[i];
-  }
-  return memOffsets;
+  // add return address
+  StackItem returnAddress {
+    .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), Token{0, 0, TokenType::POINTER}),
+    .type = StackItemType::RETURN_ADDRESS,
+  };
+  nameToStackItemIndex["-ra"] = stack.size();
+  stack.emplace_back(returnAddress);
 }
