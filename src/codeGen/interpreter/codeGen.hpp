@@ -116,7 +116,7 @@ struct CodeGen {
   void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
   void generateIfStatement(const IfStatement&);
-  void updateJumpOpTo(uint64_t, MarkerType, MarkerType = MarkerType::NONE);
+  void updateJumpMarkersTo(uint64_t, MarkerType, MarkerType = MarkerType::NONE);
   uint64_t addMarker(MarkerType);
 
   // scopes
@@ -136,6 +136,9 @@ struct CodeGen {
   void add8ByteNum(const uint64_t);
   void addBytesBasedOnEndianess(const void *, uint64_t);
   void addPointer();
+  void addJumpOp(OpCodes);
+
+  void updateJumpOpTo(uint64_t, uint64_t);
 
 
   void alignForImm(uint32_t, uint32_t);

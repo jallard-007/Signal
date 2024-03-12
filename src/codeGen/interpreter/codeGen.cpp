@@ -75,8 +75,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     } while (expressionList);
   }
 
-  // add function call
-  addByteOp(OpCodes::FUNC_CALL);
+  // add function call ?
   return {};
 }
 
@@ -290,6 +289,15 @@ void CodeGen::addPointer() {
 }
 
 /**
+ * Used to add a jump op when the offset of the jump is unknown (for branches)
+*/
+void CodeGen::addJumpOp(OpCodes jumpOp) {
+  assert(jumpOp >= OpCodes::RS_JUMP && jumpOp <= OpCodes::RS_JUMP_LE);
+  addByteOp(jumpOp);
+  addByte(0);
+}
+
+/**
  * Align for size byte immediate with offset
  * Use before any instruction that has an immediate value
  * Param offset: number of bytes before immediate
@@ -364,16 +372,16 @@ bool isCommutative(OpCodes op) {
  * Does bit shifting as necessary with 4 byte immediate limit
 */
 void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
-  uc* split = (unsigned char *)&val; // split 8 byte val into array of 8 1 byte values
   if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
     // add value in little endian format
+    alignForImm(2, 8);
+    addBytes({(uc)OpCodes::MOVE_LI, reg});
+    add8ByteNum(val);
+  } else {
     alignForImm(2, 4);
-    addBytes({(uc)OpCodes::MOVE_I, reg, split[4], split[5], split[6], split[7]});
-    alignForImm(2, 4);
-    addBytes({(uc)OpCodes::SHIFT_L_I, reg, 32, 0, 0, 0});
+    addBytes({(uc)OpCodes::MOVE_I, reg});
+    add4ByteNum(val);
   }
-  alignForImm(2, 4);
-  addBytes({(uc)OpCodes::MOVE_I, reg, split[0], split[1], split[2], split[3]});
 }
 
 /**
@@ -544,17 +552,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
   // short-circuit logical ops
   if (binOp.op.type == TokenType::LOGICAL_AND) {
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    alignForImm(1, 8);
     addMarker(MarkerType::SHORT_CIRCUIT);
-    addByteOp(OpCodes::JUMP_E);
-    add8ByteNum(0);
+    addJumpOp(OpCodes::RS_JUMP_E);
   }
   else if (binOp.op.type == TokenType::LOGICAL_OR) {
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    alignForImm(1, 8);
     addMarker(MarkerType::SHORT_CIRCUIT);
-    addByteOp(OpCodes::JUMP_NE);
-    add8ByteNum(0);
+    addJumpOp(OpCodes::RS_JUMP_NE);
   }
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   if (!rightResult.isReg) {
@@ -565,7 +569,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     rightResult.isTemp = true;
   }
   addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
-  updateJumpOpTo(byteCode.size(), MarkerType::SHORT_CIRCUIT);
+  updateJumpMarkersTo(byteCode.size(), MarkerType::SHORT_CIRCUIT);
   if (rightResult.isTemp) {
     freeRegister((uc)rightResult.val);
   }
@@ -665,28 +669,28 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
     // figure out marker system to allow replacement of jump instruction values
     // logical
     case TokenType::EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_NE, OpCodes::GET_E, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_NE, OpCodes::GET_E, controlFlow);
     }
     case TokenType::NOT_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_AND: {
-      return booleanBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_OR: {
-      return booleanBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
     }
     case TokenType::LESS_THAN: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_GE, OpCodes::GET_L, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_GE, OpCodes::GET_L, controlFlow);
     }
     case TokenType::LESS_THAN_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_G, OpCodes::GET_LE, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_G, OpCodes::GET_LE, controlFlow);
     }
     case TokenType::GREATER_THAN: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_LE, OpCodes::GET_G, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_LE, OpCodes::GET_G, controlFlow);
     }
     case TokenType::GREATER_THAN_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::JUMP_L, OpCodes::GET_GE, controlFlow);
+      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_L, OpCodes::GET_GE, controlFlow);
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
@@ -1043,7 +1047,7 @@ void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
       return;
     } else {
       addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
-      expRes.jumpOp = OpCodes::JUMP_E;
+      expRes.jumpOp = OpCodes::RS_JUMP_E;
     }
   }
   alignForImm(1, 8);
@@ -1053,15 +1057,35 @@ void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
   generateScope(ifStatement.body);
 }
 
-void CodeGen::updateJumpOpTo(const uint64_t indexTo, MarkerType type, MarkerType until) {
+void CodeGen::updateJumpOpTo(const uint64_t jumpOpIndex, const uint64_t indexTo) {
+  int64_t relativeDiff = jumpOpIndex - indexTo;
+  assert(byteCode[jumpOpIndex] >= (uc)OpCodes::RS_JUMP && byteCode[jumpOpIndex] <= (uc)OpCodes::RS_JUMP_LE);
+  if (relativeDiff <= INT8_MAX && relativeDiff >= INT8_MIN) {
+    // fits in RS_JUMP, which it already is
+    byteCode[jumpOpIndex + 1] = relativeDiff;
+    return;
+  }
+  // doesn't fit in RS_JUMP
+  if (relativeDiff <= INT16_MAX && relativeDiff >= INT16_MIN) {
+    // fits in R_JUMP, have to change it, but this will shift everything over and mess up stored indexes?!
+    assert(false);
+    return;
+  }
+  // doesn't fit in R_JUMP, have to do it relative to ip
+  // MOVE_I (or even MOVE_LI if bigger than 32 bit) reg diff
+  // ADD reg ip
+  // jump reg
+  assert(false);
+}
+
+void CodeGen::updateJumpMarkersTo(const uint64_t indexTo, MarkerType type, MarkerType until) {
   for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
     if (until != MarkerType::NONE && jumpMarker->type == until) {
       jumpMarker->type = MarkerType::NONE;
       break;
     }
     if (jumpMarker->type == type) {
-      uint64_t index = jumpMarker->index + 1;
-      *(uint64_t *)(byteCode.data() + index) = indexTo;
+      updateJumpOpTo(jumpMarker->index, indexTo);
       jumpMarker->type = MarkerType::NONE;
       if (until == MarkerType::NONE) {
         break;
@@ -1082,6 +1106,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       if (controlFlowStatement.forLoop->condition.getType() != ExpressionType::NONE) {
         ExpressionResult expRes = generateExpression(controlFlowStatement.forLoop->condition);
         if (expRes.jumpOp == OpCodes::NOP) {
+          // jump op wasn't set by expression gen
           if (!expRes.isReg) {
             if (!expRes.val) {
               // condition always false
@@ -1090,38 +1115,36 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
             // dont need to add a jump statement, go straight to the body
           } else {
             addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
-            alignForImm(1, 8);
             addMarker(MarkerType::IF_STATEMENT);
-            addBytes({(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+            addJumpOp(OpCodes::RS_JUMP_E);
           }
         } else {
-          alignForImm(1, 8);
           addMarker(MarkerType::IF_STATEMENT);
-          addBytes({(uc)expRes.jumpOp, 0, 0, 0, 0, 0, 0, 0, 0});
+          addJumpOp(expRes.jumpOp);
         }
       }
       generateScope(controlFlowStatement.forLoop->body);
       generateExpression(controlFlowStatement.forLoop->iteration);
-      alignForImm(1, 8);
-      std::vector<uc> jumpOp  = {(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0};
-      *(uint64_t *)(jumpOp.data() + 1) = startOfLoopIndex;
-      addBytes(jumpOp);
-      updateJumpOpTo(byteCode.size(), MarkerType::IF_STATEMENT);
-      updateJumpOpTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
-      updateJumpOpTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
+      const uint64_t jumpOpIndex = byteCode.size();
+      addJumpOp(OpCodes::RS_JUMP);
+      updateJumpOpTo(jumpOpIndex, startOfLoopIndex);
+      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
+      updateJumpMarkersTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
+      updateJumpMarkersTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
       break;
     }
     case ControlFlowStatementType::WHILE_LOOP: {
       const uint64_t startOfLoopIndex = addMarker(MarkerType::START_LOOP);
       IfStatement& whileLoop = controlFlowStatement.whileLoop->statement;
       generateIfStatement(whileLoop);
-      alignForImm(1, 8);
-      std::vector<uc> jumpOp  = {(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0};
-      *(uint64_t *)(jumpOp.data() + 1) = startOfLoopIndex;
-      addBytes(jumpOp);
-      updateJumpOpTo(byteCode.size(), MarkerType::IF_STATEMENT);
-      updateJumpOpTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
-      updateJumpOpTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
+      {
+        const uint64_t jumpIndex = byteCode.size();
+        addJumpOp(OpCodes::RS_JUMP);
+        updateJumpOpTo(jumpIndex, startOfLoopIndex);
+      }
+      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
+      updateJumpMarkersTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
+      updateJumpMarkersTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
       break; 
     }
     case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
@@ -1135,9 +1158,9 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       if (elifStatementList || elseStatement) {
         alignForImm(1, 8);
         addMarker(MarkerType::END_IF);
-        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+        addJumpOp(OpCodes::RS_JUMP);
       }
-      updateJumpOpTo(byteCode.size(), MarkerType::IF_STATEMENT);
+      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
 
       // elif statements
       while (elifStatementList) {
@@ -1146,9 +1169,9 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         if (elifStatementList || elseStatement) {
           alignForImm(1, 8);
           addMarker(MarkerType::END_IF);
-          addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+          addJumpOp(OpCodes::RS_JUMP);
         }
-        updateJumpOpTo(byteCode.size(), MarkerType::IF_STATEMENT);
+        updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
       }
 
       // else statement
@@ -1157,7 +1180,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       }
 
       // update all END_IF jump ops (until START_IF) to go to current index
-      updateJumpOpTo(byteCode.size(), MarkerType::END_IF, MarkerType::START_IF);
+      updateJumpMarkersTo(byteCode.size(), MarkerType::END_IF, MarkerType::START_IF);
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
@@ -1291,12 +1314,12 @@ void CodeGen::generateStatement(const Statement& statement) {
       if (statement.keyword.type == TokenType::BREAK) {
         alignForImm(1, 8);
         addMarker(MarkerType::BREAK);
-        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+        addJumpOp(OpCodes::RS_JUMP);
       }
       else if (statement.keyword.type == TokenType::CONTINUE) {
         alignForImm(1, 8);
         addMarker(MarkerType::CONTINUE);
-        addBytes({(uc)OpCodes::JUMP, 0, 0, 0, 0, 0, 0, 0, 0});
+        addJumpOp(OpCodes::RS_JUMP);
       }
       else {
         std::cerr << "Invalid keyword type in CodeGen::generateStatement\n";

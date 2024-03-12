@@ -88,7 +88,7 @@ TEST_CASE("variable creation", "[codeGen]") {
 TEST_CASE("jump statements in always true control flow", "[codeGen]") {
   {
     // at the end of the `if (1)` body, it should jump past the else body
-    const std::string str = "if (1) {} else {num:uint64;} ";
+    const std::string str = "if (1) {num:uint64;} else {num:uint64;} ";
     testBoilerPlate(str);
     Statement statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement);
@@ -97,14 +97,21 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
     codeGen.generateStatement(statement);
     std::vector<uc> expected;
-    alignForImm(expected, 1, 8);
-    addBytes(expected, {(uc)OpCodes::JUMP, 24, 0, 0, 0, 0, 0, 0, 0});
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 4);
+    addBytes(expected, {(uc)OpCodes::ADD_I, stackPointerIndex, 4, 0, 0, 0});
+    const uint32_t indexOfJump = expected.size() + 1;
+    addBytes(expected, {(uc)OpCodes::RS_JUMP, 0});
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    const int32_t jumpDistance = expected.size() - indexOfJump;
+    assert(jumpDistance >= INT8_MIN && jumpDistance <= INT8_MAX);
+    expected[indexOfJump] = jumpDistance;
     CHECK(codeGen.byteCode == expected);
   }
   {
-    // should jump to the start of the for loop (just after the variable dec)
+    // should jump to the start of the for loop
     const std::string str = "num:uint64; for (;;) {} ";
     testBoilerPlate(str);
     { // add some instructions above the loop to check if jump address is right
@@ -123,13 +130,12 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    alignForImm(expected, 1, 8);
-    addBytes(expected, {(uc)OpCodes::JUMP, 8, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
     // should jump to the start of the while loop (just after the variable dec)
-    const std::string str = "num:uint64; while true {} ";
+    const std::string str = " while true { num:uint64; } ";
     testBoilerPlate(str);
     { // add some instructions above the loop to check if jump address is right
       Statement statement;
@@ -147,8 +153,8 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     std::vector<uc> expected;
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    alignForImm(expected, 1, 8);
-    addBytes(expected, {(uc)OpCodes::JUMP, 8, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP, (uc)-12});
     CHECK(codeGen.byteCode == expected);
   }
 }
@@ -226,18 +232,18 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     // short circuit
     alignForImm(expected, 1, 8);
     const uint32_t indexOfShortCircuitJump = expected.size() + 1;
-    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP_E, 0});
 
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::MOVE_I, 2, 0, 0, 0, 0});
     addBytes(expected, {(uc)OpCodes::LOGICAL_AND, 1, 2});
-    expected[indexOfShortCircuitJump] = expected.size();
+    expected[indexOfShortCircuitJump] = (uc)(expected.size() - indexOfShortCircuitJump);
     alignForImm(expected, 1, 8);
     const uint32_t indexOfSecondJump = expected.size() + 1;
-    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP_E, 0});
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
-    expected[indexOfSecondJump] = expected.size();
+    expected[indexOfSecondJump] = (uc)(expected.size() - indexOfSecondJump);
 
     CHECK(codeGen.byteCode == expected);
   }
@@ -256,20 +262,18 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::SET_Z, 1});
 
     // short circuit
-    alignForImm(expected, 1, 8);
     const uint32_t indexOfShortCircuitJump = expected.size() + 1;
-    addBytes(expected, {(uc)OpCodes::JUMP_NE, 0, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP_NE, 0});
 
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::MOVE_I, 2, 0, 0, 0, 0});
     addBytes(expected, {(uc)OpCodes::LOGICAL_OR, 1, 2});
-    expected[indexOfShortCircuitJump] = expected.size();
-    alignForImm(expected, 1, 8);
+    expected[indexOfShortCircuitJump] = (uc)(expected.size() - indexOfShortCircuitJump);
     const uint32_t indexOfSecondJump = expected.size() + 1;
-    addBytes(expected, {(uc)OpCodes::JUMP_E, 0, 0, 0, 0, 0, 0, 0, 0});
+    addBytes(expected, {(uc)OpCodes::RS_JUMP_E, 0});
     alignForImm(expected, 2, 4);
     addBytes(expected, {(uc)OpCodes::SUB_I, stackPointerIndex, 4, 0, 0, 0});
-    expected[indexOfSecondJump] = expected.size();
+    expected[indexOfSecondJump] = (uc)(expected.size() - indexOfSecondJump);
 
     CHECK(codeGen.byteCode == expected);
   }
