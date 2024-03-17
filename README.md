@@ -9,7 +9,7 @@ Uses CMake as a build tool and Catch2 for testing
 TODO:
 - Code gen
     - figure out how to update jump ops. we start with a RS_JUMP to keep it compact, but what if 
-        the relative jump is more than what a int8 can do? have to change to a larger jump, which means changing to R_JUMP (or bigger) and shifting the code over to fit the extra data. this results in indexes changing, and relative jumps being incorrect.
+        the relative jump is more than what a int8 can do? have to change to a larger jump, which means changing to R_JUMP (or bigger) and shifting the code over to fit the extra data. this results in indexes changing, relative jumps being incorrect, and data alignment being off, therefore have to shift by a multiple of 8 to keep everything aligned.
         potential solution: update all jump ops at the end of function generation, track how much shifting as been done so that they can be updated accordingly. NEED TO DRAW IT OUT
 
     - functions, scopes, nested scopes, breaking out of loops (Use stack markers)

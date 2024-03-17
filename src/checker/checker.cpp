@@ -467,12 +467,12 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
             } else if (forLoop.initialize.type != StatementType::NONE) {
               exit(1);
             }
-            ResultingType res = checkExpression(tk, forLoop.condition);
+            ResultingType res = checkExpression(tk, forLoop.statement.condition);
             if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NONE && !canBeConvertedToBool(*res.type)) {
-              addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &forLoop.condition});
+              addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &forLoop.statement.condition});
             }
             checkExpression(tk, forLoop.iteration);
-            checkScope(tk, forLoop.body, returnType, isLoop, isSwitch);
+            checkScope(tk, forLoop.statement.body, returnType, isLoop, isSwitch);
             if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
               lookUp.erase(locals.back());
               locals.pop_back();

@@ -133,6 +133,9 @@ enum class TokenType : uint8_t {
   DEC_PTR,
 };
 
+/**
+ * Need to change to uint64_t so that this works with little and big endian in Expression node (expression type)
+*/
 struct Token {
   private:
   char padding __attribute__((__unused__));

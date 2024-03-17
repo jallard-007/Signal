@@ -230,7 +230,6 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::SET_Z, 1});
 
     // short circuit
-    alignForImm(expected, 1, 8);
     const uint32_t indexOfShortCircuitJump = expected.size() + 1;
     addBytes(expected, {(uc)OpCodes::RS_JUMP_E, 0});
 
@@ -238,7 +237,6 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(uc)OpCodes::MOVE_I, 2, 0, 0, 0, 0});
     addBytes(expected, {(uc)OpCodes::LOGICAL_AND, 1, 2});
     expected[indexOfShortCircuitJump] = (uc)(expected.size() - indexOfShortCircuitJump);
-    alignForImm(expected, 1, 8);
     const uint32_t indexOfSecondJump = expected.size() + 1;
     addBytes(expected, {(uc)OpCodes::RS_JUMP_E, 0});
     alignForImm(expected, 2, 4);

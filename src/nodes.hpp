@@ -217,19 +217,19 @@ struct ArrayOrStructLiteral {
 // CONDITIONAL STATEMENTS
 
 // ifStatement:= if expression scope
-struct IfStatement {
+struct BranchStatement {
   Scope body;
   Expression condition;
-  IfStatement() = default;
-  IfStatement(const IfStatement&) = default;
-  IfStatement& operator=(const IfStatement&) = default;
+  BranchStatement() = default;
+  BranchStatement(const BranchStatement&) = default;
+  BranchStatement& operator=(const BranchStatement&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
-  IfStatement deepCopy(NodeMemPool&);
+  BranchStatement deepCopy(NodeMemPool&);
 };
 
 // elifStatementList:= elifStatement elifStatementList | nothing
 struct ElifStatementList {
-  IfStatement elif;
+  BranchStatement elif;
   ElifStatementList *next{nullptr};
   ElifStatementList() = default;
   ElifStatementList(const ElifStatementList&) = default;
@@ -240,7 +240,7 @@ struct ElifStatementList {
 //                       | ifStatement elifStatementList
 //                       | ifStatement elifStatementList elseStatement
 struct ConditionalStatement {
-  IfStatement ifStatement;
+  BranchStatement ifStatement;
   ElifStatementList *elifStatement{nullptr};
   Scope *elseStatement{nullptr};
   ConditionalStatement() = default;
@@ -281,7 +281,7 @@ struct SwitchStatement {
 
 // whileLoop:= while (expression) scope
 struct WhileLoop {
-  IfStatement statement;
+  BranchStatement statement;
   WhileLoop() = default;
   WhileLoop(const WhileLoop&) = default;
   void prettyPrint(Tokenizer&, std::string&, uint32_t);
@@ -290,9 +290,8 @@ struct WhileLoop {
 
 // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 struct ForLoop {
-  Scope body;
   Statement initialize;
-  Expression condition;
+  BranchStatement statement;
   Expression iteration;
   ForLoop() = default;
   ForLoop(const ForLoop &) = default;

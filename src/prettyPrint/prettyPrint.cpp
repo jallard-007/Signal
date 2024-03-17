@@ -308,12 +308,12 @@ void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
 void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   str += typeToString.at(TokenType::FOR) + '(';
   initialize.prettyPrint(tk, str, indentation);
-  if (condition.getType() == ExpressionType::NONE) {
+  if (statement.condition.getType() == ExpressionType::NONE) {
     str += ';';
   } else {
     str += "; ";
   }
-  condition.prettyPrint(tk, str);
+  statement.condition.prettyPrint(tk, str);
   if (iteration.getType() == ExpressionType::NONE) {
     str += ';';
   } else {
@@ -321,7 +321,7 @@ void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
   }
   iteration.prettyPrint(tk, str);
   str += ") ";
-  body.prettyPrint(tk, str, indentation);
+  statement.body.prettyPrint(tk, str, indentation);
 }
 
 void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
@@ -366,7 +366,7 @@ void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
   statement.prettyPrint(tk ,str, indentation);
 }
 
-void IfStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void BranchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
   condition.prettyPrint(tk, str);
   str += ' ';
   body.prettyPrint(tk, str, indentation);

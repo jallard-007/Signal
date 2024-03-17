@@ -482,7 +482,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       statement.controlFlow->type = ControlFlowStatementType::CONDITIONAL_STATEMENT;
       statement.controlFlow->conditional = memPool.makeConditionalStatement();
       ConditionalStatement& cond = *statement.controlFlow->conditional;
-      if (parseIfStatement(cond.ifStatement) == ParseStatementErrorType::REPORTED) {
+      if (parseBranchStatement(cond.ifStatement) == ParseStatementErrorType::REPORTED) {
         return ParseStatementErrorType::REPORTED;
       }
 
@@ -490,7 +490,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       while (tokenizer->peekNext().type == TokenType::ELIF) {
         tokenizer->consumePeek();
         *curr = memPool.makeElifStatementList();
-        if (parseIfStatement((*curr)->elif) == ParseStatementErrorType::REPORTED) {
+        if (parseBranchStatement((*curr)->elif) == ParseStatementErrorType::REPORTED) {
           return ParseStatementErrorType::REPORTED;
         }
         curr = &(*curr)->next;
@@ -515,7 +515,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
       tokenizer->consumePeek();
       statement.controlFlow->type = ControlFlowStatementType::WHILE_LOOP;
       statement.controlFlow->whileLoop = memPool.makeWhileLoop();
-      if (parseIfStatement(statement.controlFlow->whileLoop->statement) == ParseStatementErrorType::REPORTED) {
+      if (parseBranchStatement(statement.controlFlow->whileLoop->statement) == ParseStatementErrorType::REPORTED) {
         return ParseStatementErrorType::REPORTED;
       }
     }
@@ -592,7 +592,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
 
       // parse condition statement
       if (tokenizer->peekNext().type != TokenType::SEMICOLON) {
-        ParseExpressionErrorType errorType = parseExpression(forLoop->condition);
+        ParseExpressionErrorType errorType = parseExpression(forLoop->statement.condition);
         if (errorType != ParseExpressionErrorType::NONE) {
           return ParseStatementErrorType::REPORTED;
         }
@@ -622,7 +622,7 @@ ParseStatementErrorType Parser::parseStatement(Statement &statement) {
         return ParseStatementErrorType::REPORTED;
       }
       tokenizer->consumePeek();
-      ParseStatementErrorType errorType = parseScope(forLoop->body.scopeStatements);
+      ParseStatementErrorType errorType = parseScope(forLoop->statement.body.scopeStatements);
       if (errorType != ParseStatementErrorType::NONE) {
         return ParseStatementErrorType::REPORTED;
       }
@@ -815,7 +815,7 @@ ParseStatementErrorType Parser::parseIdentifierStatement(Statement& statement, T
  * Parses if statements
  * \note this includes if, elif, and while statements
 */
-ParseStatementErrorType Parser::parseIfStatement(IfStatement& condStatement) {
+ParseStatementErrorType Parser::parseBranchStatement(BranchStatement& condStatement) {
   if (parseExpressionBeforeScope(condStatement.condition) != ParseStatementErrorType::NONE) {
     return ParseStatementErrorType::REPORTED;
   }

@@ -27,12 +27,3 @@ bool openAndWriteFile(const std::string& file, std::vector<unsigned char>& conte
   t.write((char *)content.data(), content.size());
   return true;
 }
-
-bool isBigEndian() {
-  union {
-    uint32_t i;
-    char c[4];
-  } bInt = {0x01020304};
-
-  return bInt.c[0] == 1;
-}

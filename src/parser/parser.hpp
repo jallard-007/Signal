@@ -70,7 +70,7 @@ struct Parser {
   ParseStatementErrorType parseStatement(Statement&);
   ParseStatementErrorType parseScope(StatementList&);
   ParseStatementErrorType parseExpressionBeforeScope(Expression&);
-  ParseStatementErrorType parseIfStatement(IfStatement&);
+  ParseStatementErrorType parseBranchStatement(BranchStatement&);
   ParseStatementErrorType parseIdentifierStatement(Statement&, Token);
   ParseStatementErrorType parseVariableDec(VariableDec&);
   ParseExpressionErrorType parseExpression(Expression&);

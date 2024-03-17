@@ -213,8 +213,7 @@ ReturnStatement* ReturnStatement::deepCopy(NodeMemPool& mem) {
 
 ForLoop* ForLoop::deepCopy(NodeMemPool& mem) {
   ForLoop *copy = mem.makeForLoop();
-  copy->body = body.deepCopy(mem);
-  copy->condition = condition.deepCopy(mem);
+  copy->statement = statement.deepCopy(mem);
   copy->initialize = initialize.deepCopy(mem);
   copy->iteration = iteration.deepCopy(mem);
   return copy;
@@ -254,8 +253,8 @@ Expression Expression::deepCopy(NodeMemPool& mem) {
   return copy;
 }
 
-IfStatement IfStatement::deepCopy(NodeMemPool& mem) {
-  IfStatement copy;
+BranchStatement BranchStatement::deepCopy(NodeMemPool& mem) {
+  BranchStatement copy;
   copy.condition = condition.deepCopy(mem);
   copy.body = body.deepCopy(mem);
   return copy;

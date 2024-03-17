@@ -11,12 +11,8 @@
 
 #define uc unsigned char
 
-Marker::Marker(uint64_t index, MarkerType type):
-  index{index}, type{type} {}
-
-bool Marker::operator==(const Marker other) const {
-  return other.index == index && other.type == type;
-}
+JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
+  start{start}, type{type} {}
 
 CodeGen::CodeGen(
   Program& program,
@@ -200,7 +196,6 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
         addBytes({(uc)OpCodes::ADD_I, miscIndex});
         add4ByteNum(varOffset);
         OpCodes loadOp = getLoadOpForSize(sizeOfVar);
-        assert(loadOp != OpCodes::NOP);
         addBytes({(uc)loadOp, variableInfo.reg, miscIndex});
       }
       return {.val = variableInfo.reg, .isReg = true};
@@ -218,7 +213,7 @@ OpCodes getLoadOpForSize(const uc size) {
     case 2: return OpCodes::LOAD_W;
     case 4: return OpCodes::LOAD_D;
     case 8: return OpCodes::LOAD_Q;
-    default: return OpCodes::NOP;
+    default: std::cerr << "invalid size in getLoadOpForSize: " << (uint32_t)size << '\n'; exit(1);
   }
 }
 
@@ -252,44 +247,35 @@ void CodeGen::addByteOp(OpCodes opCode) {
 }
 
 void CodeGen::addBytes(const std::vector<uc>& bytes) {
-  for (const uc byte: bytes) {
-    addByte(byte);
-  }
+  byteCode.reserve(byteCode.size() + bytes.size());
+  byteCode.insert(byteCode.end(), bytes.begin(), bytes.end());
 }
 
-void CodeGen::addBytesBasedOnEndianess(const void *num, const uint64_t size) {
-  auto bytes = (const uc *)num;
-  if (isBigEndian()) {
-    for (uint64_t i = size; i > 0; ++i) {
-      addByte(bytes[i]);
-    }
-    addByte(bytes[0]);
-  } else {
-    for (uint64_t i = 0; i < size; ++i) {
-      addByte(bytes[i]);
-    }
-  }
+void CodeGen::addNumBytes(const void *data, const uint64_t n) {
+  byteCode.reserve(byteCode.size() + n);
+  byteCode.insert(byteCode.end(), n, 0);
+  memcpy(byteCode.end().base() - n, data, n);
 }
 
 void CodeGen::add2ByteNum(const uint16_t num) {
-  addBytesBasedOnEndianess(&num, sizeof(num));
+  addNumBytes(&num, sizeof(num));
 }
 
 void CodeGen::add4ByteNum(const uint32_t num) {
-  addBytesBasedOnEndianess(&num, sizeof(num));
+  addNumBytes(&num, sizeof(num));
 }
 
 void CodeGen::add8ByteNum(const uint64_t num) {
-  addBytesBasedOnEndianess(&num, sizeof(num));
+  addNumBytes(&num, sizeof(num));
 }
 
 void CodeGen::addPointer() {
   void *p = 0;
-  addBytesBasedOnEndianess(&p, sizeof p);
+  addNumBytes(&p, sizeof p);
 }
 
 /**
- * Used to add a jump op when the offset of the jump is unknown (for branches)
+ * Used to add a jump op
 */
 void CodeGen::addJumpOp(OpCodes jumpOp) {
   assert(jumpOp >= OpCodes::RS_JUMP && jumpOp <= OpCodes::RS_JUMP_LE);
@@ -373,7 +359,6 @@ bool isCommutative(OpCodes op) {
 */
 void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
   if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
-    // add value in little endian format
     alignForImm(2, 8);
     addBytes({(uc)OpCodes::MOVE_LI, reg});
     add8ByteNum(val);
@@ -410,7 +395,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     return {.val = evaluateExpression(op, leftResult.val, rightResult.val)};
   }
 
-  // move any immediate values larger than 32 bits into registers so we don't have to worry about it later
+  // move any immediate values larger than 32 bits into registers, we only have 4 byte immediate instructions
   if (leftImm) {
     if (topBitsSet(leftResult.val)) {
       const uc reg = allocateRegister();
@@ -432,9 +417,9 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   if (leftResult.isTemp) {
     // right imm
     if (!rightResult.isReg) {
-      uc *split = (uc *)&rightResult.val;
       alignForImm(2, 4);
-      addBytes({(uc)opImm, (uc)leftResult.val, split[0], split[1], split[2], split[3]});
+      addBytes({(uc)opImm, (uc)leftResult.val});
+      add4ByteNum((uint32_t)rightResult.val);
       return {.val = leftResult.val, .isReg = true, .isTemp = true};
     }
     // right temp / var
@@ -451,9 +436,9 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     // right temp
     if (rightResult.isTemp) {
       if (isCommutative(op)) {
-        uc *split = (uc *)&leftResult.val;
         alignForImm(2, 4);
-        addBytes({(uc)opImm, (uc)rightResult.val, split[0], split[1], split[2], split[3]});
+        addBytes({(uc)opImm, (uc)rightResult.val});
+        add4ByteNum((uint32_t)leftResult.val);
         return {.val = rightResult.val, .isReg = true, .isTemp = true};
       }
       // cannot flip args
@@ -550,14 +535,15 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     leftResult.isTemp = true;
   }
   // short-circuit logical ops
+  addJumpMarker(JumpMarkerType::LOGICAL_BIN_OP_START);
   if (binOp.op.type == TokenType::LOGICAL_AND) {
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    addMarker(MarkerType::SHORT_CIRCUIT);
+    addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
     addJumpOp(OpCodes::RS_JUMP_E);
   }
   else if (binOp.op.type == TokenType::LOGICAL_OR) {
     addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    addMarker(MarkerType::SHORT_CIRCUIT);
+    addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
     addJumpOp(OpCodes::RS_JUMP_NE);
   }
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
@@ -569,7 +555,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     rightResult.isTemp = true;
   }
   addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
-  updateJumpMarkersTo(byteCode.size(), MarkerType::SHORT_CIRCUIT);
+  updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END, JumpMarkerType::LOGICAL_BIN_OP_START);
   if (rightResult.isTemp) {
     freeRegister((uc)rightResult.val);
   }
@@ -1030,148 +1016,130 @@ void CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, b
   tk = oldTk;
 }
 
-uint64_t CodeGen::addMarker(MarkerType type) {
+uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
   jumpMarkers.emplace_back(byteCode.size(), type);
   return byteCode.size();
 }
 
-void CodeGen::generateIfStatement(const IfStatement& ifStatement) {
+/**
+ * Generate a branching statement
+ * if return result is true,
+ * adds a jump marker of type JumpMarkerType::TO_BRANCH_END that must be updated by the caller to land wherever needed
+*/
+BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& ifStatement) {
   ExpressionResult expRes = generateExpression(ifStatement.condition, true);
   if (expRes.jumpOp == OpCodes::NOP) {
     if (!expRes.isReg) {
+      // condition is a constant value, don't need to test
       if (expRes.val) {
         // condition always true
         generateScope(ifStatement.body);
-      }
-      // else condition always false
-      return;
-    } else {
-      addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
-      expRes.jumpOp = OpCodes::RS_JUMP_E;
+        return BranchStatementResult::ALWAYS_TRUE;
+      } // else condition always false, don't generate
+      return BranchStatementResult::ALWAYS_FALSE;
     }
+    addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
+    expRes.jumpOp = OpCodes::RS_JUMP_E;
   }
-  alignForImm(1, 8);
-  addMarker(MarkerType::IF_STATEMENT);
-  addBytes({(uc)expRes.jumpOp, 0, 0, 0, 0, 0, 0, 0, 0});
-  // if condition is false, jump to next in chain (elif if there is one, otherwise else if there is one, otherwise next statement)
+  addJumpMarker(JumpMarkerType::TO_BRANCH_END);
+  addJumpOp(expRes.jumpOp);
   generateScope(ifStatement.body);
+  return BranchStatementResult::ADDED_JUMP;
 }
 
-void CodeGen::updateJumpOpTo(const uint64_t jumpOpIndex, const uint64_t indexTo) {
-  int64_t relativeDiff = jumpOpIndex - indexTo;
-  assert(byteCode[jumpOpIndex] >= (uc)OpCodes::RS_JUMP && byteCode[jumpOpIndex] <= (uc)OpCodes::RS_JUMP_LE);
-  if (relativeDiff <= INT8_MAX && relativeDiff >= INT8_MIN) {
-    // fits in RS_JUMP, which it already is
-    byteCode[jumpOpIndex + 1] = relativeDiff;
-    return;
-  }
-  // doesn't fit in RS_JUMP
-  if (relativeDiff <= INT16_MAX && relativeDiff >= INT16_MIN) {
-    // fits in R_JUMP, have to change it, but this will shift everything over and mess up stored indexes?!
-    assert(false);
-    return;
-  }
-  // doesn't fit in R_JUMP, have to do it relative to ip
-  // MOVE_I (or even MOVE_LI if bigger than 32 bit) reg diff
-  // ADD reg ip
-  // jump reg
-  assert(false);
-}
-
-void CodeGen::updateJumpMarkersTo(const uint64_t indexTo, MarkerType type, MarkerType until) {
+/**
+ * Updates jump markers with destination. Sets type of each updated marker to none
+ * \param destination the destination
+ * \param type type of jump marker to update
+ * \param until keep updating markers till this type is reached. if none, updates the first marker and stops
+ * \param clear set the 'until' marker to type none if reached
+*/
+void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, JumpMarkerType until, bool clear) {
   for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
-    if (until != MarkerType::NONE && jumpMarker->type == until) {
-      jumpMarker->type = MarkerType::NONE;
+    if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
+      if (clear) {
+        jumpMarker->type = JumpMarkerType::NONE;
+      }
       break;
     }
     if (jumpMarker->type == type) {
-      updateJumpOpTo(jumpMarker->index, indexTo);
-      jumpMarker->type = MarkerType::NONE;
-      if (until == MarkerType::NONE) {
+      jumpMarker->destination = destination;
+      jumpMarker->type = JumpMarkerType::NONE;
+      if (until == JumpMarkerType::NONE) {
         break;
       }
     }
   }
   // clean up
-  while (!jumpMarkers.empty() && jumpMarkers.back().type == MarkerType::NONE) {
-    jumpMarkers.pop_back();
-  }
+  // while (!jumpMarkers.empty() && jumpMarkers.back().type == JumpMarkerType::NONE) {
+  //   jumpMarkers.pop_back();
+  // }
 }
 
 void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
   switch (controlFlowStatement.type) {
     case ControlFlowStatementType::FOR_LOOP: {
       generateStatement(controlFlowStatement.forLoop->initialize);
-      const uint64_t startOfLoopIndex = addMarker(MarkerType::START_LOOP);
-      if (controlFlowStatement.forLoop->condition.getType() != ExpressionType::NONE) {
-        ExpressionResult expRes = generateExpression(controlFlowStatement.forLoop->condition);
-        if (expRes.jumpOp == OpCodes::NOP) {
-          // jump op wasn't set by expression gen
-          if (!expRes.isReg) {
-            if (!expRes.val) {
-              // condition always false
-              break;
-            }
-            // dont need to add a jump statement, go straight to the body
-          } else {
-            addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
-            addMarker(MarkerType::IF_STATEMENT);
-            addJumpOp(OpCodes::RS_JUMP_E);
-          }
-        } else {
-          addMarker(MarkerType::IF_STATEMENT);
-          addJumpOp(expRes.jumpOp);
-        }
-      }
-      generateScope(controlFlowStatement.forLoop->body);
+      const uint64_t startOfLoopIndex = addJumpMarker(JumpMarkerType::LOOP_START);
+      const BranchStatementResult res = generateBranchStatement(controlFlowStatement.forLoop->statement);
       generateExpression(controlFlowStatement.forLoop->iteration);
-      const uint64_t jumpOpIndex = byteCode.size();
+      addJumpMarker(JumpMarkerType::TO_LOOP_START);
       addJumpOp(OpCodes::RS_JUMP);
-      updateJumpOpTo(jumpOpIndex, startOfLoopIndex);
-      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
-      updateJumpMarkersTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
-      updateJumpMarkersTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
+      if (res == BranchStatementResult::ADDED_JUMP) {
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+      }
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, JumpMarkerType::LOOP_START);
+      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, JumpMarkerType::LOOP_START, true);
       break;
     }
     case ControlFlowStatementType::WHILE_LOOP: {
-      const uint64_t startOfLoopIndex = addMarker(MarkerType::START_LOOP);
-      IfStatement& whileLoop = controlFlowStatement.whileLoop->statement;
-      generateIfStatement(whileLoop);
-      {
-        const uint64_t jumpIndex = byteCode.size();
-        addJumpOp(OpCodes::RS_JUMP);
-        updateJumpOpTo(jumpIndex, startOfLoopIndex);
+      const uint64_t startOfLoopIndex = addJumpMarker(JumpMarkerType::LOOP_START);
+      BranchStatement& whileLoop = controlFlowStatement.whileLoop->statement;
+      const BranchStatementResult res = generateBranchStatement(whileLoop);
+      // place unconditional jump at the end of the while loop to go to start
+      addJumpMarker(JumpMarkerType::TO_LOOP_START);
+      addJumpOp(OpCodes::RS_JUMP);
+      if (res == BranchStatementResult::ADDED_JUMP) {
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
       }
-      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
-      updateJumpMarkersTo(byteCode.size(), MarkerType::BREAK, MarkerType::START_LOOP);
-      updateJumpMarkersTo(startOfLoopIndex, MarkerType::CONTINUE, MarkerType::START_LOOP);
+      // update jump markers added by break / continue
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, JumpMarkerType::LOOP_START);
+      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, JumpMarkerType::LOOP_START, true);
       break; 
     }
     case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
-      const IfStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
+      const BranchStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
       const ElifStatementList *elifStatementList = controlFlowStatement.conditional->elifStatement;
       const Scope* elseStatement = controlFlowStatement.conditional->elseStatement;
-      addMarker(MarkerType::START_IF); // mark start of this if/elif/else chain
+      addJumpMarker(JumpMarkerType::IF_CHAIN_START); // mark start of this if/elif/else chain
 
       // if statement
-      generateIfStatement(ifStatement);
-      if (elifStatementList || elseStatement) {
-        alignForImm(1, 8);
-        addMarker(MarkerType::END_IF);
-        addJumpOp(OpCodes::RS_JUMP);
+      {
+        const BranchStatementResult res = generateBranchStatement(ifStatement);
+        if (elifStatementList || elseStatement) {
+          // elif/else statements follow, add a jump after the this so that we skip the rest
+          addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
+          addJumpOp(OpCodes::RS_JUMP);
+        }
+        if (res == BranchStatementResult::ADDED_JUMP) {
+          // update if false condition jump to go to code after the branch
+          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+        }
       }
-      updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
 
       // elif statements
       while (elifStatementList) {
-        generateIfStatement(elifStatementList->elif);
+        const BranchStatementResult res = generateBranchStatement(elifStatementList->elif);
         elifStatementList = elifStatementList->next;
         if (elifStatementList || elseStatement) {
-          alignForImm(1, 8);
-          addMarker(MarkerType::END_IF);
+          // elif/else statements follow, add a jump after the this so that we skip the rest
+          addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
           addJumpOp(OpCodes::RS_JUMP);
         }
-        updateJumpMarkersTo(byteCode.size(), MarkerType::IF_STATEMENT);
+        if (res == BranchStatementResult::ADDED_JUMP) {
+          // update elif false condition jump to go to code after the branch
+          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+        }
       }
 
       // else statement
@@ -1179,8 +1147,8 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         generateScope(*elseStatement);
       }
 
-      // update all END_IF jump ops (until START_IF) to go to current index
-      updateJumpMarkersTo(byteCode.size(), MarkerType::END_IF, MarkerType::START_IF);
+      // update all TO_IF_CHAIN_END jump ops until START_IF_CHAIN to go to current index
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, JumpMarkerType::IF_CHAIN_START, true);
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
@@ -1312,13 +1280,11 @@ void CodeGen::generateStatement(const Statement& statement) {
     case StatementType::KEYWORD: {
       // continue or break
       if (statement.keyword.type == TokenType::BREAK) {
-        alignForImm(1, 8);
-        addMarker(MarkerType::BREAK);
+        addJumpMarker(JumpMarkerType::TO_LOOP_END);
         addJumpOp(OpCodes::RS_JUMP);
       }
       else if (statement.keyword.type == TokenType::CONTINUE) {
-        alignForImm(1, 8);
-        addMarker(MarkerType::CONTINUE);
+        addJumpMarker(JumpMarkerType::TO_LOOP_START);
         addJumpOp(OpCodes::RS_JUMP);
       }
       else {

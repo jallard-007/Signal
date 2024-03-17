@@ -27,24 +27,32 @@ struct StructInformation {
   StructInformation() = default;
 };
 
-enum class MarkerType: uint8_t {
+enum class JumpMarkerType: uint8_t {
   NONE,
-  START_IF,
-  IF_STATEMENT,
-  END_IF,
-  START_LOOP,
-  SWITCH,
-  BREAK,
-  CONTINUE,
-  SHORT_CIRCUIT,
+  
+  // if/elif/else statements
+  BRANCH_START, // marks start of branching statement
+  TO_BRANCH_END, // go to end of branching statement (condition was false)
+  IF_CHAIN_START, // marks start of if/elif/else chain
+  TO_IF_CHAIN_END, // to go end if if/elif/else chain
+
+  // loops
+  LOOP_START,
+  TO_LOOP_START,
+  TO_LOOP_END,
+
+  // short circuit logical binary ops
+  LOGICAL_BIN_OP_START,
+  TO_LOGICAL_BIN_OP_END,
 };
 
-struct Marker {
-  uint64_t index;
-  MarkerType type;
-  Marker() = delete;
-  Marker(uint64_t, MarkerType);
-  bool operator==(const Marker) const;
+struct JumpMarker {
+  uint64_t start;
+  uint64_t destination;
+  JumpMarkerType type;
+  JumpMarker() = delete;
+  JumpMarker(uint64_t, JumpMarkerType);
+  // bool operator==(const Marker) const;
 };
 
 enum class StackMarkerType: uint8_t {
@@ -77,12 +85,18 @@ struct StackItem {
   StackItemType type = StackItemType::NONE;
 };
 
+enum class BranchStatementResult: uint8_t {
+  ADDED_JUMP,
+  ALWAYS_TRUE,
+  ALWAYS_FALSE,
+};
+
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
   std::map<std::string, uint32_t> nameToStackItemIndex;
   std::vector<unsigned char> byteCode;
-  std::vector<Marker> jumpMarkers;
+  std::vector<JumpMarker> jumpMarkers;
   std::vector<StackItem> stack;
   Tokenizer *tk{nullptr};
   Program &program;
@@ -115,9 +129,9 @@ struct CodeGen {
 
   void generateStatement(const Statement&);
   void generateControlFlowStatement(const ControlFlowStatement&);
-  void generateIfStatement(const IfStatement&);
-  void updateJumpMarkersTo(uint64_t, MarkerType, MarkerType = MarkerType::NONE);
-  uint64_t addMarker(MarkerType);
+  BranchStatementResult generateBranchStatement(const BranchStatement&);
+  void updateJumpMarkersTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE, bool = false);
+  uint64_t addJumpMarker(JumpMarkerType);
 
   // scopes
   void generateScope(const Scope&);
@@ -131,10 +145,10 @@ struct CodeGen {
   void addByteOp(OpCodes);
   void addByte(unsigned char);
   void addBytes(const std::vector<unsigned char>&);
+  void addNumBytes(const void *, uint64_t);
   void add2ByteNum(const uint16_t);
   void add4ByteNum(const uint32_t);
   void add8ByteNum(const uint64_t);
-  void addBytesBasedOnEndianess(const void *, uint64_t);
   void addPointer();
   void addJumpOp(OpCodes);
 

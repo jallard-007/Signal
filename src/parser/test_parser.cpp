@@ -755,10 +755,10 @@ TEST_CASE("Keywords", "[parser]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     auto& forLoop = statement.controlFlow->forLoop;
     CHECK(forLoop->initialize.type == StatementType::VARIABLE_DEC);
-    CHECK(forLoop->condition.getType() == ExpressionType::BINARY_OP);
+    CHECK(forLoop->statement.condition.getType() == ExpressionType::BINARY_OP);
     CHECK(forLoop->iteration.getType() == ExpressionType::UNARY_OP);
-    CHECK(forLoop->body.scopeStatements.curr.type == StatementType::EXPRESSION);
-    CHECK(forLoop->body.scopeStatements.next == nullptr);
+    CHECK(forLoop->statement.body.scopeStatements.curr.type == StatementType::EXPRESSION);
+    CHECK(forLoop->statement.body.scopeStatements.next == nullptr);
   }
 }
 
