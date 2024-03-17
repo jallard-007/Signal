@@ -77,15 +77,12 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
 
 bool CodeGen::generate() {
   const GeneralDecList* decList = &program.decs;
-  if (decList->curr.type == GeneralDecType::NONE) {
-    return false;
-  }
-  do {
+  while (decList) {
     if (!generateGeneralDeclaration(decList->curr)) {
       return false;
     }
     decList = decList->next;
-  } while (decList);
+  }
   return true;
 }
 
@@ -741,49 +738,41 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
 uint32_t CodeGen::sizeOfType(const Token token) {
   switch (token.type) {
     case TokenType::BOOL: {
-      return 1;
+      return sizeof (bool);
     }
     case TokenType::CHAR_TYPE: {
-      return 1;
+      return sizeof (char);
     }
     case TokenType::STRING_TYPE: {
-      return 8;
+      return sizeof (char *);
     }
-    case TokenType::INT8_TYPE: {
-      return 1;
-    }
+    case TokenType::INT8_TYPE:
     case TokenType::UINT8_TYPE: {
-      return 1;
+      return sizeof (uint8_t);
     }
-    case TokenType::INT16_TYPE: {
-      return 2;
-    }
+    case TokenType::INT16_TYPE:
     case TokenType::UINT16_TYPE: {
-      return 2;
+      return sizeof (uint16_t);
     }
-    case TokenType::INT32_TYPE: {
-      return 4;
-    }
+    case TokenType::INT32_TYPE:
     case TokenType::UINT32_TYPE: {
-      return 4;
+      return sizeof (uint32_t);
     }
-    case TokenType::INT64_TYPE: {
-      return 8;
-    }
+    case TokenType::INT64_TYPE:
     case TokenType::UINT64_TYPE: {
-      return 8;
+      return sizeof (uint64_t);
     }
     case TokenType::POINTER: {
       return sizeof (void *);
     }
     case TokenType::DOUBLE_TYPE: {
-      return 8;
+      return sizeof (double);
     }
     case TokenType::VOID: {
       return 0;
     }
     case TokenType::REFERENCE: {
-      return 8;
+      return sizeof (void *);
     }
     case TokenType::IDENTIFIER: {
       return getStructInfo(tk->extractToken(token)).size;
@@ -802,6 +791,7 @@ bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
       break;
     }
     case GeneralDecType::STRUCT: {
+      // generate the functions within, add a parameter for 'this'
       std::cerr << "Unsupported dec STRUCT\n";
       exit(1);
     }
@@ -812,18 +802,23 @@ bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
       return generateFunctionDeclaration(*genDec.funcDec);
     }
     case GeneralDecType::ENUM: {
+      // assign values for each item in the enum
       std::cerr << "Unsupported dec ENUM\n";
       exit(1);
     }
     case GeneralDecType::TEMPLATE: {
+      // don't do anything
       std::cerr << "Unsupported dec TEMPLATE\n";
       exit(1);
     }
     case GeneralDecType::TEMPLATE_CREATE: {
+      // generate whatever is in the template with the template type
+      // might handle the copy during checker stage, in that case don't do anything
       std::cerr << "Unsupported dec TEMPLATE_CREATE\n";
       exit(1);
     }
     case GeneralDecType::INCLUDE_DEC: {
+      // don't do anything, handled by parser
       break;
     }
   }
@@ -1147,7 +1142,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         generateScope(*elseStatement);
       }
 
-      // update all TO_IF_CHAIN_END jump ops until START_IF_CHAIN to go to current index
+      // update all TO_IF_CHAIN_END jump ops until IF_CHAIN_START to go to current index
       updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, JumpMarkerType::IF_CHAIN_START, true);
       break;
     }
@@ -1157,14 +1152,15 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     case ControlFlowStatementType::EXIT_STATEMENT: {
       ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
       if (!expRes.isReg) {
-        const uc reg = allocateRegister();
-        moveImmToReg(reg, expRes.val);
-        expRes.val = reg;
+        moveImmToReg(miscIndex, expRes.val);
+        expRes.val = miscIndex;
       }
       addBytes({(uc)OpCodes::EXIT, (uc)expRes.val});
       break;
     }
     case ControlFlowStatementType::SWITCH_STATEMENT: {
+      std::cerr << "ControlFlowStatementType::SWITCH_STATEMENT not implemented in CodeGen::generateControlFlowStatement\n";
+      exit(1);
       break;
     }
     default: {
