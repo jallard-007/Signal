@@ -7,7 +7,7 @@
 #define ip registers[instructionPointerIndex]
 #define bp registers[basePointerIndex]
 #define dp registers[dataPointerIndex]
-#define misc registers[miscIndex] // used for temporary/intermediate values
+#define miscReg registers[miscRegisterIndex] // used for temporary/intermediate values
 
 #define uc unsigned char
 
@@ -23,7 +23,7 @@ CodeGen::CodeGen(
   ip.inUse = true;
   bp.inUse = true;
   dp.inUse = true;
-  misc.inUse = true;
+  miscReg.inUse = true;
 }
 
 /*
@@ -175,6 +175,9 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::string identifier = tk->extractToken(token);
       uint32_t stackItemIndex = nameToStackItemIndex[identifier];
       StackVariable &variableInfo = stack[stackItemIndex].variable;
+      if (variableInfo.reg) {
+        return {.val = variableInfo.reg, .isReg = true};
+      }
       const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
       // |                   | <- sp
       // |       | <- offset
@@ -185,15 +188,17 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
         // too large to fit into a reg, just return offset
         return {.val = varOffset};
       }
-      if (!variableInfo.reg) {
-        // load value into a register
-        variableInfo.reg = allocateRegister();
-        addBytes({(uc)OpCodes::MOVE, miscIndex, stackPointerIndex});
+      // load value into a register
+      variableInfo.reg = allocateRegister();
+      OpCodes loadOp = getLoadOpForSize(sizeOfVar);
+      if (varOffset) {
+        addBytes({(uc)OpCodes::MOVE, miscRegisterIndex, stackPointerIndex});
         alignForImm(2, 4);
-        addBytes({(uc)OpCodes::ADD_I, miscIndex});
+        addBytes({(uc)OpCodes::ADD_I, miscRegisterIndex});
         add4ByteNum(varOffset);
-        OpCodes loadOp = getLoadOpForSize(sizeOfVar);
-        addBytes({(uc)loadOp, variableInfo.reg, miscIndex});
+        addBytes({(uc)loadOp, variableInfo.reg, miscRegisterIndex});
+      } else {
+        addBytes({(uc)loadOp, variableInfo.reg, stackPointerIndex});
       }
       return {.val = variableInfo.reg, .isReg = true};
     }
@@ -249,8 +254,7 @@ void CodeGen::addBytes(const std::vector<uc>& bytes) {
 }
 
 void CodeGen::addNumBytes(const void *data, const uint64_t n) {
-  byteCode.reserve(byteCode.size() + n);
-  byteCode.insert(byteCode.end(), n, 0);
+  byteCode.resize(byteCode.size() + n);
   memcpy(byteCode.end().base() - n, data, n);
 }
 
@@ -336,7 +340,40 @@ uint64_t evaluateExpression(OpCodes op, uint64_t left, uint64_t right) {
       return left >> right;
     }
     default: {
-      std::cerr << "Invalid OpCode in codeGen::evaluateExpression [" << (uint32_t)op  << "]\n";
+      std::cerr << "Invalid OpCode in evaluateExpression [" << (uint32_t)op  << "]\n";
+      exit(1);
+    }
+  }
+}
+
+bool evaluateBooleanBinOp(TokenType op, uint64_t leftSide, uint64_t rightSide) {
+  switch (op) {
+    case TokenType::EQUAL: {
+      return leftSide == rightSide;
+    }
+    case TokenType::NOT_EQUAL: {
+      return leftSide != rightSide;
+    }
+    case TokenType::LOGICAL_AND: {
+      return leftSide && rightSide;
+    }
+    case TokenType::LOGICAL_OR: {
+      return leftSide || rightSide;
+    }
+    case TokenType::LESS_THAN: {
+      return leftSide < rightSide;
+    }
+    case TokenType::LESS_THAN_EQUAL: {
+      return leftSide <= rightSide;
+    }
+    case TokenType::GREATER_THAN: {
+      return leftSide > rightSide;
+    }
+    case TokenType::GREATER_THAN_EQUAL: {
+      return leftSide >= rightSide;
+    }
+    default: {
+      std::cerr << "Invalid TokenType in evaluateBooleanBinOp [" << (uint32_t)op  << "]\n";
       exit(1);
     }
   }
@@ -499,8 +536,8 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
   registers[leftResult.val].changed = true;
   if (!rightResult.isReg) {
     if (topBitsSet(rightResult.val)) {
-      moveImmToReg(miscIndex, rightResult.val);
-      addBytes({(uc)op, (uc)leftResult.val, miscIndex});
+      moveImmToReg(miscRegisterIndex, rightResult.val);
+      addBytes({(uc)op, (uc)leftResult.val, miscRegisterIndex});
     } else {
       alignForImm(2, 4);
       addBytes({(uc)opImm, (uc)leftResult.val});
@@ -523,28 +560,95 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
  * \param controlFlow dictates if the jump op will be returned, or if the get op will be used and a register will be returned
 */
 ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes jumpOp, OpCodes getOp, bool controlFlow) {
+  // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
+  if (binOp.op.type == TokenType::LOGICAL_AND || binOp.op.type == TokenType::LOGICAL_OR) {
+    uint64_t shortCircuitIndexStart = 0;
+    ExpressionResult leftResult = generateExpression(binOp.leftSide);
+    if (!leftResult.isReg) {
+      // left side is immediate value
+      if (!leftResult.val) {
+        // for &&, expression is false, don't generate anymore
+        if (binOp.op.type == TokenType::LOGICAL_AND) {
+          return {.val = false};
+        }
+        // for ||, need to check next, but can remove left side
+      } else {
+        // for ||, expression is true, don't generate anymore
+        if (binOp.op.type == TokenType::LOGICAL_OR) {
+          return {.val = true};
+        }
+        // for &&, need to check next, but can remove left side
+      }
+    } else {
+      // short-circuit logical ops
+      shortCircuitIndexStart = byteCode.size();
+      if (binOp.op.type == TokenType::LOGICAL_AND) {
+        addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+        addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
+        addJumpOp(OpCodes::RS_JUMP_E); // if leftResult is false, skip right side
+      }
+      else {
+        addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+        addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
+        addJumpOp(OpCodes::RS_JUMP_NE); // if leftResult is true, skip right side
+      }
+    }
+    ExpressionResult rightResult = generateExpression(binOp.rightSide);
+    if (!rightResult.isReg) {
+      // right side is immediate value
+      if (!leftResult.isReg) {
+        // both sides are immediate
+        return {.val = evaluateBooleanBinOp(binOp.op.type, leftResult.val, rightResult.val)};
+      }
+      // left result is not an immediate, clear out short circuit code
+      byteCode.resize(shortCircuitIndexStart);
+      if (!rightResult.val) {
+        // for &&, cond is always false
+        if (binOp.op.type == TokenType::LOGICAL_AND) {
+          return {.val = false};
+        }
+        // for ||, depends on left side
+      } else {
+        // for ||, cond is always true
+        if (binOp.op.type == TokenType::LOGICAL_AND) {
+          return {.val = true};
+        }
+        // for &&, depends on left side
+      }
+      addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+    } else {
+      if (!leftResult.isReg) {
+        addBytes({(uc)OpCodes::SET_FLAGS, (uc)rightResult.val});
+      } else {
+        addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
+      }
+    }
+    ExpressionResult expRes;
+    if (controlFlow) {
+      expRes.jumpOp = jumpOp;
+    } else {
+      expRes.isReg = true;
+      expRes.isTemp = true;
+      const uc reg = allocateRegister();
+      addBytes({(uc)getOp, reg});
+      expRes.val = reg;
+    }
+    return expRes;
+  }
+
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
-  if (!leftResult.isReg) {
+  ExpressionResult rightResult = generateExpression(binOp.rightSide);
+  if (!leftResult.isReg) { // immediate value
+    if (!rightResult.isReg) {
+      return {.val = evaluateBooleanBinOp(binOp.op.type, leftResult.val, rightResult.val)};
+    }
     const uc reg = allocateRegister();
     moveImmToReg(reg, leftResult.val);
     leftResult.isReg = true;
     leftResult.val = reg;
     leftResult.isTemp = true;
-  }
-  // short-circuit logical ops
-  addJumpMarker(JumpMarkerType::LOGICAL_BIN_OP_START);
-  if (binOp.op.type == TokenType::LOGICAL_AND) {
-    addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
-    addJumpOp(OpCodes::RS_JUMP_E);
-  }
-  else if (binOp.op.type == TokenType::LOGICAL_OR) {
-    addBytes({(uc)OpCodes::SET_Z, (uc)leftResult.val});
-    addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
-    addJumpOp(OpCodes::RS_JUMP_NE);
-  }
-  ExpressionResult rightResult = generateExpression(binOp.rightSide);
-  if (!rightResult.isReg) {
+  } else if (!rightResult.isReg) {
     const uc reg = allocateRegister();
     moveImmToReg(reg, rightResult.val);
     rightResult.isReg = true;
@@ -552,7 +656,6 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     rightResult.isTemp = true;
   }
   addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
-  updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END, JumpMarkerType::LOGICAL_BIN_OP_START);
   if (rightResult.isTemp) {
     freeRegister((uc)rightResult.val);
   }
@@ -1033,7 +1136,7 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
       } // else condition always false, don't generate
       return BranchStatementResult::ALWAYS_FALSE;
     }
-    addBytes({(uc)OpCodes::SET_Z, (uc)expRes.val});
+    addBytes({(uc)OpCodes::SET_FLAGS, (uc)expRes.val});
     expRes.jumpOp = OpCodes::RS_JUMP_E;
   }
   addJumpMarker(JumpMarkerType::TO_BRANCH_END);
@@ -1152,8 +1255,8 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     case ControlFlowStatementType::EXIT_STATEMENT: {
       ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
       if (!expRes.isReg) {
-        moveImmToReg(miscIndex, expRes.val);
-        expRes.val = miscIndex;
+        moveImmToReg(miscRegisterIndex, expRes.val);
+        expRes.val = miscRegisterIndex;
       }
       addBytes({(uc)OpCodes::EXIT, (uc)expRes.val});
       break;
@@ -1199,9 +1302,8 @@ void CodeGen::startSoftScope() {
 }
 
 void CodeGen::endSoftScope() {
-    while (!stack.empty()) {
-    // shouldn't need this marker as this *should* always be the first item in the stack
-    // for now we'll leave it in
+  uint32_t stackUsage = 0;
+  while (!stack.empty()) {
     if (
       stack.back().type == StackItemType::MARKER &&
       stack.back().marker == StackMarkerType::SOFT_SCOPE_START
@@ -1210,8 +1312,14 @@ void CodeGen::endSoftScope() {
       break;
     }
     // TODO: run destructor for each item within this scope
+    stackUsage += sizeOfType(getTypeFromTokenList(stack.back().variable.varDec.type));
     stack.pop_back();
     assert(!stack.empty()); // paired with marker comment above
+  }
+  if (stackUsage) {
+    alignForImm(2, 4);
+    addBytes({(uc)OpCodes::ADD_I, stackPointerIndex});
+    add4ByteNum(stackUsage);
   }
 }
 

@@ -42,7 +42,6 @@ enum class JumpMarkerType: uint8_t {
   TO_LOOP_END,
 
   // short circuit logical binary ops
-  LOGICAL_BIN_OP_START,
   TO_LOGICAL_BIN_OP_END,
 };
 

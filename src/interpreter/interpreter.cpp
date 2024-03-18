@@ -272,12 +272,18 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::SET_Z: {
-      z = !registers[program[ip++]];
-      break;
-    }
-    case OpCodes::SET_P: {
-      p = registers[program[ip++]];
+    case OpCodes::SET_FLAGS: {
+      int64_t res = (int64_t)registers[program[ip]];
+      if (res == 0) {
+        z = true;
+        p = false;
+      } else if (res > 0) {
+        z = false;
+        p = true;
+      } else {
+        z = false;
+        p = false;
+      }
       break;
     }
     case OpCodes::GET_E: {

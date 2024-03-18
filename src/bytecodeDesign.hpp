@@ -5,7 +5,7 @@
 #define stackPointerIndex NUM_REGISTERS - 2
 #define basePointerIndex NUM_REGISTERS - 3
 #define dataPointerIndex NUM_REGISTERS - 4
-#define miscIndex 0
+#define miscRegisterIndex 0 // setting the zero register to a reserved register so that we can easily test if a register has been allocated
 
 /* BUILT IN FUNCTIONS
 arguments are passed on the stack. before calling a function, space for the return value needs to be made
@@ -74,8 +74,7 @@ enum class OpCodes: unsigned char {
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
   CMP, // CMP src1, src2
 
-  SET_Z, // SET src
-  SET_P, // SET src
+  SET_FLAGS, // SET src
   GET_E, // GET_E dest | set dest to 1 if z is true
   GET_NE, // GET_NE dest | set dest to 1 if z is false
   GET_G, // GET_G dest | set dest to 1 if p is true
