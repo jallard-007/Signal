@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include "codeGen.hpp"
-#include "../../utils.hpp"
+#include "utils.hpp"
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
@@ -9,7 +9,7 @@
 #define dp registers[dataPointerIndex]
 #define miscReg registers[miscRegisterIndex] // used for temporary/intermediate values
 
-#define uc unsigned char
+#define bc bytecode_t
 
 JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
   start{start}, type{type} {}
@@ -190,15 +190,15 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       }
       // load value into a register
       variableInfo.reg = allocateRegister();
-      OpCodes loadOp = getLoadOpForSize(sizeOfVar);
+      OpCode loadOp = getLoadOpForSize(sizeOfVar);
       if (varOffset) {
-        addBytes({(uc)OpCodes::MOVE, miscRegisterIndex, stackPointerIndex});
+        addBytes({(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
         alignForImm(2, 4);
-        addBytes({(uc)OpCodes::ADD_I, miscRegisterIndex});
+        addBytes({(bc)OpCode::ADD_I, miscRegisterIndex});
         add4ByteNum(varOffset);
-        addBytes({(uc)loadOp, variableInfo.reg, miscRegisterIndex});
+        addBytes({(bc)loadOp, variableInfo.reg, miscRegisterIndex});
       } else {
-        addBytes({(uc)loadOp, variableInfo.reg, stackPointerIndex});
+        addBytes({(bc)loadOp, variableInfo.reg, stackPointerIndex});
       }
       return {.val = variableInfo.reg, .isReg = true};
     }
@@ -209,19 +209,19 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
 }
 
 
-OpCodes getLoadOpForSize(const uc size) {
+OpCode getLoadOpForSize(const uint8_t size) {
   switch(size) {
-    case 1: return OpCodes::LOAD_B;
-    case 2: return OpCodes::LOAD_W;
-    case 4: return OpCodes::LOAD_D;
-    case 8: return OpCodes::LOAD_Q;
+    case 1: return OpCode::LOAD_B;
+    case 2: return OpCode::LOAD_W;
+    case 4: return OpCode::LOAD_D;
+    case 8: return OpCode::LOAD_Q;
     default: std::cerr << "invalid size in getLoadOpForSize: " << (uint32_t)size << '\n'; exit(1);
   }
 }
 
 
-uc CodeGen::allocateRegister() {
-  for (uc i = 0; i < NUM_REGISTERS; ++i) {
+bytecode_t CodeGen::allocateRegister() {
+  for (uint8_t i = 0; i < NUM_REGISTERS; ++i) {
     if (!registers[i].inUse) {
       registers[i].inUse = true;
       return i;
@@ -231,7 +231,7 @@ uc CodeGen::allocateRegister() {
   exit(1);
 }
 
-void CodeGen::freeRegister(uc regNum) {
+void CodeGen::freeRegister(bytecode_t regNum) {
   RegisterInfo& regInfo = registers[regNum];
   if (regInfo.changed) {
     // SUB_I misc, bp, regInfo.stackOffset
@@ -241,14 +241,14 @@ void CodeGen::freeRegister(uc regNum) {
   regInfo.inUse = false;
 }
 
-void CodeGen::addByte(uc byte) {
+void CodeGen::addByte(bc byte) {
   byteCode.emplace_back(byte);
 }
-void CodeGen::addByteOp(OpCodes opCode) {
-  addByte((uc)opCode);
+void CodeGen::addByteOp(OpCode opCode) {
+  addByte((bc)opCode);
 }
 
-void CodeGen::addBytes(const std::vector<uc>& bytes) {
+void CodeGen::addBytes(const std::vector<bc>& bytes) {
   byteCode.reserve(byteCode.size() + bytes.size());
   byteCode.insert(byteCode.end(), bytes.begin(), bytes.end());
 }
@@ -278,8 +278,8 @@ void CodeGen::addPointer() {
 /**
  * Used to add a jump op
 */
-void CodeGen::addJumpOp(OpCodes jumpOp) {
-  assert(jumpOp >= OpCodes::RS_JUMP && jumpOp <= OpCodes::RS_JUMP_LE);
+void CodeGen::addJumpOp(OpCode jumpOp) {
+  assert(jumpOp >= OpCode::RS_JUMP && jumpOp <= OpCode::RS_JUMP_LE);
   addByteOp(jumpOp);
   addByte(0);
 }
@@ -296,7 +296,7 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
     return;
   }
   while(mod++ != size) {
-    addByteOp(OpCodes::NOP);
+    addByteOp(OpCode::NOP);
   }
 }
 
@@ -307,36 +307,36 @@ bool topBitsSet(uint64_t val) {
   return val & 0xFFFFFFFF00000000; // check if any bit in largest 4 bytes are set
 }
 
-uint64_t evaluateExpression(OpCodes op, uint64_t left, uint64_t right) {
+uint64_t evaluateExpression(OpCode op, uint64_t left, uint64_t right) {
   switch (op) {
-    case OpCodes::ADD: {
+    case OpCode::ADD: {
       return left + right;
     }
-    case OpCodes::SUB: {
+    case OpCode::SUB: {
       return left - right;
     }
-    case OpCodes::MUL: {
+    case OpCode::MUL: {
       return left * right;
     }
-    case OpCodes::DIV: {
+    case OpCode::DIV: {
       return left / right;
     }
-    case OpCodes::MOD: {
+    case OpCode::MOD: {
       return left % right;
     }
-    case OpCodes::OR: {
+    case OpCode::OR: {
       return left | right;
     }
-    case OpCodes::AND: {
+    case OpCode::AND: {
       return left & right;
     }
-    case OpCodes::XOR: {
+    case OpCode::XOR: {
       return left ^ right;
     }
-    case OpCodes::SHIFT_L: {
+    case OpCode::SHIFT_L: {
       return left << right;
     }
-    case OpCodes::SHIFT_R: {
+    case OpCode::SHIFT_R: {
       return left >> right;
     }
     default: {
@@ -379,26 +379,26 @@ bool evaluateBooleanBinOp(TokenType op, uint64_t leftSide, uint64_t rightSide) {
   }
 }
 
-bool isCommutative(OpCodes op) {
+bool isCommutative(OpCode op) {
   return
-    op == OpCodes::SUB ||
-    op == OpCodes::DIV ||
-    op == OpCodes::F_SUB ||
-    op == OpCodes::F_DIV;
+    op == OpCode::SUB ||
+    op == OpCode::DIV ||
+    op == OpCode::F_SUB ||
+    op == OpCode::F_DIV;
 }
 
 /**
  * Moves any integer size val into a register.
  * Does bit shifting as necessary with 4 byte immediate limit
 */
-void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
+void CodeGen::moveImmToReg(const bytecode_t reg, const uint64_t val) {
   if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
     alignForImm(2, 8);
-    addBytes({(uc)OpCodes::MOVE_LI, reg});
+    addBytes({(bc)OpCode::MOVE_LI, reg});
     add8ByteNum(val);
   } else {
     alignForImm(2, 4);
-    addBytes({(uc)OpCodes::MOVE_I, reg});
+    addBytes({(bc)OpCode::MOVE_I, reg});
     add4ByteNum(val);
   }
 }
@@ -407,7 +407,7 @@ void CodeGen::moveImmToReg(const uc reg, const uint64_t val) {
  * Generates byte code for a mathematical binary expression
  * Preserves any non-temporary values
 */
-ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
+ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   const bool leftImm = !leftResult.isReg;
@@ -432,7 +432,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   // move any immediate values larger than 32 bits into registers, we only have 4 byte immediate instructions
   if (leftImm) {
     if (topBitsSet(leftResult.val)) {
-      const uc reg = allocateRegister();
+      const bc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
       leftResult.val = reg;
       leftResult.isReg = true;
@@ -440,7 +440,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   }
   else if (rightImm) {
     if (topBitsSet(rightResult.val)) {
-      const uc reg = allocateRegister();
+      const bc reg = allocateRegister();
       moveImmToReg(reg, rightResult.val);
       rightResult.val = reg;
       rightResult.isReg = true;
@@ -452,15 +452,15 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     // right imm
     if (!rightResult.isReg) {
       alignForImm(2, 4);
-      addBytes({(uc)opImm, (uc)leftResult.val});
+      addBytes({(bc)opImm, (bc)leftResult.val});
       add4ByteNum((uint32_t)rightResult.val);
       return {.val = leftResult.val, .isReg = true, .isTemp = true};
     }
     // right temp / var
     else {
-      addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+      addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
       if (rightResult.isTemp) {
-        freeRegister((uc)rightResult.val);
+        freeRegister((bc)rightResult.val);
       }
       return {.val = leftResult.val, .isReg = true, .isTemp = true};
     }
@@ -471,24 +471,24 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
     if (rightResult.isTemp) {
       if (isCommutative(op)) {
         alignForImm(2, 4);
-        addBytes({(uc)opImm, (uc)rightResult.val});
+        addBytes({(bc)opImm, (bc)rightResult.val});
         add4ByteNum((uint32_t)leftResult.val);
         return {.val = rightResult.val, .isReg = true, .isTemp = true};
       }
       // cannot flip args
       else {
-        uc reg = allocateRegister();
+        bc reg = allocateRegister();
         moveImmToReg(reg, leftResult.val);
-        addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-        freeRegister((uc)rightResult.val);
+        addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+        freeRegister((bc)rightResult.val);
         return {.val = reg, .isReg = true, .isTemp = true};
       }
     }
     // right var
     else {
-      uc reg = allocateRegister();
+      bc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
-      addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+      addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
       return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
@@ -496,31 +496,31 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
   {
     // right imm
     if (!rightResult.isReg) {
-      uc reg = allocateRegister();
-      addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
+      uint16_t reg = allocateRegister();
+      addBytes({(bc)OpCode::MOVE, (bc)reg, (bc)leftResult.val});
       alignForImm(2, 4);
-      addBytes({(uc)op, (uc)reg});
+      addBytes({(bc)op, (bc)reg});
       add4ByteNum(uint32_t(rightResult.val));
       return {.val = reg, .isReg = true, .isTemp = true};
     }
     // right temp
     else if (rightResult.isTemp) {
       if (isCommutative(op)) {
-        addBytes({(uc)op, (uc)rightResult.val, (uc)leftResult.val});
+        addBytes({(bc)op, (bc)rightResult.val, (bc)leftResult.val});
         return rightResult;
       } else {
-        uc reg = allocateRegister();
-        addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
-        addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
-        freeRegister((uc)rightResult.val);
+        bc reg = allocateRegister();
+        addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
+        addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+        freeRegister((bc)rightResult.val);
         return {.val = reg, .isReg = true, .isTemp = true};
       }
     }
     // right var
     else {
-      uc reg = allocateRegister();
-      addBytes({(uc)OpCodes::MOVE, reg, (uc)leftResult.val});
-      addBytes({(uc)op, (uc)reg, (uc)rightResult.val});
+      bc reg = allocateRegister();
+      addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
+      addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
       return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
@@ -530,21 +530,21 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCodes op
  * Generates byte code for assignment expressions
  * Values on the left side are not preserved
 */
-ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, const OpCodes opImm) {
+ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   ExpressionResult leftResult = generateExpression(binOp.leftSide);
   registers[leftResult.val].changed = true;
   if (!rightResult.isReg) {
     if (topBitsSet(rightResult.val)) {
       moveImmToReg(miscRegisterIndex, rightResult.val);
-      addBytes({(uc)op, (uc)leftResult.val, miscRegisterIndex});
+      addBytes({(bc)op, (bc)leftResult.val, miscRegisterIndex});
     } else {
       alignForImm(2, 4);
-      addBytes({(uc)opImm, (uc)leftResult.val});
+      addBytes({(bc)opImm, (bc)leftResult.val});
       add4ByteNum((uint32_t)rightResult.val);
     }
   } else {
-    addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+    addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
   }
   return leftResult;
 }
@@ -559,7 +559,7 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCodes op, 
  * \param getOp the get op code to use when placing the result in a register. used when controlFlow is false
  * \param controlFlow dictates if the jump op will be returned, or if the get op will be used and a register will be returned
 */
-ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes jumpOp, OpCodes getOp, bool controlFlow) {
+ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp, bool controlFlow) {
   // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
   if (binOp.op.type == TokenType::LOGICAL_AND || binOp.op.type == TokenType::LOGICAL_OR) {
     uint64_t shortCircuitIndexStart = 0;
@@ -583,14 +583,14 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
       // short-circuit logical ops
       shortCircuitIndexStart = byteCode.size();
       if (binOp.op.type == TokenType::LOGICAL_AND) {
-        addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+        addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
-        addJumpOp(OpCodes::RS_JUMP_E); // if leftResult is false, skip right side
+        addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
       }
       else {
-        addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+        addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
-        addJumpOp(OpCodes::RS_JUMP_NE); // if leftResult is true, skip right side
+        addJumpOp(OpCode::RS_JUMP_NE); // if leftResult is true, skip right side
       }
     }
     ExpressionResult rightResult = generateExpression(binOp.rightSide);
@@ -615,12 +615,12 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
         }
         // for &&, depends on left side
       }
-      addBytes({(uc)OpCodes::SET_FLAGS, (uc)leftResult.val});
+      addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
     } else {
       if (!leftResult.isReg) {
-        addBytes({(uc)OpCodes::SET_FLAGS, (uc)rightResult.val});
+        addBytes({(bc)OpCode::SET_FLAGS, (bc)rightResult.val});
       } else {
-        addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+        addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
       }
     }
@@ -630,8 +630,8 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     } else {
       expRes.isReg = true;
       expRes.isTemp = true;
-      const uc reg = allocateRegister();
-      addBytes({(uc)getOp, reg});
+      const bc reg = allocateRegister();
+      addBytes({(bc)getOp, reg});
       expRes.val = reg;
     }
     return expRes;
@@ -643,24 +643,24 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
     if (!rightResult.isReg) {
       return {.val = evaluateBooleanBinOp(binOp.op.type, leftResult.val, rightResult.val)};
     }
-    const uc reg = allocateRegister();
+    const bc reg = allocateRegister();
     moveImmToReg(reg, leftResult.val);
     leftResult.isReg = true;
     leftResult.val = reg;
     leftResult.isTemp = true;
   } else if (!rightResult.isReg) {
-    const uc reg = allocateRegister();
+    const bc reg = allocateRegister();
     moveImmToReg(reg, rightResult.val);
     rightResult.isReg = true;
     rightResult.val = reg;
     rightResult.isTemp = true;
   }
-  addBytes({(uc)op, (uc)leftResult.val, (uc)rightResult.val});
+  addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
   if (rightResult.isTemp) {
-    freeRegister((uc)rightResult.val);
+    freeRegister((bc)rightResult.val);
   }
   if (leftResult.isTemp) {
-    freeRegister((uc)leftResult.val);
+    freeRegister((bc)leftResult.val);
   }
   ExpressionResult expRes;
   if (controlFlow) {
@@ -668,8 +668,8 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCodes op, OpCodes j
   } else {
     expRes.isReg = true;
     expRes.isTemp = true;
-    const uc reg = allocateRegister();
-    addBytes({(uc)getOp, reg});
+    const bc reg = allocateRegister();
+    addBytes({(bc)getOp, reg});
     expRes.val = reg;
   }
   return expRes;
@@ -687,96 +687,96 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 
     // mathematical ops
     case TokenType::ADDITION: {
-      return mathematicalBinOp(binOp, OpCodes::ADD, OpCodes::ADD_I);
+      return mathematicalBinOp(binOp, OpCode::ADD, OpCode::ADD_I);
     }
     case TokenType::SUBTRACTION: {
-      return mathematicalBinOp(binOp, OpCodes::SUB, OpCodes::SUB_I);
+      return mathematicalBinOp(binOp, OpCode::SUB, OpCode::SUB_I);
     }
     case TokenType::MULTIPLICATION: {
-      return mathematicalBinOp(binOp, OpCodes::MUL, OpCodes::MUL_I);
+      return mathematicalBinOp(binOp, OpCode::MUL, OpCode::MUL_I);
     }
     case TokenType::DIVISION: {
-      return mathematicalBinOp(binOp, OpCodes::DIV, OpCodes::DIV_I);
+      return mathematicalBinOp(binOp, OpCode::DIV, OpCode::DIV_I);
     }
     case TokenType::MODULO: {
-      return mathematicalBinOp(binOp, OpCodes::MOD, OpCodes::MOD_I);
+      return mathematicalBinOp(binOp, OpCode::MOD, OpCode::MOD_I);
     }
     case TokenType::BITWISE_OR: {
-      return mathematicalBinOp(binOp, OpCodes::OR, OpCodes::OR_I);
+      return mathematicalBinOp(binOp, OpCode::OR, OpCode::OR_I);
     }
     case TokenType::BITWISE_AND: {
-      return mathematicalBinOp(binOp, OpCodes::AND, OpCodes::AND_I);
+      return mathematicalBinOp(binOp, OpCode::AND, OpCode::AND_I);
     }
     case TokenType::BITWISE_XOR: {
-      return mathematicalBinOp(binOp, OpCodes::XOR, OpCodes::XOR_I);
+      return mathematicalBinOp(binOp, OpCode::XOR, OpCode::XOR_I);
     }
     case TokenType::SHIFT_LEFT: {
-      return mathematicalBinOp(binOp, OpCodes::SHIFT_L, OpCodes::SHIFT_L_I);
+      return mathematicalBinOp(binOp, OpCode::SHIFT_L, OpCode::SHIFT_L_I);
     }
     case TokenType::SHIFT_RIGHT: {
-      return mathematicalBinOp(binOp, OpCodes::SHIFT_R, OpCodes::SHIFT_R_I);
+      return mathematicalBinOp(binOp, OpCode::SHIFT_R, OpCode::SHIFT_R_I);
     }
 
     // assignment ops
     case TokenType::ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::MOVE, OpCodes::MOVE_I);
+      return assignmentBinOp(binOp, OpCode::MOVE, OpCode::MOVE_I);
     }
     case TokenType::ADDITION_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::ADD, OpCodes::ADD_I);
+      return assignmentBinOp(binOp, OpCode::ADD, OpCode::ADD_I);
     }
     case TokenType::SUBTRACTION_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::SUB, OpCodes::SUB_I);
+      return assignmentBinOp(binOp, OpCode::SUB, OpCode::SUB_I);
     }
     case TokenType::MULTIPLICATION_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::MUL, OpCodes::MUL_I);
+      return assignmentBinOp(binOp, OpCode::MUL, OpCode::MUL_I);
     }
     case TokenType::DIVISION_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::DIV, OpCodes::DIV_I);
+      return assignmentBinOp(binOp, OpCode::DIV, OpCode::DIV_I);
     }
     case TokenType::MODULO_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::MOD, OpCodes::MOD_I);
+      return assignmentBinOp(binOp, OpCode::MOD, OpCode::MOD_I);
     }
     case TokenType::BITWISE_OR_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::OR, OpCodes::OR_I);
+      return assignmentBinOp(binOp, OpCode::OR, OpCode::OR_I);
     }
     case TokenType::BITWISE_XOR_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::XOR, OpCodes::XOR_I);
+      return assignmentBinOp(binOp, OpCode::XOR, OpCode::XOR_I);
     }
     case TokenType::BITWISE_AND_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::AND, OpCodes::AND_I);
+      return assignmentBinOp(binOp, OpCode::AND, OpCode::AND_I);
     }
     case TokenType::SHIFT_LEFT_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::SHIFT_L, OpCodes::SHIFT_L_I);
+      return assignmentBinOp(binOp, OpCode::SHIFT_L, OpCode::SHIFT_L_I);
     }
     case TokenType::SHIFT_RIGHT_ASSIGNMENT: {
-      return assignmentBinOp(binOp, OpCodes::SHIFT_R, OpCodes::SHIFT_R_I);
+      return assignmentBinOp(binOp, OpCode::SHIFT_R, OpCode::SHIFT_R_I);
     }
 
     // figure out marker system to allow replacement of jump instruction values
     // logical
     case TokenType::EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_NE, OpCodes::GET_E, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_NE, OpCode::GET_E, controlFlow);
     }
     case TokenType::NOT_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_AND: {
-      return booleanBinOp(binOp, OpCodes::LOGICAL_AND, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCode::LOGICAL_AND, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
     }
     case TokenType::LOGICAL_OR: {
-      return booleanBinOp(binOp, OpCodes::LOGICAL_OR, OpCodes::RS_JUMP_E, OpCodes::GET_NE, controlFlow);
+      return booleanBinOp(binOp, OpCode::LOGICAL_OR, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
     }
     case TokenType::LESS_THAN: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_GE, OpCodes::GET_L, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_GE, OpCode::GET_L, controlFlow);
     }
     case TokenType::LESS_THAN_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_G, OpCodes::GET_LE, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_G, OpCode::GET_LE, controlFlow);
     }
     case TokenType::GREATER_THAN: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_LE, OpCodes::GET_G, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_LE, OpCode::GET_G, controlFlow);
     }
     case TokenType::GREATER_THAN_EQUAL: {
-      return booleanBinOp(binOp, OpCodes::CMP, OpCodes::RS_JUMP_L, OpCodes::GET_GE, controlFlow);
+      return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_L, OpCode::GET_GE, controlFlow);
     }
     default: {
       std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
@@ -790,19 +790,19 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   switch (unOp.op.type) {
     case TokenType::NOT: {
       if (!expRes.isReg) {
-        const uc reg = allocateRegister();
+        const bc reg = allocateRegister();
         moveImmToReg(reg, expRes.val);
         expRes.val = reg;
         expRes.isReg = true;
         expRes.isTemp = true;
       } else if (!expRes.isTemp) {
-        const uc reg = allocateRegister();
-        addBytes({(uc)OpCodes::MOVE, reg, (uc)expRes.val});
+        const bc reg = allocateRegister();
+        addBytes({(bc)OpCode::MOVE, reg, (bc)expRes.val});
         expRes.val = reg;
         expRes.isReg = true;
         expRes.isTemp = true;
       }
-      addBytes({(uc)OpCodes::NOT, (uc)expRes.val});
+      addBytes({(bc)OpCode::NOT, (bc)expRes.val});
       return expRes;
     }
     case TokenType::ADDRESS_OF: {
@@ -934,7 +934,7 @@ bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * \returns the size of the type
 */
 bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
-  uc reg = 0;
+  bc reg = 0;
   const Token typeToken = getTypeFromTokenList(varDec.type);
   const uint32_t size = sizeOfType(typeToken);
   const uint32_t preAddStackPointerOffset = getCurrStackPointerOffset();
@@ -947,30 +947,30 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
       if (!expRes.isReg) {
         reg = allocateRegister();
-        moveImmToReg((uc)reg, expRes.val);
+        moveImmToReg((bc)reg, expRes.val);
       } else {
-        reg = (uc)expRes.val;
+        reg = (bc)expRes.val;
       }
       stackVar.reg = reg;
     }
     switch (size) {
       case 1: {
         if (reg) {
-          addBytes({(uc)OpCodes::PUSH_B, (uc)reg});
+          addBytes({(bc)OpCode::PUSH_B, (bc)reg});
         } else {
-          addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+          addBytes({(bc)OpCode::DEC, stackPointerIndex});
         }
         break;
       }
       case 2: {
         if (reg) {
           if (padding) {
-            addBytes({(uc)OpCodes::DEC, stackPointerIndex});
+            addBytes({(bc)OpCode::DEC, stackPointerIndex});
           }
-          addBytes({(uc)OpCodes::PUSH_W, (uc)reg});
+          addBytes({(bc)OpCode::PUSH_W, (bc)reg});
         } else {
           alignForImm(2, 4);
-          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
           add4ByteNum(size + padding);
         }
         break;
@@ -980,14 +980,14 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
           // add padding to align
           if (padding) {
             alignForImm(2, 4);
-            addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+            addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
             add4ByteNum(padding);
           }
           // push value to stack
-          addBytes({(uc)OpCodes::PUSH_D, (uc)reg});
+          addBytes({(bc)OpCode::PUSH_D, (bc)reg});
         } else {
           alignForImm(2, 4);
-          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
           add4ByteNum(size + padding);
         }
         break;
@@ -996,13 +996,13 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         if (reg) {
           if (padding) {
             alignForImm(2, 4);
-            addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+            addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
             add4ByteNum(padding);
           }
-          addBytes({(uc)OpCodes::PUSH_Q, (uc)reg});
+          addBytes({(bc)OpCode::PUSH_Q, (bc)reg});
         } else {
           alignForImm(2, 4);
-          addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
           add4ByteNum(size + padding);
         }
         break;
@@ -1015,7 +1015,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
     alignForImm(2, 4);
-    addBytes({(uc)OpCodes::SUB_I, stackPointerIndex});
+    addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
     add4ByteNum(size + padding);
     // generateVariableDeclarationStructType(varDec, initialize);
   }
@@ -1126,7 +1126,7 @@ uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
 */
 BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& ifStatement) {
   ExpressionResult expRes = generateExpression(ifStatement.condition, true);
-  if (expRes.jumpOp == OpCodes::NOP) {
+  if (expRes.jumpOp == OpCode::NOP) {
     if (!expRes.isReg) {
       // condition is a constant value, don't need to test
       if (expRes.val) {
@@ -1136,8 +1136,8 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
       } // else condition always false, don't generate
       return BranchStatementResult::ALWAYS_FALSE;
     }
-    addBytes({(uc)OpCodes::SET_FLAGS, (uc)expRes.val});
-    expRes.jumpOp = OpCodes::RS_JUMP_E;
+    addBytes({(bc)OpCode::SET_FLAGS, (bc)expRes.val});
+    expRes.jumpOp = OpCode::RS_JUMP_E;
   }
   addJumpMarker(JumpMarkerType::TO_BRANCH_END);
   addJumpOp(expRes.jumpOp);
@@ -1182,7 +1182,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       const BranchStatementResult res = generateBranchStatement(controlFlowStatement.forLoop->statement);
       generateExpression(controlFlowStatement.forLoop->iteration);
       addJumpMarker(JumpMarkerType::TO_LOOP_START);
-      addJumpOp(OpCodes::RS_JUMP);
+      addJumpOp(OpCode::RS_JUMP);
       if (res == BranchStatementResult::ADDED_JUMP) {
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
       }
@@ -1196,7 +1196,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       const BranchStatementResult res = generateBranchStatement(whileLoop);
       // place unconditional jump at the end of the while loop to go to start
       addJumpMarker(JumpMarkerType::TO_LOOP_START);
-      addJumpOp(OpCodes::RS_JUMP);
+      addJumpOp(OpCode::RS_JUMP);
       if (res == BranchStatementResult::ADDED_JUMP) {
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
       }
@@ -1217,7 +1217,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         if (elifStatementList || elseStatement) {
           // elif/else statements follow, add a jump after the this so that we skip the rest
           addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
-          addJumpOp(OpCodes::RS_JUMP);
+          addJumpOp(OpCode::RS_JUMP);
         }
         if (res == BranchStatementResult::ADDED_JUMP) {
           // update if false condition jump to go to code after the branch
@@ -1232,7 +1232,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         if (elifStatementList || elseStatement) {
           // elif/else statements follow, add a jump after the this so that we skip the rest
           addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
-          addJumpOp(OpCodes::RS_JUMP);
+          addJumpOp(OpCode::RS_JUMP);
         }
         if (res == BranchStatementResult::ADDED_JUMP) {
           // update elif false condition jump to go to code after the branch
@@ -1258,7 +1258,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         moveImmToReg(miscRegisterIndex, expRes.val);
         expRes.val = miscRegisterIndex;
       }
-      addBytes({(uc)OpCodes::EXIT, (uc)expRes.val});
+      addBytes({(bc)OpCode::EXIT, (bc)expRes.val});
       break;
     }
     case ControlFlowStatementType::SWITCH_STATEMENT: {
@@ -1318,7 +1318,7 @@ void CodeGen::endSoftScope() {
   }
   if (stackUsage) {
     alignForImm(2, 4);
-    addBytes({(uc)OpCodes::ADD_I, stackPointerIndex});
+    addBytes({(bc)OpCode::ADD_I, stackPointerIndex});
     add4ByteNum(stackUsage);
   }
 }
@@ -1335,8 +1335,8 @@ void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
   //   .type = StackItemType::BASE_POINTER
   // };
   // stack.emplace_back(basePointerMarker);
-  // addBytes({(uc)OpCodes::PUSH_Q, basePointerIndex});
-  // addBytes({(uc)OpCodes::MOVE, basePointerIndex, stackPointerIndex});
+  // addBytes({(bc)OpCode::PUSH_Q, basePointerIndex});
+  // addBytes({(bc)OpCode::MOVE, basePointerIndex, stackPointerIndex});
 }
 
 void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
@@ -1356,8 +1356,8 @@ void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
     stack.pop_back();
     assert(!stack.empty()); // paired with marker comment above
   }
-  addBytes({(uc)OpCodes::MOVE, stackPointerIndex, basePointerIndex});
-  addBytes({(uc)OpCodes::POP_Q, basePointerIndex});
+  addBytes({(bc)OpCode::MOVE, stackPointerIndex, basePointerIndex});
+  addBytes({(bc)OpCode::POP_Q, basePointerIndex});
 }
 
 void CodeGen::generateStatement(const Statement& statement) {
@@ -1385,11 +1385,11 @@ void CodeGen::generateStatement(const Statement& statement) {
       // continue or break
       if (statement.keyword.type == TokenType::BREAK) {
         addJumpMarker(JumpMarkerType::TO_LOOP_END);
-        addJumpOp(OpCodes::RS_JUMP);
+        addJumpOp(OpCode::RS_JUMP);
       }
       else if (statement.keyword.type == TokenType::CONTINUE) {
         addJumpMarker(JumpMarkerType::TO_LOOP_START);
-        addJumpOp(OpCodes::RS_JUMP);
+        addJumpOp(OpCode::RS_JUMP);
       }
       else {
         std::cerr << "Invalid keyword type in CodeGen::generateStatement\n";

@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "parser.hpp"
-#include "../testingMemPool.hpp"
+#include "testingMemPool.hpp"
 
 TEST_CASE("getType", "[parser]") {
   const std::string str = " char ptr ptr , uint32 ptr ptr )";

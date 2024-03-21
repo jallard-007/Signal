@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
-#include "../token.hpp"
+#include "token.hpp"
 
 struct TokenPositionInfo{
   uint32_t lineNum;

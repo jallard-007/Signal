@@ -3,10 +3,10 @@
 #include <map>
 #include <array>
 #include <cstdint>
-#include "../../nodes.hpp"
-#include "../../tokenizer/tokenizer.hpp"
-#include "../../bytecodeDesign.hpp"
-#include "../../checker/checker.hpp"
+#include "nodes.hpp"
+#include "tokenizer/tokenizer.hpp"
+#include "bytecodeDesign/bytecodeDesign.hpp"
+#include "checker/checker.hpp"
 
 struct RegisterInfo {
   bool inUse {false};
@@ -15,7 +15,7 @@ struct RegisterInfo {
 
 struct ExpressionResult {
   uint64_t val{0};
-  OpCodes jumpOp {OpCodes::NOP};
+  OpCode jumpOp {OpCode::NOP};
   bool isReg {false};
   bool isTemp {false};
 };
@@ -63,7 +63,7 @@ enum class StackMarkerType: uint8_t {
 struct StackVariable {
   const VariableDec &varDec;
   uint32_t offset = 0;
-  unsigned char reg = 0;
+  bytecode_t reg = 0;
 };
 
 enum class StackItemType: uint8_t {
@@ -113,9 +113,9 @@ struct CodeGen {
 
   // binary ops
   ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
-  ExpressionResult mathematicalBinOp(const BinOp&, OpCodes, OpCodes);
-  ExpressionResult assignmentBinOp(const BinOp&, OpCodes, OpCodes);
-  ExpressionResult booleanBinOp(const BinOp&, OpCodes, OpCodes, OpCodes, bool = false);
+  ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
+  ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
+  ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
 
   ExpressionResult loadValue(const Token&);
 
@@ -141,15 +141,15 @@ struct CodeGen {
   void endFunctionScope(const FunctionDec&);
 
   // adding to the bytecode
-  void addByteOp(OpCodes);
-  void addByte(unsigned char);
-  void addBytes(const std::vector<unsigned char>&);
+  void addByteOp(OpCode);
+  void addByte(bytecode_t);
+  void addBytes(const std::vector<bytecode_t>&);
   void addNumBytes(const void *, uint64_t);
   void add2ByteNum(const uint16_t);
   void add4ByteNum(const uint32_t);
   void add8ByteNum(const uint64_t);
   void addPointer();
-  void addJumpOp(OpCodes);
+  void addJumpOp(OpCode);
 
   void updateJumpOpTo(uint64_t, uint64_t);
 
@@ -166,13 +166,13 @@ struct CodeGen {
   uint32_t getOffsetPushingItemToStack(uint32_t, Token, uint32_t = 0);
   int getStackOffset(const std::string&);
 
-  unsigned char allocateRegister();
-  void freeRegister(unsigned char);
+  bytecode_t allocateRegister();
+  void freeRegister(bytecode_t);
   uint32_t sizeOfType(Token);
   Token getTypeFromTokenList(const TokenList&);
 };
 
-OpCodes getLoadOpForSize(unsigned char);
+OpCode getLoadOpForSize(unsigned char);
 
 
 /*

@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
-#include "../parser/parser.hpp"
-#include "../testingMemPool.hpp"
+#include "parser/parser.hpp"
+#include "testingMemPool.hpp"
 
 TEST_CASE("pretty print test", "[prettyPrinter]") {
   SKIP();

@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "checker.hpp"
-#include "../parser/parser.hpp"
-#include "../testingMemPool.hpp"
+#include "parser/parser.hpp"
+#include "testingMemPool.hpp"
 
 TEST_CASE("scanTopLevel", "[checker]") {
   const std::string str = "func funcName(): int {other: char; }var : int;struct thing {  var : int;}";

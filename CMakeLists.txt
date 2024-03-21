@@ -6,27 +6,34 @@ project(main CXX)
 set(CMAKE_CXX_STANDARD 20)
 
 add_library(common STATIC
-    ./src/codeGen/interpreter/codeGen.cpp
-    ./src/checker/checker.cpp
-    ./src/prettyPrint/prettyPrint.cpp
-    ./src/parser/parser.cpp
-    ./src/nodes.cpp
-    ./src/tokenizer/tokenizer.cpp
-    ./src/token.cpp
-    ./src/utils.cpp
+    src/codeGen/interpreter/codeGen.cpp
+    src/checker/checker.cpp
+    src/prettyPrint/prettyPrint.cpp
+    src/parser/parser.cpp
+    src/nodes.cpp
+    src/tokenizer/tokenizer.cpp
+    src/token.cpp
+    src/utils.cpp
+    src/bytecodeDesign/bytecodeDesign.cpp
 )
-add_library(lib_interpreter STATIC ./src/interpreter/interpreter.cpp)
-set_target_properties(lib_interpreter common PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
+target_include_directories(common PRIVATE src)
 
-add_executable(signal ./src/interpreter/interpreterMain.cpp ./src/utils.cpp)
-target_link_libraries(signal PRIVATE lib_interpreter)
+add_library(interpreter STATIC src/interpreter/interpreter.cpp)
+target_include_directories(interpreter PRIVATE src)
+set_target_properties(interpreter common PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/out)
 
-add_executable(main ./src/main.cpp)
+add_executable(signal src/interpreter/interpreterMain.cpp src/utils.cpp)
+target_include_directories(signal PRIVATE src)
+target_link_libraries(signal PRIVATE interpreter)
+
+add_executable(main src/main.cpp src/bytecodeDesign/bytecodeDesign.cpp)
+target_include_directories(main PRIVATE src/)
 target_link_libraries(main PRIVATE common)
 
 if ( UNIX )
-    add_executable(tests ./src/testingMemPool.cpp ./src/tokenizer/test_tokenizer.cpp ./src/parser/test_parser.cpp ./src/prettyPrint/test_prettyPrint.cpp ./src/checker/test_checker.cpp ./src/interpreter/test_interpreter.cpp ./src/codeGen/interpreter/test_codeGen.cpp)
-    target_link_libraries(tests PRIVATE common lib_interpreter Catch2::Catch2WithMain)
+    add_executable(tests src/testingMemPool.cpp src/tokenizer/test_tokenizer.cpp src/parser/test_parser.cpp src/prettyPrint/test_prettyPrint.cpp src/checker/test_checker.cpp src/interpreter/test_interpreter.cpp src/codeGen/interpreter/test_codeGen.cpp src/bytecodeDesign/test_bytecodeDesign.cpp)
+    target_include_directories(tests PRIVATE src/)
+    target_link_libraries(tests PRIVATE common interpreter Catch2::Catch2WithMain)
     include(CTest)
     include(Catch)
     catch_discover_tests(tests)

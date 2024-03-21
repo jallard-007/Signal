@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../nodes.hpp"
-#include "../nodeMemPool.hpp"
+#include "nodes.hpp"
+#include "nodeMemPool.hpp"
 #include <map>
 
 enum class CheckerErrorType: uint8_t {

@@ -1,11 +1,16 @@
 #pragma once
 
+#include <vector>
+#include <iostream>
+
 #define NUM_REGISTERS 32
 #define instructionPointerIndex NUM_REGISTERS - 1
 #define stackPointerIndex NUM_REGISTERS - 2
 #define basePointerIndex NUM_REGISTERS - 3
 #define dataPointerIndex NUM_REGISTERS - 4
 #define miscRegisterIndex 0 // setting the zero register to a reserved register so that we can easily test if a register has been allocated
+
+typedef unsigned char bytecode_t;
 
 /* BUILT IN FUNCTIONS
 arguments are passed on the stack. before calling a function, space for the return value needs to be made
@@ -28,7 +33,7 @@ and return value via: sp + 8
 
 the return value can be accessed by the caller from sp
 */
-enum class BuiltInFunctions: unsigned char {
+enum class BuiltInFunction: bytecode_t {
   // memory management
   ALLOCATE, // ALLOCATE arg1 | allocate arg1 bytes and return address
   REALLOCATE, // REALLOCATE arg1, arg2 | reallocate memory pointed at by arg1 with new size arg2, return new address
@@ -64,12 +69,15 @@ enum class BuiltInFunctions: unsigned char {
   READ_CHAR, // READ_CHAR arg1 | returns one character from file pointer arg1
   WRITE, // WRITE arg1, arg2, arg3 | write arg2 bytes from arg1 to file pointer arg3, returns number of bytes written
   SEEK, // SEEK arg1, arg2, arg3 | seek to a position with offset arg2 from "type" arg3 in file pointer arg1. 'type' being start of file, curr position, or end of file
+
+  FIRST = ALLOCATE,
+  LAST = SEEK
 };
 
-enum class OpCodes: unsigned char {
+enum class OpCode: bytecode_t {
   NOP, // do nothing
   EXIT, // EXIT src | exits the program with the code in src
-  CALL_B, // CALL_B BuiltInFunctions | call a built in function such as print, etc.
+  CALL_B, // CALL_B BuiltInFunction | call a built in function such as print, etc.
 
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
   CMP, // CMP src1, src2
@@ -178,8 +186,14 @@ enum class OpCodes: unsigned char {
 
   // this marks the end of ops that should be in the executable
   // any ops below are temporary ops that should be changed before code gen process is done
-  END_OF_VALID_OPS,
+  FIRST = NOP,
+  LAST = F_DIV_I,
 };
+
+std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& obj);
+
+extern const char * bytecode_t_to_op [];
+extern const char * bytecode_t_to_builtin_function [];
 
 /*
 

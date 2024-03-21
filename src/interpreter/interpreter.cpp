@@ -3,7 +3,7 @@
 #include <cstring>
 #include "interpreter.hpp"
 
-#define uc unsigned char
+#define bc bytecode_t
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
@@ -23,8 +23,8 @@
 
 
 Interpreter::Interpreter(
-  uc const *programInstructions,
-  uc *programData,
+  bc const *programInstructions,
+  bc *programData,
   uint64_t stackSize
 ): program{programInstructions} {
   __stack.resize(stackSize);
@@ -52,7 +52,7 @@ Interpreter::Interpreter(
 
 int Interpreter::runProgram() {
   while (running) {
-  OpCodes op = (OpCodes)program[ip++];
+  OpCode op = (OpCode)program[ip++];
   #define MY_DEBUG
   #ifdef MY_DEBUG
   uint32_t arg1 = program[ip];
@@ -63,30 +63,30 @@ int Interpreter::runProgram() {
   (void)curr_stack;
   #endif
   switch (op) {
-    case OpCodes::NOP: {
+    case OpCode::NOP: {
       break;
     }
-    case OpCodes::EXIT: {
+    case OpCode::EXIT: {
       exitCode = registers[program[ip]];
       running = false;
       break;
     }
-    case OpCodes::CALL_B: {
-      switch ((BuiltInFunctions)program[ip++]) {
+    case OpCode::CALL_B: {
+      switch ((BuiltInFunction)program[ip++]) {
         // memory
-        case BuiltInFunctions::ALLOCATE: {
+        case BuiltInFunction::ALLOCATE: {
           // 8 bytes return value | 8 bytes size
           UINT64_SP(8) = (uint64_t)malloc(UINT64_SP(0));
           sp += 8;
           break;
         }
-        case BuiltInFunctions::REALLOCATE: {
+        case BuiltInFunction::REALLOCATE: {
           // 8 bytes return value | 8 bytes pointer | 8 bytes size
           UINT64_SP(16) = (uint64_t)realloc((void *)UINT64_SP(8), *(uint64_t *)UINT64_SP(0));
           sp += 16;
           break;
         }
-        case BuiltInFunctions::DEALLOCATE: {
+        case BuiltInFunction::DEALLOCATE: {
           // 8 bytes pointer
           free((void *)UINT64_SP(0));
           sp += 8;
@@ -94,19 +94,19 @@ int Interpreter::runProgram() {
         }
 
         // general
-        case BuiltInFunctions::MEM_COPY: {
+        case BuiltInFunction::MEM_COPY: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
           UINT64_SP(24) = (uint64_t)std::memcpy((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::MEM_MOVE: {
+        case BuiltInFunction::MEM_MOVE: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
           UINT64_SP(24) = (uint64_t)std::memmove((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::MEM_COMPARE: {
+        case BuiltInFunction::MEM_COMPARE: {
           // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2 | 8 bytes size
           INT32_SP(28) = std::memcmp(VOID_P_SP(16), VOID_P_SP(8), UINT64_SP(0));
           sp += 28;
@@ -114,44 +114,44 @@ int Interpreter::runProgram() {
         }
   
         // strings
-        case BuiltInFunctions::STR_LENGTH: {
+        case BuiltInFunction::STR_LENGTH: {
           // 8 bytes return value | 8 bytes string pointer
           UINT64_SP(8) = strlen(CHAR_P_SP(0));
           sp += 8;
           break;
         }
-        case BuiltInFunctions::STR_COMPARE: {
+        case BuiltInFunction::STR_COMPARE: {
           // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2
           INT32_SP(20) = strcmp(CHAR_P_SP(8), CHAR_P_SP(0));
           sp += 20;
           // res is 0 if equal, >0 if str1 is greater, <0 if str2 is greater
           break;
         }
-        case BuiltInFunctions::STR_N_COMPARE: {
+        case BuiltInFunction::STR_N_COMPARE: {
           // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2 | 8 bytes n
           INT32_SP(28) = strncmp(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
           sp += 28;
           break;
         }
-        case BuiltInFunctions::STR_COPY: {
+        case BuiltInFunction::STR_COPY: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2
           CHAR_P_SP(16) = strcpy(CHAR_P_SP(8), CHAR_P_SP(0));
           sp += 16;
           break;
         }
-        case BuiltInFunctions::STR_N_COPY: {
+        case BuiltInFunction::STR_N_COPY: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
           CHAR_P_SP(24) = strncpy(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::STR_CAT: {
+        case BuiltInFunction::STR_CAT: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2
           CHAR_P_SP(16) = strcat(CHAR_P_SP(8), CHAR_P_SP(0));
           sp += 16;
           break;
         }
-        case BuiltInFunctions::STR_N_CAT: {
+        case BuiltInFunction::STR_N_CAT: {
           // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
           CHAR_P_SP(24) = strncat(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
           sp += 24;
@@ -159,37 +159,37 @@ int Interpreter::runProgram() {
         }
 
         // printing
-        case BuiltInFunctions::PRINT_STRING: {
+        case BuiltInFunction::PRINT_STRING: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 bytes str
           INT32_SP(20) = fputs(CHAR_P_SP(0), FILE_P_SP(8));
           sp += 20;
           break;
         }
-        case BuiltInFunctions::PRINT_CHAR: {
+        case BuiltInFunction::PRINT_CHAR: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 1 byte char
           INT32_SP(13) = fputc(CHAR_SP(0), FILE_P_SP(1));
           sp += 13;
           break;
         }
-        case BuiltInFunctions::PRINT_SIGNED: {
+        case BuiltInFunction::PRINT_SIGNED: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
           INT32_SP(20) = fprintf(FILE_P_SP(8), "%" PRId64, (int64_t)UINT64_SP(0));
           sp += 20;
           break;
         }
-        case BuiltInFunctions::PRINT_UNSIGNED: {
+        case BuiltInFunction::PRINT_UNSIGNED: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
           INT32_SP(20) = fprintf(FILE_P_SP(8), "%" PRIu64, UINT64_SP(0));
           sp += 20;
           break;
         }
-        case BuiltInFunctions::PRINT_HEX: {
+        case BuiltInFunction::PRINT_HEX: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
           INT32_SP(20) = fprintf(FILE_P_SP(0), "0x%08" PRIx64, UINT64_SP(8));
           sp += 20;
           break;
         }
-        case BuiltInFunctions::FFLUSH: {
+        case BuiltInFunction::FFLUSH: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
           INT32_SP(12) = fflush(FILE_P_SP(0));
           sp += 12;
@@ -197,7 +197,7 @@ int Interpreter::runProgram() {
         }
         
         // files
-        case BuiltInFunctions::OPEN: {
+        case BuiltInFunction::OPEN: {
           // 8 bytes return value | 8 bytes str | 8 bytes str
           // modes =
           //   "r" read
@@ -210,37 +210,37 @@ int Interpreter::runProgram() {
           sp += 16;
           break;
         }
-        case BuiltInFunctions::CLOSE: {
+        case BuiltInFunction::CLOSE: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
           INT32_SP(12) = fclose(FILE_P_SP(0));
           sp += 12;
           break;
         }
-        case BuiltInFunctions::READ: {
+        case BuiltInFunction::READ: {
           // 8 bytes return value | 8 bytes buffer | 8 bytes n | 8 bytes file pointer
           UINT64_SP(24) = fread(VOID_P_SP(16), 1, UINT64_SP(8), FILE_P_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::READ_LINE: {
+        case BuiltInFunction::READ_LINE: {
           // 8 bytes return value | 8 bytes buffer | 4 bytes n | 4 bytes padding | 8 bytes file pointer
           CHAR_P_SP(24) = fgets(CHAR_P_SP(16), INT32_SP(12), FILE_P_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::READ_CHAR: {
+        case BuiltInFunction::READ_CHAR: {
           // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
           INT32_SP(12) = getc(FILE_P_SP(0));
           sp += 12;
           break;
         }
-        case BuiltInFunctions::WRITE: {
+        case BuiltInFunction::WRITE: {
           // 8 bytes return value | 8 bytes data | 8 bytes n | 8 bytes file pointer
           UINT64_SP(24) = fwrite(VOID_P_SP(16), 1, UINT64_SP(12), FILE_P_SP(0));
           sp += 24;
           break;
         }
-        case BuiltInFunctions::SEEK: {
+        case BuiltInFunction::SEEK: {
           // whenceOptions =
           //   SEEK_SET start of file
           //   SEEK_CUR curr position
@@ -257,7 +257,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::CMP: {
+    case OpCode::CMP: {
       int64_t res = (int64_t)registers[program[ip]] - (int64_t)registers[program[ip+1]];
       ip += 2;
       if (res == 0) {
@@ -272,7 +272,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::SET_FLAGS: {
+    case OpCode::SET_FLAGS: {
       int64_t res = (int64_t)registers[program[ip]];
       if (res == 0) {
         z = true;
@@ -286,75 +286,75 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::GET_E: {
+    case OpCode::GET_E: {
       registers[program[ip++]] = z;
       break;
     }
-    case OpCodes::GET_NE: {
+    case OpCode::GET_NE: {
       registers[program[ip++]] = !z;
       break;
     }
-    case OpCodes::GET_G: {
+    case OpCode::GET_G: {
       registers[program[ip++]] = p;
       break;
     }
-    case OpCodes::GET_GE: {
+    case OpCode::GET_GE: {
       registers[program[ip++]] = z || p;
       break;
     }
-    case OpCodes::GET_L: {
+    case OpCode::GET_L: {
       registers[program[ip++]] = !z && !p;
       break;
     }
-    case OpCodes::GET_LE: {
+    case OpCode::GET_LE: {
       registers[program[ip++]] = z || !p;
       break;
     }
-    case OpCodes::LOAD_B: {
+    case OpCode::LOAD_B: {
       registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::LOAD_W: {
+    case OpCode::LOAD_W: {
       registers[program[ip]] = *(uint16_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::LOAD_D: {
+    case OpCode::LOAD_D: {
       registers[program[ip]] = *(uint32_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::LOAD_Q: {
+    case OpCode::LOAD_Q: {
       registers[program[ip]] = *(uint64_t*)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::STORE_B: {
+    case OpCode::STORE_B: {
       *(uint8_t*)registers[program[ip]] = (uint8_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::STORE_W: {
+    case OpCode::STORE_W: {
       *(uint16_t*)registers[program[ip]] = (uint16_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::STORE_D: {
+    case OpCode::STORE_D: {
       *(uint32_t*)registers[program[ip]] = (uint32_t)registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::STORE_Q: {
+    case OpCode::STORE_Q: {
       *(uint64_t*)registers[program[ip]] = registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::JUMP: {
+    case OpCode::JUMP: {
       ip = registers[program[ip + 1]];
       break;
     }
-    case OpCodes::JUMP_E: {
+    case OpCode::JUMP_E: {
       if (z) {
         ip = registers[program[ip + 1]];
       } else {
@@ -362,7 +362,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::JUMP_NE: {
+    case OpCode::JUMP_NE: {
       if (!z) {
         ip = registers[program[ip + 1]];
       } else {
@@ -370,7 +370,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::JUMP_G: {
+    case OpCode::JUMP_G: {
       if (p) {
         ip = registers[program[ip + 1]];
       } else {
@@ -378,7 +378,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::JUMP_GE: {
+    case OpCode::JUMP_GE: {
       if (z || p) {
         ip = registers[program[ip + 1]];
       } else {
@@ -386,7 +386,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::JUMP_L: {
+    case OpCode::JUMP_L: {
       if (!z && !p) {
         ip = registers[program[ip + 1]];
       } else {
@@ -394,7 +394,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::JUMP_LE: {
+    case OpCode::JUMP_LE: {
       if (z || !p) {
         ip = registers[program[ip + 1]];
       } else {
@@ -402,11 +402,11 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP: {
+    case OpCode::R_JUMP: {
       ip += *(int16_t *)(program + ip) - 1;
       break;
     }
-    case OpCodes::R_JUMP_E: {
+    case OpCode::R_JUMP_E: {
       if (z) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -414,7 +414,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP_NE: {
+    case OpCode::R_JUMP_NE: {
       if (!z) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -422,7 +422,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP_G: {
+    case OpCode::R_JUMP_G: {
       if (p) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -430,7 +430,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP_GE: {
+    case OpCode::R_JUMP_GE: {
       if (z || p) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -438,7 +438,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP_L: {
+    case OpCode::R_JUMP_L: {
       if (!z && !p) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -446,7 +446,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::R_JUMP_LE: {
+    case OpCode::R_JUMP_LE: {
       if (z || !p) {
         ip += *(int16_t *)(program + ip) - 1;
       } else {
@@ -454,11 +454,11 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP: {
+    case OpCode::RS_JUMP: {
       ip += (int8_t)program[ip] - 1;
       break;
     }
-    case OpCodes::RS_JUMP_E: {
+    case OpCode::RS_JUMP_E: {
       if (z) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -466,7 +466,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP_NE: {
+    case OpCode::RS_JUMP_NE: {
       if (!z) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -474,7 +474,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP_G: {
+    case OpCode::RS_JUMP_G: {
       if (p) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -482,7 +482,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP_GE: {
+    case OpCode::RS_JUMP_GE: {
       if (z || p) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -490,7 +490,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP_L: {
+    case OpCode::RS_JUMP_L: {
       if (!z && !p) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -498,7 +498,7 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::RS_JUMP_LE: {
+    case OpCode::RS_JUMP_LE: {
       if (z || !p) {
         ip += (int8_t)program[ip] - 1;
       } else {
@@ -506,195 +506,195 @@ int Interpreter::runProgram() {
       }
       break;
     }
-    case OpCodes::MOVE: {
+    case OpCode::MOVE: {
       registers[program[ip]] = registers[program[ip+1]];
       ip += 2;
       break;
     }
-    case OpCodes::MOVE_I: {
+    case OpCode::MOVE_I: {
       registers[program[ip]] = *(uint32_t *)(program + ip + 1);
       ip += 5;
       break;
     }
-    case OpCodes::MOVE_LI: {
+    case OpCode::MOVE_LI: {
       registers[program[ip]] = *(uint64_t *)(program + ip + 1);
       ip += 9;
       break;
     }
-    case OpCodes::PUSH_B: {
+    case OpCode::PUSH_B: {
       --sp;
       *(uint8_t *)sp = (uint8_t)registers[program[ip++]];
       break;
     }
-    case OpCodes::PUSH_W: {
+    case OpCode::PUSH_W: {
       sp -= 2;
       *(uint16_t *)sp = (uint16_t)registers[program[ip++]];
       break;
     }
-    case OpCodes::PUSH_D: {
+    case OpCode::PUSH_D: {
       sp -= 4;
       *(uint32_t *)sp = (uint32_t)registers[program[ip++]];
       break;
     }
-    case OpCodes::PUSH_Q: {
+    case OpCode::PUSH_Q: {
       sp -= 8;
       *(uint64_t *)sp = registers[program[ip++]];
       break;
     }
-    case OpCodes::POP_B: {
+    case OpCode::POP_B: {
       registers[program[ip++]] = *(uint8_t *)sp;
       ++sp;
       break;
     }
-    case OpCodes::POP_W: {
+    case OpCode::POP_W: {
       registers[program[ip++]] = *(uint16_t *)sp;
       sp += 2;
       break;
     }
-    case OpCodes::POP_D: {
+    case OpCode::POP_D: {
       registers[program[ip++]] = *(uint32_t *)sp;
       sp += 4;
       break;
     }
-    case OpCodes::POP_Q: {
+    case OpCode::POP_Q: {
       registers[program[ip++]] = *(uint64_t *)sp;
       sp += 8;
       break;
     }
-    case OpCodes::INC: {
+    case OpCode::INC: {
       ++registers[program[ip]];
       ++ip;
       break;
     }
-    case OpCodes::DEC: {
+    case OpCode::DEC: {
       --registers[program[ip]];
       ++ip;
       break;
     }
-    case OpCodes::NOT: {
+    case OpCode::NOT: {
       registers[program[ip]] = !registers[program[ip]];
       ++ip;
       break;
     }
-    case OpCodes::ADD: {
+    case OpCode::ADD: {
       arithmeticOp(+=);
       break;
     }
-    case OpCodes::ADD_I: {
+    case OpCode::ADD_I: {
       arithmeticOp_I(+=);
       break;
     }
-    case OpCodes::SUB: {
+    case OpCode::SUB: {
       arithmeticOp(-=);
       break;
     }
-    case OpCodes::SUB_I: {
+    case OpCode::SUB_I: {
       arithmeticOp_I(-=);
       break;
     }
-    case OpCodes::MUL: {
+    case OpCode::MUL: {
       arithmeticOp(*=);
       break;
     }
-    case OpCodes::MUL_I: {
+    case OpCode::MUL_I: {
       arithmeticOp_I(*=);
       break;
     }
-    case OpCodes::DIV: {
+    case OpCode::DIV: {
       arithmeticOp(/=);
       break;
     }
-    case OpCodes::DIV_I: {
+    case OpCode::DIV_I: {
       arithmeticOp_I(/=);
       break;
     }
-    case OpCodes::MOD: {
+    case OpCode::MOD: {
       arithmeticOp(%=);
       break;
     }
-    case OpCodes::MOD_I: {
+    case OpCode::MOD_I: {
       arithmeticOp_I(%=);
       break;
     }
-    case OpCodes::OR: {
+    case OpCode::OR: {
       arithmeticOp(|=);
       break;
     }
-    case OpCodes::OR_I: {
+    case OpCode::OR_I: {
       arithmeticOp_I(|=);
       break;
     }
-    case OpCodes::AND: {
+    case OpCode::AND: {
       arithmeticOp(&=);
       break;
     }
-    case OpCodes::AND_I: {
+    case OpCode::AND_I: {
       arithmeticOp_I(&=);
       break;
     }
-    case OpCodes::XOR: {
+    case OpCode::XOR: {
       arithmeticOp(^=);
       break;
     }
-    case OpCodes::XOR_I: {
+    case OpCode::XOR_I: {
       arithmeticOp_I(^=);
       break;
     }
-    case OpCodes::SHIFT_L: {
+    case OpCode::SHIFT_L: {
       arithmeticOp(<<=);
       break;
     }
-    case OpCodes::SHIFT_L_I: {
+    case OpCode::SHIFT_L_I: {
       arithmeticOp_I(<<=);
       break;
     }
-    case OpCodes::SHIFT_R: {
+    case OpCode::SHIFT_R: {
       arithmeticOp(>>=);
       break;
     }
-    case OpCodes::SHIFT_R_I: {
+    case OpCode::SHIFT_R_I: {
       arithmeticOp_I(>>=);
       break;
     }
-    case OpCodes::LOGICAL_OR: {
+    case OpCode::LOGICAL_OR: {
       z = !(registers[program[ip]] || registers[program[ip+1]]);
       ip += 2;
       break;
     }
-    case OpCodes::LOGICAL_AND: {
+    case OpCode::LOGICAL_AND: {
       z = !(registers[program[ip]] && registers[program[ip+1]]);
       ip += 2;
       break;
     }
-    case OpCodes::F_ADD: {
+    case OpCode::F_ADD: {
       arithmeticOp_F(+);
       break;
     }
-    case OpCodes::F_ADD_I: {
+    case OpCode::F_ADD_I: {
       arithmeticOp_F_I(+);
       break;
     }
-    case OpCodes::F_SUB: {
+    case OpCode::F_SUB: {
       arithmeticOp_F(-);
       break;
     }
-    case OpCodes::F_SUB_I: {
+    case OpCode::F_SUB_I: {
       arithmeticOp_F_I(-);
       break;
     }
-    case OpCodes::F_MUL: {
+    case OpCode::F_MUL: {
       arithmeticOp_F(*);
       break;
     }
-    case OpCodes::F_MUL_I: {
+    case OpCode::F_MUL_I: {
       arithmeticOp_F_I(*);
       break;
     }
-    case OpCodes::F_DIV: {
+    case OpCode::F_DIV: {
       arithmeticOp_F(/);
       break;
     }
-    case OpCodes::F_DIV_I: {
+    case OpCode::F_DIV_I: {
       arithmeticOp_F_I(/);
       break;
     }

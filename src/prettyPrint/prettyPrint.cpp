@@ -1,4 +1,4 @@
-#include "../nodes.hpp"
+#include "nodes.hpp"
 
 const uint8_t indentationSize = 2;
 

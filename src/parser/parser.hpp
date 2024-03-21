@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../tokenizer/tokenizer.hpp"
-#include "../nodeMemPool.hpp"
+#include "tokenizer/tokenizer.hpp"
+#include "nodeMemPool.hpp"
 
 enum class UnexpectedType : uint8_t {
   NONE,

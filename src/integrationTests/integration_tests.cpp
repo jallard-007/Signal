@@ -1,11 +1,11 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "../interpreter/interpreter.hpp"
-#include "../parser/parser.hpp"
-#include "../codeGen/interpreter/codeGen.hpp"
-#include "../checker/checker.hpp"
-#include "../utils.hpp"
-#include "../testingMemPool.hpp"
+#include "interpreter/interpreter.hpp"
+#include "parser/parser.hpp"
+#include "codeGen/interpreter/codeGen.hpp"
+#include "checker/checker.hpp"
+#include "utils.hpp"
+#include "testingMemPool.hpp"
 
 #define currDir "src/integrationTests/"
 
