@@ -479,7 +479,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
       else {
         bc reg = allocateRegister();
         moveImmToReg(reg, leftResult.val);
-        addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+        addBytes({(bc)op, reg, (bc)rightResult.val});
         freeRegister((bc)rightResult.val);
         return {.val = reg, .isReg = true, .isTemp = true};
       }
@@ -488,7 +488,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     else {
       bc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
-      addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+      addBytes({(bc)op, reg, (bc)rightResult.val});
       return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
@@ -496,10 +496,10 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
   {
     // right imm
     if (!rightResult.isReg) {
-      uint16_t reg = allocateRegister();
-      addBytes({(bc)OpCode::MOVE, (bc)reg, (bc)leftResult.val});
+      bc reg = allocateRegister();
+      addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
       alignForImm(2, 4);
-      addBytes({(bc)op, (bc)reg});
+      addBytes({(bc)op, reg});
       add4ByteNum(uint32_t(rightResult.val));
       return {.val = reg, .isReg = true, .isTemp = true};
     }
@@ -511,7 +511,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
       } else {
         bc reg = allocateRegister();
         addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
-        addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+        addBytes({(bc)op, reg, (bc)rightResult.val});
         freeRegister((bc)rightResult.val);
         return {.val = reg, .isReg = true, .isTemp = true};
       }
@@ -520,7 +520,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     else {
       bc reg = allocateRegister();
       addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
-      addBytes({(bc)op, (bc)reg, (bc)rightResult.val});
+      addBytes({(bc)op, reg, (bc)rightResult.val});
       return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
@@ -947,7 +947,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
       if (!expRes.isReg) {
         reg = allocateRegister();
-        moveImmToReg((bc)reg, expRes.val);
+        moveImmToReg(reg, expRes.val);
       } else {
         reg = (bc)expRes.val;
       }
@@ -956,7 +956,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     switch (size) {
       case 1: {
         if (reg) {
-          addBytes({(bc)OpCode::PUSH_B, (bc)reg});
+          addBytes({(bc)OpCode::PUSH_B, reg});
         } else {
           addBytes({(bc)OpCode::DEC, stackPointerIndex});
         }
@@ -967,7 +967,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
           if (padding) {
             addBytes({(bc)OpCode::DEC, stackPointerIndex});
           }
-          addBytes({(bc)OpCode::PUSH_W, (bc)reg});
+          addBytes({(bc)OpCode::PUSH_W, reg});
         } else {
           alignForImm(2, 4);
           addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
@@ -984,7 +984,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
             add4ByteNum(padding);
           }
           // push value to stack
-          addBytes({(bc)OpCode::PUSH_D, (bc)reg});
+          addBytes({(bc)OpCode::PUSH_D, reg});
         } else {
           alignForImm(2, 4);
           addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
@@ -999,7 +999,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
             addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
             add4ByteNum(padding);
           }
-          addBytes({(bc)OpCode::PUSH_Q, (bc)reg});
+          addBytes({(bc)OpCode::PUSH_Q, reg});
         } else {
           alignForImm(2, 4);
           addBytes({(bc)OpCode::SUB_I, stackPointerIndex});

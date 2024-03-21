@@ -24,7 +24,7 @@
 
 Interpreter::Interpreter(
   bc const *programInstructions,
-  bc *programData,
+  unsigned char *programData,
   uint64_t stackSize
 ): program{programInstructions} {
   __stack.resize(stackSize);

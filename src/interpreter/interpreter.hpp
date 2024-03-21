@@ -7,10 +7,10 @@
 
 struct Interpreter {
   private:
-  std::vector<bytecode_t> __stack;
+  std::vector<unsigned char> __stack;
   public:
   uint64_t registers [NUM_REGISTERS] {0};
-  bytecode_t *stack {0};
+  unsigned char *stack {0};
   bytecode_t const * const program;
   int exitCode {0};
   bool z {0}; // zero flag
@@ -19,7 +19,7 @@ struct Interpreter {
   Interpreter() = delete;
   Interpreter(
     const bytecode_t *programInstructions,
-    bytecode_t *programData,
+    unsigned char *programData,
     uint64_t stackSize
   );
   int runProgram();

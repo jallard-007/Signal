@@ -5,7 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#define uc unsigned char
+#define bc bytecode_t
 
 #define testBoilerPlate(str) \
   std::vector<Tokenizer> tokenizers; \
@@ -17,21 +17,21 @@
 
 
 // copy of addByte from CodeGen class
-void addByte(std::vector<uc>& byteCode, uc byte) {
+void addByte(std::vector<bc>& byteCode, bc byte) {
   byteCode.emplace_back(byte);
 }
 // copy of addByteOp from CodeGen class
-void addByteOp(std::vector<uc>& byteCode, OpCode opCode) {
-  addByte(byteCode, (uc)opCode);
+void addByteOp(std::vector<bc>& byteCode, OpCode opCode) {
+  addByte(byteCode, (bc)opCode);
 }
 // copy of addBytes from CodeGen class
-void addBytes(std::vector<uc>& byteCode, const std::vector<uc>& bytes) {
-  for (const uc byte: bytes) {
+void addBytes(std::vector<bc>& byteCode, const std::vector<bc>& bytes) {
+  for (const bc byte: bytes) {
     addByte(byteCode, byte);
   }
 }
 // copy of alignForImm from CodeGen class
-void alignForImm(std::vector<uc>& byteCode, const uint32_t offset, const uint32_t size) {
+void alignForImm(std::vector<bc>& byteCode, const uint32_t offset, const uint32_t size) {
   uint8_t mod = (byteCode.size() + offset) % size;
   if (mod == 0) {
     return;
@@ -65,9 +65,9 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
@@ -78,10 +78,10 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::MOVE_I, 1, 10, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::PUSH_D, 1});
+    addBytes(expected, {(bc)OpCode::MOVE_I, 1, 10, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::PUSH_D, 1});
     CHECK(codeGen.byteCode == expected);
   }
 }
@@ -97,16 +97,16 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
     codeGen.generateStatement(statement);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::RS_JUMP, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
@@ -126,10 +126,10 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     codeGen.generateStatement(statement);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::RS_JUMP, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
@@ -143,12 +143,12 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
     codeGen.generateStatement(statement);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::RS_JUMP, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
     CHECK(codeGen.byteCode == expected);
   }
 }
@@ -230,27 +230,27 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    std::vector<uc> expected;
+    std::vector<bc> expected;
     // load x
-    addBytes(expected, {(uc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
+    addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::LOAD_D, 1, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
 
     // short circuit
-    addBytes(expected, {(uc)OpCode::SET_FLAGS, 1});
-    addBytes(expected, {(uc)OpCode::RS_JUMP_E, 0});
+    addBytes(expected, {(bc)OpCode::SET_FLAGS, 1});
+    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
     // load y
-    addBytes(expected, {(uc)OpCode::LOAD_D, 2, stackPointerIndex});
+    addBytes(expected, {(bc)OpCode::LOAD_D, 2, stackPointerIndex});
 
-    addBytes(expected, {(uc)OpCode::LOGICAL_AND, 1, 2});
-    addBytes(expected, {(uc)OpCode::RS_JUMP_E, 0});
+    addBytes(expected, {(bc)OpCode::LOGICAL_AND, 1, 2});
+    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
 
     CHECK(codeGen.byteCode == expected);
   }
@@ -270,32 +270,32 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    std::vector<uc> expected;
-    addBytes(expected, {(uc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
+    std::vector<bc> expected;
+    addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
-    addBytes(expected, {(uc)OpCode::LOAD_D, 1, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
 
     // short circuit
-    addBytes(expected, {(uc)OpCode::SET_FLAGS, 1});
-    addBytes(expected, {(uc)OpCode::RS_JUMP_E, 0});
+    addBytes(expected, {(bc)OpCode::SET_FLAGS, 1});
+    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
-    addBytes(expected, {(uc)OpCode::LOAD_D, 2, stackPointerIndex});
+    addBytes(expected, {(bc)OpCode::LOAD_D, 2, stackPointerIndex});
 
-    addBytes(expected, {(uc)OpCode::LOGICAL_AND, 1, 2});
-    addBytes(expected, {(uc)OpCode::GET_NE, 3});
+    addBytes(expected, {(bc)OpCode::LOGICAL_AND, 1, 2});
+    addBytes(expected, {(bc)OpCode::GET_NE, 3});
 
     // short circuit
-    addBytes(expected, {(uc)OpCode::SET_FLAGS, 3});
-    addBytes(expected, {(uc)OpCode::RS_JUMP_NE, 0});
+    addBytes(expected, {(bc)OpCode::SET_FLAGS, 3});
+    addBytes(expected, {(bc)OpCode::RS_JUMP_NE, 0});
 
-    addBytes(expected, {(uc)OpCode::LOGICAL_OR, 3, 1});
-    addBytes(expected, {(uc)OpCode::RS_JUMP_E, 0});
+    addBytes(expected, {(bc)OpCode::LOGICAL_OR, 3, 1});
+    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
     alignForImm(expected, 2, 4);
-    addBytes(expected, {(uc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
 
     CHECK(codeGen.byteCode == expected);
   }

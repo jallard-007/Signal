@@ -74,7 +74,6 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       case OpCode::RS_JUMP_LE: {
         int32_t arg1 = vec[++i];
         os << " " << arg1;
-        i += 1;
         break;
       }
 
