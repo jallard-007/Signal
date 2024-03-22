@@ -3,11 +3,11 @@
 #include <vector>
 #include <iostream>
 
+#define SIZE_OF_REGISTER 8
 #define NUM_REGISTERS 32
 #define instructionPointerIndex NUM_REGISTERS - 1
 #define stackPointerIndex NUM_REGISTERS - 2
-#define basePointerIndex NUM_REGISTERS - 3
-#define dataPointerIndex NUM_REGISTERS - 4
+#define dataPointerIndex NUM_REGISTERS - 3
 #define miscRegisterIndex 0 // setting the zero register to a reserved register so that we can easily test if a register has been allocated
 
 typedef unsigned char bytecode_t;

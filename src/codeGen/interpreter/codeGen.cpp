@@ -5,7 +5,6 @@
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
-#define bp registers[basePointerIndex]
 #define dp registers[dataPointerIndex]
 #define miscReg registers[miscRegisterIndex] // used for temporary/intermediate values
 
@@ -21,7 +20,6 @@ CodeGen::CodeGen(
 ): program{program}, lookUp{lookUp}, tokenizers{tokenizers} {
   sp.inUse = true;
   ip.inUse = true;
-  bp.inUse = true;
   dp.inUse = true;
   miscReg.inUse = true;
 }
@@ -57,7 +55,8 @@ ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLi
 */
 ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
   // need to lookup return type so we can make room for it
-  GeneralDec const *const &generalDec = lookUp[tk->extractToken(functionCall.name)];
+  const std::string& functionName = tk->extractToken(functionCall.name);
+  GeneralDec const *const &generalDec = lookUp[functionName];
   Token returnType = getTypeFromTokenList(generalDec->funcDec->returnType);
   (void)returnType;
   // 8 byte align return type since function assumes it is
@@ -72,6 +71,10 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   }
 
   // add function call ?
+  alignForImm(1, 4);
+  // register this position to be updated
+  addByteOp(OpCode::JUMP);
+  add4ByteNum(0);
   return {};
 }
 
@@ -140,8 +143,8 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     }
     case TokenType::STRING_LITERAL: { 
       std::string stringLiteral = tk->extractToken(token);
+      // place string literal in data section of bytecode, return offset to start of string
       return {};
-      // place string literal in data section of bytecode string, return offset to start of string
     }
     case TokenType::DECIMAL_NUMBER: {
       std::string decimalNumber = tk->extractToken(token);
@@ -178,13 +181,9 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       if (variableInfo.reg) {
         return {.val = variableInfo.reg, .isReg = true};
       }
+      const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
       const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
-      // |                   | <- sp
-      // |       | <- offset
-      // | value |
-      const uint32_t spOffset = getCurrStackPointerOffset();
-      const uint32_t varOffset = spOffset - variableInfo.offset;
-      if (sizeOfVar > 8) {
+      if (sizeOfVar > SIZE_OF_REGISTER) {
         // too large to fit into a reg, just return offset
         return {.val = varOffset};
       }
@@ -192,13 +191,13 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       variableInfo.reg = allocateRegister();
       OpCode loadOp = getLoadOpForSize(sizeOfVar);
       if (varOffset) {
-        addBytes({(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
+        addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
         alignForImm(2, 4);
-        addBytes({(bc)OpCode::ADD_I, miscRegisterIndex});
+        addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex}});
         add4ByteNum(varOffset);
-        addBytes({(bc)loadOp, variableInfo.reg, miscRegisterIndex});
+        addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
       } else {
-        addBytes({(bc)loadOp, variableInfo.reg, stackPointerIndex});
+        addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
       }
       return {.val = variableInfo.reg, .isReg = true};
     }
@@ -206,6 +205,13 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       return {};
     }
   }
+}
+
+uint32_t CodeGen::getVarOffsetFromSP(const StackVariable &variableInfo) {
+  // |                   | <- sp
+  // |       | <- positionOnStack
+  // | value |
+  return getCurrStackPointerPosition() - variableInfo.positionOnStack;
 }
 
 
@@ -248,7 +254,7 @@ void CodeGen::addByteOp(OpCode opCode) {
   addByte((bc)opCode);
 }
 
-void CodeGen::addBytes(const std::vector<bc>& bytes) {
+void CodeGen::addBytes(const std::span<const bc> bytes) {
   byteCode.reserve(byteCode.size() + bytes.size());
   byteCode.insert(byteCode.end(), bytes.begin(), bytes.end());
 }
@@ -301,6 +307,8 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
 }
 
 /**
+ * Problem with this is that we are using it for all numbers, including signed. need to rework
+ * 
  * Returns true if any of the largest 32 bits are set, false otherwise
 */
 bool topBitsSet(uint64_t val) {
@@ -395,11 +403,11 @@ bool isCommutative(OpCode op) {
 void CodeGen::moveImmToReg(const bytecode_t reg, const uint64_t val) {
   if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
     alignForImm(2, 8);
-    addBytes({(bc)OpCode::MOVE_LI, reg});
+    addBytes({{(bc)OpCode::MOVE_LI, reg}});
     add8ByteNum(val);
   } else {
     alignForImm(2, 4);
-    addBytes({(bc)OpCode::MOVE_I, reg});
+    addBytes({{(bc)OpCode::MOVE_I, reg}});
     add4ByteNum(val);
   }
 }
@@ -429,6 +437,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     // both operands are immediate values, return the result
     return {.val = evaluateExpression(op, leftResult.val, rightResult.val)};
   }
+  // beyond this point, only one of left or right can possibly be an imm
 
   // move any immediate values larger than 32 bits into registers, we only have 4 byte immediate instructions
   if (leftImm) {
@@ -453,35 +462,37 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     // right imm
     if (!rightResult.isReg) {
       alignForImm(2, 4);
-      addBytes({(bc)opImm, (bc)leftResult.val});
+      addBytes({{(bc)opImm, leftResult.reg}});
       add4ByteNum((uint32_t)rightResult.val);
-      return {.val = leftResult.val, .isReg = true, .isTemp = true};
+      return {.reg = leftResult.reg, .isReg = true, .isTemp = true};
     }
     // right temp / var
     else {
-      addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
+      addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
       if (rightResult.isTemp) {
-        freeRegister((bc)rightResult.val);
+        freeRegister(rightResult.reg);
       }
-      return {.val = leftResult.val, .isReg = true, .isTemp = true};
+      return {.reg = leftResult.reg, .isReg = true, .isTemp = true};
     }
   }
   // left imm
   if (!leftResult.isReg) {
+    // right is a reg
+    assert(rightResult.isReg);
     // right temp
     if (rightResult.isTemp) {
       if (isCommutative(op)) {
         alignForImm(2, 4);
-        addBytes({(bc)opImm, (bc)rightResult.val});
+        addBytes({{(bc)opImm, rightResult.reg}});
         add4ByteNum((uint32_t)leftResult.val);
-        return {.val = rightResult.val, .isReg = true, .isTemp = true};
+        return {.reg = rightResult.reg, .isReg = true, .isTemp = true};
       }
       // cannot flip args
       else {
         bc reg = allocateRegister();
         moveImmToReg(reg, leftResult.val);
-        addBytes({(bc)op, reg, (bc)rightResult.val});
-        freeRegister((bc)rightResult.val);
+        addBytes({{(bc)op, reg, rightResult.reg}});
+        freeRegister(rightResult.reg);
         return {.val = reg, .isReg = true, .isTemp = true};
       }
     }
@@ -489,7 +500,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     else {
       bc reg = allocateRegister();
       moveImmToReg(reg, leftResult.val);
-      addBytes({(bc)op, reg, (bc)rightResult.val});
+      addBytes({{(bc)op, reg, rightResult.reg}});
       return {.val = reg, .isReg = true, .isTemp = true};
     }
   }
@@ -498,31 +509,31 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     // right imm
     if (!rightResult.isReg) {
       bc reg = allocateRegister();
-      addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
+      addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
       alignForImm(2, 4);
-      addBytes({(bc)op, reg});
+      addBytes({{(bc)op, reg}});
       add4ByteNum(uint32_t(rightResult.val));
       return {.val = reg, .isReg = true, .isTemp = true};
     }
     // right temp
     else if (rightResult.isTemp) {
       if (isCommutative(op)) {
-        addBytes({(bc)op, (bc)rightResult.val, (bc)leftResult.val});
+        addBytes({{(bc)op, rightResult.reg, leftResult.reg}});
         return rightResult;
       } else {
         bc reg = allocateRegister();
-        addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
-        addBytes({(bc)op, reg, (bc)rightResult.val});
-        freeRegister((bc)rightResult.val);
-        return {.val = reg, .isReg = true, .isTemp = true};
+        addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
+        addBytes({{(bc)op, reg, rightResult.reg}});
+        freeRegister(rightResult.reg);
+        return {.reg = reg, .isReg = true, .isTemp = true};
       }
     }
     // right var
     else {
       bc reg = allocateRegister();
-      addBytes({(bc)OpCode::MOVE, reg, (bc)leftResult.val});
-      addBytes({(bc)op, reg, (bc)rightResult.val});
-      return {.val = reg, .isReg = true, .isTemp = true};
+      addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
+      addBytes({{(bc)op, reg, rightResult.reg}});
+      return {.reg = reg, .isReg = true, .isTemp = true};
     }
   }
 }
@@ -532,22 +543,117 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
  * Values on the left side are not preserved
 */
 ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
+  // checkers job to insure the assignment is valid
+  ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
-  ExpressionResult leftResult = generateExpression(binOp.leftSide);
+  assert(!leftResult.isTemp);
+  assert(leftResult.isReg);
   registers[leftResult.val].changed = true;
   if (!rightResult.isReg) {
     if (topBitsSet(rightResult.val)) {
       moveImmToReg(miscRegisterIndex, rightResult.val);
-      addBytes({(bc)op, (bc)leftResult.val, miscRegisterIndex});
+      addBytes({{(bc)op, leftResult.reg, miscRegisterIndex}});
     } else {
       alignForImm(2, 4);
-      addBytes({(bc)opImm, (bc)leftResult.val});
+      addBytes({{(bc)opImm, leftResult.reg}});
       add4ByteNum((uint32_t)rightResult.val);
     }
   } else {
-    addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
+    addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
+    if (rightResult.isTemp){
+      freeRegister(rightResult.reg);
+    }
   }
+  // write new value to stack
+  // have to know where leftResult is. it could be on the stack or heap
+  // it could be an element in an array and/or an element in a struct
+  // it could have already been calculated before and in a register
+  // need a function to get that info based on an expression
   return leftResult;
+}
+
+/**
+ * Generates the expression and returns the address of the result.
+ * the expression must be of a type that has a resulting address.
+ * Valid expression types: value (value must be an identifier, which is a valid variable), array access, binary op member access, unary op dereference
+ * \returns an ExpressionResult object. isTemp is true if isReg is true
+ * if isReg is set to false, it means there is something wrong with the expression. this should have been caught in the checker stage
+*/
+ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
+  ExpressionResult expRes;
+  switch (expression.getType()) {
+    case ExpressionType::BINARY_OP: {
+      // if binary op is not a member access, cannot get address of the result of a binary op
+      assert(expression.getBinOp()->op.getType() == TokenType::PTR_MEMBER_ACCESS || expression.getBinOp()->op.getType() == TokenType::DOT);
+      ExpressionResult thing = getAddressOfExpression(expression.getBinOp()->leftSide);
+      /* need type of result to lookup struct info. since this is recursive, we need to return the resulting type so that the higher node can use it
+        example:
+        structArr[i].structMember.nestedStructMember
+
+        ast would look like:
+                            dot 
+                          /     |
+                      dot       nestedStructMember
+                    /     |
+            arrayAccess     structMember
+              /     |
+        structArr     i
+
+
+      */
+      const StructInformation& structInfo = structNameToInfoMap[];
+      // get offset of member and add to structVar
+      return expRes;
+    }
+    case ExpressionType::UNARY_OP: {
+      // if unary op is not dereference, cannot get address of the result of a unary op
+      assert(expression.getUnOp()->op.getType() == TokenType::DEREFERENCE);
+      expRes = generateExpression(expression.getUnOp()->operand);
+      return expRes;
+    }
+    case ExpressionType::VALUE: {
+      // a plain identifier, just need to look up if it's a reference and then use original
+      // otherwise it's a stack variable so get offset from stack pointer
+      const std::string& ident = tk->extractToken(expression.getToken());
+      uint32_t stackItemIndex = nameToStackItemIndex[ident];
+      expRes.reg = allocateRegister();
+      addBytes({{(bc)OpCode::MOVE, expRes.reg, stackPointerIndex}});
+      alignForImm(2, 4);
+      addBytes({{(bc)OpCode::ADD_I, expRes.reg}});
+      add4ByteNum(getVarOffsetFromSP(stack[stackItemIndex].variable));
+      return expRes;
+    }
+    case ExpressionType::ARRAY_ACCESS: {
+      // need the value from expression.getArrayAccess()->offset
+      // then add that to expression.getArrayAccess()->array
+      ExpressionResult offset = generateExpression(expression.getArrayAccess()->offset);
+      ExpressionResult array = getAddressOfExpression(expression.getArrayAccess()->array);
+      assert(array.isReg); // 
+      if (!offset.isReg) {
+        // offset is immediate
+        if (topBitsSet(offset.val)) {
+          moveImmToReg(miscRegisterIndex, offset.val);
+          addBytes({{(bc)OpCode::ADD, array.reg, miscRegisterIndex}});
+        } else {
+          alignForImm(2, 4);
+          addBytes({{(bc)OpCode::ADD_I, array.reg}});
+          add4ByteNum((uint32_t)offset.val);
+        }
+      } else {
+        addBytes({{(bc)OpCode::ADD, array.reg, offset.reg}});
+      }
+      expRes.isReg = true;
+      expRes.isTemp = true;
+      expRes.reg = array.reg;
+      return expRes;
+    }
+    default: {
+      // invalid type
+      assert(false);
+      return expRes;
+    }
+  }
+
 }
 
 /**
@@ -584,12 +690,12 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       // short-circuit logical ops
       shortCircuitIndexStart = byteCode.size();
       if (binOp.op.type == TokenType::LOGICAL_AND) {
-        addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
+        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.reg}});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
       }
       else {
-        addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
+        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.reg}});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_NE); // if leftResult is true, skip right side
       }
@@ -616,12 +722,12 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         }
         // for &&, depends on left side
       }
-      addBytes({(bc)OpCode::SET_FLAGS, (bc)leftResult.val});
+      addBytes({{(bc)OpCode::SET_FLAGS, (bc)leftResult.val}});
     } else {
       if (!leftResult.isReg) {
-        addBytes({(bc)OpCode::SET_FLAGS, (bc)rightResult.val});
+        addBytes({{(bc)OpCode::SET_FLAGS, (bc)rightResult.val}});
       } else {
-        addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
+        addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
       }
     }
@@ -632,7 +738,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       expRes.isReg = true;
       expRes.isTemp = true;
       const bc reg = allocateRegister();
-      addBytes({(bc)getOp, reg});
+      addBytes({{(bc)getOp, reg}});
       expRes.val = reg;
     }
     return expRes;
@@ -656,12 +762,12 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     rightResult.val = reg;
     rightResult.isTemp = true;
   }
-  addBytes({(bc)op, (bc)leftResult.val, (bc)rightResult.val});
+  addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
   if (rightResult.isTemp) {
-    freeRegister((bc)rightResult.val);
+    freeRegister(rightResult.reg);
   }
   if (leftResult.isTemp) {
-    freeRegister((bc)leftResult.val);
+    freeRegister(leftResult.reg);
   }
   ExpressionResult expRes;
   if (controlFlow) {
@@ -670,7 +776,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     expRes.isReg = true;
     expRes.isTemp = true;
     const bc reg = allocateRegister();
-    addBytes({(bc)getOp, reg});
+    addBytes({{(bc)getOp, reg}});
     expRes.val = reg;
   }
   return expRes;
@@ -798,12 +904,12 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
         expRes.isTemp = true;
       } else if (!expRes.isTemp) {
         const bc reg = allocateRegister();
-        addBytes({(bc)OpCode::MOVE, reg, (bc)expRes.val});
+        addBytes({{(bc)OpCode::MOVE, reg, expRes.reg}});
         expRes.val = reg;
         expRes.isReg = true;
         expRes.isTemp = true;
       }
-      addBytes({(bc)OpCode::NOT, (bc)expRes.val});
+      addBytes({{(bc)OpCode::NOT, expRes.reg}});
       return expRes;
     }
     case TokenType::ADDRESS_OF: {
@@ -936,11 +1042,11 @@ bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
 */
 bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
   bc reg = 0;
+  const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
+  StackVariable& stackVar = addVarDecToVirtualStack(varDec);
+  const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
   const Token typeToken = getTypeFromTokenList(varDec.type);
   const uint32_t size = sizeOfType(typeToken);
-  const uint32_t preAddStackPointerOffset = getCurrStackPointerOffset();
-  StackVariable& stackVar = addVarDecToVirtualStack(varDec);
-  const uint32_t diff = stackVar.offset - preAddStackPointerOffset;
   const uint32_t padding = diff - size;
   assert(padding < size);
   if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
@@ -950,28 +1056,28 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         reg = allocateRegister();
         moveImmToReg(reg, expRes.val);
       } else {
-        reg = (bc)expRes.val;
+        reg = expRes.reg;
       }
       stackVar.reg = reg;
     }
     switch (size) {
       case 1: {
         if (reg) {
-          addBytes({(bc)OpCode::PUSH_B, reg});
+          addBytes({{(bc)OpCode::PUSH_B, reg}});
         } else {
-          addBytes({(bc)OpCode::DEC, stackPointerIndex});
+          addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
         }
         break;
       }
       case 2: {
         if (reg) {
           if (padding) {
-            addBytes({(bc)OpCode::DEC, stackPointerIndex});
+            addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
           }
-          addBytes({(bc)OpCode::PUSH_W, reg});
+          addBytes({{(bc)OpCode::PUSH_W, reg}});
         } else {
           alignForImm(2, 4);
-          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+          addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
           add4ByteNum(size + padding);
         }
         break;
@@ -981,14 +1087,14 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
           // add padding to align
           if (padding) {
             alignForImm(2, 4);
-            addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+            addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
             add4ByteNum(padding);
           }
           // push value to stack
-          addBytes({(bc)OpCode::PUSH_D, reg});
+          addBytes({{(bc)OpCode::PUSH_D, reg}});
         } else {
           alignForImm(2, 4);
-          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+          addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
           add4ByteNum(size + padding);
         }
         break;
@@ -997,13 +1103,13 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         if (reg) {
           if (padding) {
             alignForImm(2, 4);
-            addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+            addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
             add4ByteNum(padding);
           }
-          addBytes({(bc)OpCode::PUSH_Q, reg});
+          addBytes({{(bc)OpCode::PUSH_Q, reg}});
         } else {
           alignForImm(2, 4);
-          addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+          addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
           add4ByteNum(size + padding);
         }
         break;
@@ -1016,7 +1122,7 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
     alignForImm(2, 4);
-    addBytes({(bc)OpCode::SUB_I, stackPointerIndex});
+    addBytes({{(bc)OpCode::SUB_I, stackPointerIndex}});
     add4ByteNum(size + padding);
     // generateVariableDeclarationStructType(varDec, initialize);
   }
@@ -1137,7 +1243,7 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
       } // else condition always false, don't generate
       return BranchStatementResult::ALWAYS_FALSE;
     }
-    addBytes({(bc)OpCode::SET_FLAGS, (bc)expRes.val});
+    addBytes({{(bc)OpCode::SET_FLAGS, expRes.reg}});
     expRes.jumpOp = OpCode::RS_JUMP_E;
   }
   addJumpMarker(JumpMarkerType::TO_BRANCH_END);
@@ -1259,7 +1365,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         moveImmToReg(miscRegisterIndex, expRes.val);
         expRes.val = miscRegisterIndex;
       }
-      addBytes({(bc)OpCode::EXIT, (bc)expRes.val});
+      addBytes({{(bc)OpCode::EXIT, expRes.reg}});
       break;
     }
     case ControlFlowStatementType::SWITCH_STATEMENT: {
@@ -1319,7 +1425,7 @@ void CodeGen::endSoftScope() {
   }
   if (stackUsage) {
     alignForImm(2, 4);
-    addBytes({(bc)OpCode::ADD_I, stackPointerIndex});
+    addBytes({{(bc)OpCode::ADD_I, stackPointerIndex}});
     add4ByteNum(stackUsage);
   }
 }
@@ -1331,13 +1437,6 @@ void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
   };
   stack.emplace_back(scopeMarker);
   addFunctionSignatureToVirtualStack(funcDec);
-  // StackItem basePointerMarker {
-  //   .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), Token{0, 0, TokenType::POINTER}),
-  //   .type = StackItemType::BASE_POINTER
-  // };
-  // stack.emplace_back(basePointerMarker);
-  // addBytes({(bc)OpCode::PUSH_Q, basePointerIndex});
-  // addBytes({(bc)OpCode::MOVE, basePointerIndex, stackPointerIndex});
 }
 
 void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
@@ -1357,8 +1456,6 @@ void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
     stack.pop_back();
     assert(!stack.empty()); // paired with marker comment above
   }
-  addBytes({(bc)OpCode::MOVE, stackPointerIndex, basePointerIndex});
-  addBytes({(bc)OpCode::POP_Q, basePointerIndex});
 }
 
 void CodeGen::generateStatement(const Statement& statement) {
@@ -1411,34 +1508,37 @@ Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
 
 /**
  * 
- * \returns offset of item
+ * \returns position of item
 */
-uint32_t CodeGen::getOffsetPushingItemToStack(uint32_t curr_bp_offset, Token typeToken, uint32_t alignTo) {
+uint32_t CodeGen::getPositionPushingItemToStack(Token typeToken, uint32_t alignTo) {
   uint32_t sizeOfParameter = 0;
   if (typeToken.type == TokenType::IDENTIFIER) {
     const StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
     sizeOfParameter = structInfo.size;
-    if (!alignTo)
+    if (!alignTo) {
       alignTo = structInfo.alignTo;
+    }
   } else {
     sizeOfParameter = sizeOfType(typeToken);
-    if (!alignTo)
+    if (!alignTo) {
       alignTo = sizeOfParameter;
+    }
   }
   if (alignTo > sizeOfParameter) {
     sizeOfParameter = alignTo;
   }
   assert(alignTo);
-  const uint32_t mod = curr_bp_offset % alignTo;
+  const uint32_t curr_sp_position = getCurrStackPointerPosition();
+  const uint32_t mod = curr_sp_position % alignTo;
   const uint32_t paddingNeeded = mod != 0 ? alignTo - mod : 0;
-  return curr_bp_offset + paddingNeeded + sizeOfParameter;
+  return curr_sp_position + paddingNeeded + sizeOfParameter;
 }
 
 StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
   StackItem stackItem {
     .variable = {
       .varDec = varDec,
-      .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), getTypeFromTokenList(varDec.type)),
+      .positionOnStack = getPositionPushingItemToStack(getTypeFromTokenList(varDec.type)),
     },
     .type = StackItemType::VARIABLE,
   };
@@ -1447,13 +1547,13 @@ StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
   return stack.back().variable;
 }
 
-uint32_t CodeGen::getCurrStackPointerOffset() {
+uint32_t CodeGen::getCurrStackPointerPosition() {
   auto iter = stack.rbegin();
   while (iter != stack.rend()) {
     if (iter->type == StackItemType::VARIABLE) {
-      return iter->variable.offset;
+      return iter->variable.positionOnStack;
     } else if (iter->type != StackItemType::MARKER) {
-      return iter->offset;
+      return iter->positionOnStack;
     }
     ++iter;
   }
@@ -1486,7 +1586,7 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
   // add return value, 8 byte aligned
   if (funcDec.returnType.token.type != TokenType::VOID) {
     StackItem returnValue {
-      .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), getTypeFromTokenList(funcDec.returnType), 8),
+      .positionOnStack = getPositionPushingItemToStack(getTypeFromTokenList(funcDec.returnType), 8),
       .type = StackItemType::RETURN_VALUE,
     };
     nameToStackItemIndex["-rv"] = stack.size();
@@ -1504,7 +1604,7 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
 
   // add return address
   StackItem returnAddress {
-    .offset = getOffsetPushingItemToStack(getCurrStackPointerOffset(), Token{0, 0, TokenType::POINTER}),
+    .positionOnStack = getPositionPushingItemToStack(Token{0, 0, TokenType::POINTER}),
     .type = StackItemType::RETURN_ADDRESS,
   };
   nameToStackItemIndex["-ra"] = stack.size();

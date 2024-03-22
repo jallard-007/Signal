@@ -2,6 +2,7 @@
 
 #include <map>
 #include <array>
+#include <span>
 #include <cstdint>
 #include "nodes.hpp"
 #include "tokenizer/tokenizer.hpp"
@@ -14,7 +15,11 @@ struct RegisterInfo {
 };
 
 struct ExpressionResult {
-  uint64_t val{0};
+  TokenList *type {nullptr};
+  union {
+    uint64_t val{0};
+    bytecode_t reg;
+  };
   OpCode jumpOp {OpCode::NOP};
   bool isReg {false};
   bool isTemp {false};
@@ -22,7 +27,7 @@ struct ExpressionResult {
 
 struct StructInformation {
   std::map<std::string, uint32_t> offsetMap;
-  int32_t size = -1;
+  int32_t size = -1; // do we want to allow structs without any member variables? if not, change this to unsigned, make checker show error
   uint32_t alignTo = 0;
   StructInformation() = default;
 };
@@ -62,7 +67,7 @@ enum class StackMarkerType: uint8_t {
 
 struct StackVariable {
   const VariableDec &varDec;
-  uint32_t offset = 0;
+  uint32_t positionOnStack = 0;
   bytecode_t reg = 0;
 };
 
@@ -72,14 +77,13 @@ enum class StackItemType: uint8_t {
   VARIABLE,
   RETURN_ADDRESS,
   RETURN_VALUE,
-  BASE_POINTER
 };
 
 struct StackItem {
   union {
     StackVariable variable;
     StackMarkerType marker;
-    uint32_t offset;
+    uint32_t positionOnStack;
   };
   StackItemType type = StackItemType::NONE;
 };
@@ -117,7 +121,9 @@ struct CodeGen {
   ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
   ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
 
+  uint32_t getVarOffsetFromSP(const StackVariable &);
   ExpressionResult loadValue(const Token&);
+  ExpressionResult getAddressOfExpression(const Expression&);
 
   bool generate();
   bool generateGeneralDeclaration(const GeneralDec&);
@@ -143,7 +149,7 @@ struct CodeGen {
   // adding to the bytecode
   void addByteOp(OpCode);
   void addByte(bytecode_t);
-  void addBytes(const std::vector<bytecode_t>&);
+  void addBytes(const std::span<const bytecode_t>);
   void addNumBytes(const void *, uint64_t);
   void add2ByteNum(const uint16_t);
   void add4ByteNum(const uint32_t);
@@ -158,12 +164,12 @@ struct CodeGen {
   void moveImmToReg(uint8_t, uint64_t);
 
   // stack stuff
-  uint32_t getCurrStackPointerOffset();
+  uint32_t getCurrStackPointerPosition();
   void makeRoomOnVirtualStack(Token, uint32_t = 0);
   StackVariable& addVarDecToVirtualStack(const VariableDec&);
   void addExpressionResToStack(const ExpressionResult&);
   void addTokenToStack(Token);
-  uint32_t getOffsetPushingItemToStack(uint32_t, Token, uint32_t = 0);
+  uint32_t getPositionPushingItemToStack(Token, uint32_t = 0);
   int getStackOffset(const std::string&);
 
   bytecode_t allocateRegister();

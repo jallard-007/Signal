@@ -7,7 +7,6 @@
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
-#define bp registers[basePointerIndex]
 #define dp registers[dataPointerIndex]
 #define misc registers[miscIndex]
 
@@ -30,7 +29,6 @@ Interpreter::Interpreter(
   __stack.resize(stackSize);
   stack = __stack.data();
   sp = (uint64_t)stack + stackSize;
-  bp = sp;
   dp = (uint64_t)programData;
 }
 

@@ -315,7 +315,7 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
     REQUIRE(codeGen.stack.size() == 1);
     CHECK(codeGen.stack[0].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[0].offset == 8);
+    CHECK(codeGen.stack[0].positionOnStack == 8);
   }
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
@@ -330,9 +330,9 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
     REQUIRE(codeGen.stack.size() == 2);
     CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
-    CHECK(codeGen.stack[0].offset == 8);
+    CHECK(codeGen.stack[0].positionOnStack == 8);
     CHECK(codeGen.stack[1].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[1].offset == 16);
+    CHECK(codeGen.stack[1].positionOnStack == 16);
   }
   SECTION("three") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
@@ -347,12 +347,12 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
     REQUIRE(codeGen.stack.size() == 3);
     CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
-    CHECK(codeGen.stack[0].offset == 8);
+    CHECK(codeGen.stack[0].positionOnStack == 8);
     CHECK(codeGen.stack[1].type == StackItemType::VARIABLE);
-    CHECK(codeGen.stack[1].variable.offset == 16);
+    CHECK(codeGen.stack[1].variable.positionOnStack == 16);
     CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
     CHECK(codeGen.stack[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
     CHECK(codeGen.stack[2].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[2].offset == 24);
+    CHECK(codeGen.stack[2].positionOnStack == 24);
   }
 }

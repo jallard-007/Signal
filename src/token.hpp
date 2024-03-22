@@ -148,6 +148,7 @@ struct Token {
   Token(uint32_t pos, uint16_t len, TokenType t): type{t}, length{len}, position{pos} {}
   bool operator==(const Token&) const;
   Token& operator=(const Token&);
+  inline TokenType getType() const { return type; };
 };
 
 
