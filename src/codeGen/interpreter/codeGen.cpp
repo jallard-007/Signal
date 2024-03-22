@@ -380,11 +380,12 @@ bool evaluateBooleanBinOp(TokenType op, uint64_t leftSide, uint64_t rightSide) {
 }
 
 bool isCommutative(OpCode op) {
-  return
+  return !(
     op == OpCode::SUB ||
     op == OpCode::DIV ||
     op == OpCode::F_SUB ||
-    op == OpCode::F_DIV;
+    op == OpCode::F_DIV
+  );
 }
 
 /**
