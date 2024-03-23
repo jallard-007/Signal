@@ -15,7 +15,7 @@ struct RegisterInfo {
 };
 
 struct ExpressionResult {
-  TokenList *type {nullptr};
+  const TokenList *type {nullptr};
   union {
     uint64_t val{0};
     bytecode_t reg;
@@ -156,6 +156,7 @@ struct CodeGen {
   void add8ByteNum(const uint64_t);
   void addPointer();
   void addJumpOp(OpCode);
+  void expressionResWithOp(OpCode, OpCode, bytecode_t, const ExpressionResult&);
 
   void updateJumpOpTo(uint64_t, uint64_t);
 

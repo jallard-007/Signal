@@ -584,8 +584,10 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
   switch (expression.getType()) {
     case ExpressionType::BINARY_OP: {
       // if binary op is not a member access, cannot get address of the result of a binary op
-      assert(expression.getBinOp()->op.getType() == TokenType::PTR_MEMBER_ACCESS || expression.getBinOp()->op.getType() == TokenType::DOT);
-      ExpressionResult thing = getAddressOfExpression(expression.getBinOp()->leftSide);
+      BinOp* binOp = expression.getBinOp();
+      TokenType op = binOp->op.getType();
+      assert(op == TokenType::PTR_MEMBER_ACCESS || op == TokenType::DOT);
+      expRes = getAddressOfExpression(binOp->leftSide);
       /* need type of result to lookup struct info. since this is recursive, we need to return the resulting type so that the higher node can use it
         example:
         structArr[i].structMember.nestedStructMember
@@ -599,9 +601,20 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
               /     |
         structArr     i
 
-
       */
-      const StructInformation& structInfo = structNameToInfoMap[];
+
+      if (op == TokenType::PTR_MEMBER_ACCESS) {
+        expRes.type = expRes.type->next;
+      }
+      const StructInformation& structInfo = structNameToInfoMap[tk->extractToken(expRes.type->token)];
+      assert(binOp->rightSide.getType() == ExpressionType::VALUE);
+      const std::string& memberName = tk->extractToken(binOp->rightSide.getToken());
+      const uint32_t offsetInStruct = structInfo.offsetMap.at(memberName);
+      if (offsetInStruct) {
+        alignForImm(2, 4);
+        addBytes({{(bc)OpCode::ADD_I, expRes.reg}});
+        add4ByteNum(offsetInStruct);
+      }
       // get offset of member and add to structVar
       return expRes;
     }
@@ -620,7 +633,15 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       addBytes({{(bc)OpCode::MOVE, expRes.reg, stackPointerIndex}});
       alignForImm(2, 4);
       addBytes({{(bc)OpCode::ADD_I, expRes.reg}});
-      add4ByteNum(getVarOffsetFromSP(stack[stackItemIndex].variable));
+      const StackVariable& stackVar = stack[stackItemIndex].variable;
+      add4ByteNum(getVarOffsetFromSP(stackVar));
+      expRes.type = &stackVar.varDec.type;
+      if (expRes.type->token.getType() == TokenType::REFERENCE) {
+        // always move past references
+        expRes.type = expRes.type->next;
+      }
+      expRes.isReg = true;
+      expRes.isTemp = true;
       return expRes;
     }
     case ExpressionType::ARRAY_ACCESS: {
@@ -628,20 +649,9 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       // then add that to expression.getArrayAccess()->array
       ExpressionResult offset = generateExpression(expression.getArrayAccess()->offset);
       ExpressionResult array = getAddressOfExpression(expression.getArrayAccess()->array);
+      // have to multiple offset by size of array type
       assert(array.isReg); // 
-      if (!offset.isReg) {
-        // offset is immediate
-        if (topBitsSet(offset.val)) {
-          moveImmToReg(miscRegisterIndex, offset.val);
-          addBytes({{(bc)OpCode::ADD, array.reg, miscRegisterIndex}});
-        } else {
-          alignForImm(2, 4);
-          addBytes({{(bc)OpCode::ADD_I, array.reg}});
-          add4ByteNum((uint32_t)offset.val);
-        }
-      } else {
-        addBytes({{(bc)OpCode::ADD, array.reg, offset.reg}});
-      }
+      (void)offset;
       expRes.isReg = true;
       expRes.isTemp = true;
       expRes.reg = array.reg;
@@ -654,6 +664,46 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
     }
   }
 
+}
+
+/**
+ * 
+*/
+void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, bytecode_t resReg, const ExpressionResult& expRes) {
+  if (!expRes.isReg) {
+    // offset is immediate
+    bool large = false;
+    if (isSigned(expRes.type->token.getType())) {
+      if ((int64_t)expRes.val <= INT8_MAX && (int64_t)expRes.val >= INT8_MIN) {
+        addBytes({{(bc)immOp, resReg, (bc)expRes.val}});
+        return;
+      }
+      if ((int64_t)expRes.val > INT32_MAX || (int64_t)expRes.val < INT32_MIN) {
+        large = true;
+      }
+    } else {
+      if (expRes.val <= UINT8_MAX) {
+        addBytes({{(bc)immOp, resReg, (bc)expRes.val}});
+        return;
+      }
+      if (expRes.val > UINT32_MAX) {
+        large = true;
+      }
+    }
+    if (large) {
+      alignForImm(2, 8);
+      addBytes({{(bc)OpCode::MOVE_LI, miscRegisterIndex}});
+      add4ByteNum((uint32_t)expRes.val);
+    } else {
+      // have to use full 8 byte
+      alignForImm(2, 4);
+      addBytes({{(bc)OpCode::MOVE_I, miscRegisterIndex}});
+      add8ByteNum(expRes.val);
+    }
+    addBytes({{(bc)op, resReg, miscRegisterIndex}});
+  } else {
+    addBytes({{(bc)op, resReg, expRes.reg}});
+  }
 }
 
 /**

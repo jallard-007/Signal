@@ -111,8 +111,8 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
         break;
       }
 
-      // 1 register arg, followed by a 4 byte signed in
-      case OpCode::MOVE_I:
+      // 1 register arg, followed by a 1 byte number
+      case OpCode::MOVE_SI:
       case OpCode::ADD_I:
       case OpCode::SUB_I:
       case OpCode::MUL_I:
@@ -127,6 +127,14 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       case OpCode::F_SUB_I:
       case OpCode::F_MUL_I:
       case OpCode::F_DIV_I: {
+        uint32_t arg1 = vec[++i];
+        int32_t arg2 = *(int8_t *)&vec[++i];
+        os << " " << arg1 << " " << arg2;
+        break;
+      }
+
+      // 1 register arg, followed by a 4 byte number
+      case OpCode::MOVE_I: {
         uint32_t arg1 = vec[++i];
         int32_t arg2 = *(int32_t *)&vec[++i];
         os << " " << arg1 << " " << arg2;

@@ -133,6 +133,7 @@ enum class OpCode: bytecode_t {
 
   // move data between registers
   MOVE, // MOVE dest, src
+  MOVE_SI, // MOVE dest, 1 byte imm
   MOVE_I, // MOVE dest, 4 byte imm
   MOVE_LI, // MOVE dest, 8 byte imm
 
@@ -151,25 +152,25 @@ enum class OpCode: bytecode_t {
   DEC,
   NOT,
   ADD, // ADD dest, src
-  ADD_I, // ADD_I dest, 4 byte imm
+  ADD_I, // ADD_I dest, 1 byte imm
   SUB, // SUB dest, src
-  SUB_I, // SUB_I dest, 4 byte imm
+  SUB_I, // SUB_I dest, 1 byte imm
   MUL, // MUL dest, src
-  MUL_I, // MUL_I dest, 4 byte imm
+  MUL_I, // MUL_I dest, 1 byte imm
   DIV, // DIV dest, src
-  DIV_I, // DIV_I dest, 4 byte imm
+  DIV_I, // DIV_I dest, 1 byte imm
   MOD, // MOD dest, src
-  MOD_I, // MOD_I dest, 4 byte imm
+  MOD_I, // MOD_I dest, 1 byte imm
   OR, // OR dest, src
-  OR_I, // OR_I dest, 4 byte imm
+  OR_I, // OR_I dest, 1 byte imm
   AND, // AND dest, src
-  AND_I, // AND_I dest, 4 byte imm
+  AND_I, // AND_I dest, 1 byte imm
   XOR, // XOR dest, src
-  XOR_I, // XOR_I dest, 4 byte imm
+  XOR_I, // XOR_I dest, 1 byte imm
   SHIFT_L, // SHIFT_L dest, src
-  SHIFT_L_I, // SHIFT_L_I dest, 4 byte imm
+  SHIFT_L_I, // SHIFT_L_I dest, 1 byte imm
   SHIFT_R, // SHIFT_R dest, src
-  SHIFT_R_I, // SHIFT_R_I dest, 4 byte imm
+  SHIFT_R_I, // SHIFT_R_I dest, 1 byte imm
 
   LOGICAL_OR,
   LOGICAL_AND,

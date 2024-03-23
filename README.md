@@ -9,7 +9,10 @@ Uses CMake as a build tool and Catch2 for testing
 TODO:
 - Parser
     - change array access expression type to binary op
+- Bytecode design, Interpreter, CodeGen,
+    - change add/sub/mul etc. immediate instructions to take a smaller byte num (1 or 2, not sure which though)
 - Code gen
+    - refactor to use expressionResWithOp everywhere
     - storing values back to memory (assignment bin ops), need address and type of expression
     - functions, scopes, nested scopes, breaking out of loops (Use stack markers)
     - unary operators

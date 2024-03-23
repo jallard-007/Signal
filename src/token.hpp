@@ -160,6 +160,8 @@ bool isControlFlow(TokenType);
 bool isLiteral(TokenType);
 bool isLogicalOp(TokenType);
 bool isAssignment(TokenType);
+bool isUnsigned(TokenType);
+bool isSigned(TokenType);
 
 extern const TokenType numToType [128];
 extern const std::unordered_map<TokenType, std::string> typeToString;

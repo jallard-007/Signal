@@ -509,6 +509,11 @@ int Interpreter::runProgram() {
       ip += 2;
       break;
     }
+    case OpCode::MOVE_SI: {
+      registers[program[ip]] = *(uint8_t *)(program + ip + 1);
+      ip += 2;
+      break;
+    }
     case OpCode::MOVE_I: {
       registers[program[ip]] = *(uint32_t *)(program + ip + 1);
       ip += 5;
