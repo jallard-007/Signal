@@ -37,8 +37,8 @@ Interpreter::Interpreter(
   ip += 2
 
 #define arithmeticOp_I(op) \
-  registers[program[ip]] op *(uint32_t *)(program+ip+1); \
-  ip += 5
+  registers[program[ip]] op *(uint16_t *)(program+ip+1); \
+  ip += 3
 
 #define arithmeticOp_F(op) \
   *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(registers+program[ip+2]); \
@@ -250,7 +250,8 @@ int Interpreter::runProgram() {
         }
         default: {
           std::cerr << "Runtime Error: Invalid BuiltInFunction, Code [" << (uint32_t)program[ip - 1] << "]\n";
-          exit(1);
+          running = false;
+          break;
         }
       }
       break;

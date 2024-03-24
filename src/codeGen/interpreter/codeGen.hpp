@@ -15,11 +15,11 @@ struct RegisterInfo {
 };
 
 struct ExpressionResult {
-  const TokenList *type {nullptr};
   union {
-    uint64_t val{0};
+    uint64_t val {0};
     bytecode_t reg;
   };
+  const TokenList *type {nullptr};
   OpCode jumpOp {OpCode::NOP};
   bool isReg {false};
   bool isTemp {false};
@@ -162,7 +162,7 @@ struct CodeGen {
 
 
   void alignForImm(uint32_t, uint32_t);
-  void moveImmToReg(uint8_t, uint64_t);
+  void moveImmToReg(uint8_t, const ExpressionResult&);
 
   // stack stuff
   uint32_t getCurrStackPointerPosition();

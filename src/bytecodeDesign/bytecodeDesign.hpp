@@ -152,25 +152,25 @@ enum class OpCode: bytecode_t {
   DEC,
   NOT,
   ADD, // ADD dest, src
-  ADD_I, // ADD_I dest, 1 byte imm
+  ADD_I, // ADD_I dest, 2 byte imm
   SUB, // SUB dest, src
-  SUB_I, // SUB_I dest, 1 byte imm
+  SUB_I, // SUB_I dest, 2 byte imm
   MUL, // MUL dest, src
-  MUL_I, // MUL_I dest, 1 byte imm
+  MUL_I, // MUL_I dest, 2 byte imm
   DIV, // DIV dest, src
-  DIV_I, // DIV_I dest, 1 byte imm
+  DIV_I, // DIV_I dest, 2 byte imm
   MOD, // MOD dest, src
-  MOD_I, // MOD_I dest, 1 byte imm
+  MOD_I, // MOD_I dest, 2 byte imm
   OR, // OR dest, src
-  OR_I, // OR_I dest, 1 byte imm
+  OR_I, // OR_I dest, 2 byte imm
   AND, // AND dest, src
-  AND_I, // AND_I dest, 1 byte imm
+  AND_I, // AND_I dest, 2 byte imm
   XOR, // XOR dest, src
-  XOR_I, // XOR_I dest, 1 byte imm
+  XOR_I, // XOR_I dest, 2 byte imm
   SHIFT_L, // SHIFT_L dest, src
-  SHIFT_L_I, // SHIFT_L_I dest, 1 byte imm
+  SHIFT_L_I, // SHIFT_L_I dest, 2 byte imm
   SHIFT_R, // SHIFT_R dest, src
-  SHIFT_R_I, // SHIFT_R_I dest, 1 byte imm
+  SHIFT_R_I, // SHIFT_R_I dest, 2 byte imm
 
   LOGICAL_OR,
   LOGICAL_AND,

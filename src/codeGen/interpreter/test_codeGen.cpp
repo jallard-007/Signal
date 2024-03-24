@@ -66,8 +66,8 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
     std::vector<bc> expected;
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
@@ -79,8 +79,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
     std::vector<bc> expected;
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::MOVE_I, 1, 10, 0, 0, 0});
+    addBytes(expected, {(bc)OpCode::MOVE_SI, 1, 10});
     addBytes(expected, {(bc)OpCode::PUSH_D, 1});
     CHECK(codeGen.byteCode == expected);
   }
@@ -98,15 +97,15 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
     codeGen.generateStatement(statement);
     std::vector<bc> expected;
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
     addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
     CHECK(codeGen.byteCode == expected);
   }
   {
@@ -127,8 +126,8 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     codeGen.generateStatement(statement);
     std::vector<bc> expected;
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
     addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
     CHECK(codeGen.byteCode == expected);
   }
@@ -144,10 +143,10 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
     codeGen.generateStatement(statement);
     std::vector<bc> expected;
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0, 0, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
     addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
     CHECK(codeGen.byteCode == expected);
   }
@@ -233,8 +232,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     std::vector<bc> expected;
     // load x
     addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0});
     addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
 
     // short circuit
@@ -247,10 +246,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(bc)OpCode::LOGICAL_AND, 1, 2});
     addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0});
 
     CHECK(codeGen.byteCode == expected);
   }
@@ -272,8 +271,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(cond_statement);
     std::vector<bc> expected;
     addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0});
     addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
 
     // short circuit
@@ -292,10 +291,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     addBytes(expected, {(bc)OpCode::LOGICAL_OR, 3, 1});
     addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
 
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0, 0, 0});
-    alignForImm(expected, 2, 4);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0, 0, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
+    alignForImm(expected, 2, 2);
+    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0});
 
     CHECK(codeGen.byteCode == expected);
   }
