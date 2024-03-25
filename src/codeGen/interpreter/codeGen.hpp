@@ -199,7 +199,8 @@ struct CodeGen {
 };
 
 OpCode getLoadOpForSize(unsigned char);
-
+ExpressionResult evaluateUnaryOpImmExpression(TokenType, ExpressionResult&);
+ExpressionResult evaluateBinOpImmExpression(TokenType, ExpressionResult&, ExpressionResult&);
 
 /*
 hard scope change: starting a new function (variables can take on any identifier not in the global scope)

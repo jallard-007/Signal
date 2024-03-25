@@ -156,6 +156,166 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
     CHECK(*(int64_t *)expRes.getData() == result);
   }
+  SECTION("ben expression 1") {
+    #define EXPRESSION 55 % 6
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 2") {
+    #define EXPRESSION 8 * 5.3
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 3") {
+    #define EXPRESSION 23984723 - 9234.2 * 3 || 0x823ff2
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::BOOL);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 4") {
+    #define EXPRESSION 0b11111111111 ^ ((0xfffffff + (15 - 0b0101) / 17  + 7) - 2)
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 5") {
+    #define EXPRESSION (false || 0x23423ac ^ 128) + 1843709551615/2
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 6") {
+    #define EXPRESSION (18446551615-123876) + 2
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 7") {
+    #define EXPRESSION 5 | (0x3a3423 | 0b1) * 102 || 66
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::BOOL);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 8") {
+    #define EXPRESSION 5 > 0.000078
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::BOOL);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 9") {
+    #define EXPRESSION ((234532 & 234) < 0xB234) && !(34 - 3234.2 * 1.5 - 75)
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::BOOL);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
+  SECTION("ben expression 10") {
+    #define EXPRESSION 808 - 0b111010010100001110100111111 && true
+    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::BOOL);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
+  }
 }
 
 TEST_CASE("variable creation", "[codeGen]") {
