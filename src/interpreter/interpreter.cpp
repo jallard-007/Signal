@@ -9,6 +9,7 @@
 #define ip registers[instructionPointerIndex]
 #define dp registers[dataPointerIndex]
 #define misc registers[miscIndex]
+#define getInstructionByte(offset) *(char *)(ip + offset)
 
 // macros for getting values from the stack
 #define UINT64_SP(offset) *(uint64_t *)(sp + offset)
@@ -30,32 +31,33 @@ Interpreter::Interpreter(
   stack = __stack.data();
   sp = (uint64_t)stack + stackSize;
   dp = (uint64_t)programData;
+  ip = (uint64_t)programInstructions;
 }
 
 #define arithmeticOp(op) \
-  registers[program[ip]] op registers[program[ip+1]]; \
+  registers[*(bc *)ip] op registers[*(bc *)(ip+1)]; \
   ip += 2
 
 #define arithmeticOp_I(op) \
-  registers[program[ip]] op *(uint16_t *)(program+ip+1); \
+  registers[*(bc *)ip] op *(uint16_t *)(ip+1); \
   ip += 3
 
 #define arithmeticOp_F(op) \
-  *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(registers+program[ip+2]); \
+  *(double *)(registers+*(bc *)ip) = *(double *)(registers+*(bc *)(ip+1)) op *(double *)(registers+*(bc *)(ip+2)); \
   ip += 3
 
 #define arithmeticOp_F_I(op) \
-  *(double *)(registers+program[ip]) = *(double *)(registers+program[ip+1]) op *(double *)(program+ip+2); \
+  *(double *)(registers+*(bc *)ip) = *(double *)(registers+*(bc *)(ip+1)) op *(double *)(ip+2); \
   ip += 10
 
 int Interpreter::runProgram() {
   while (running) {
-  OpCode op = (OpCode)program[ip++];
+  OpCode op = (OpCode)*(bc *)ip++;
   #define MY_DEBUG
   #ifdef MY_DEBUG
-  uint32_t arg1 = program[ip];
+  uint32_t arg1 = *(bc *)ip;
   (void)arg1;
-  uint32_t arg2 = program[ip+1];
+  uint32_t arg2 = *(bc *)(ip+1);
   (void)arg2;
   uint64_t *curr_stack = (uint64_t *)sp;
   (void)curr_stack;
@@ -65,12 +67,12 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::EXIT: {
-      exitCode = registers[program[ip]];
+      exitCode = registers[*(bc *)ip];
       running = false;
       break;
     }
     case OpCode::CALL_B: {
-      switch ((BuiltInFunction)program[ip++]) {
+      switch ((BuiltInFunction)*(bc *)ip++) {
         // memory
         case BuiltInFunction::ALLOCATE: {
           // 8 bytes return value | 8 bytes size
@@ -249,7 +251,7 @@ int Interpreter::runProgram() {
           break;
         }
         default: {
-          std::cerr << "Runtime Error: Invalid BuiltInFunction, Code [" << (uint32_t)program[ip - 1] << "]\n";
+          std::cerr << "Runtime Error: Invalid BuiltInFunction, Code [" << (uint32_t)*(bc *)(ip - 1) << "]\n";
           running = false;
           break;
         }
@@ -257,7 +259,7 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::CMP: {
-      int64_t res = (int64_t)registers[program[ip]] - (int64_t)registers[program[ip+1]];
+      int64_t res = (int64_t)registers[*(bc *)ip] - (int64_t)registers[*(bc *)(ip + 1)];
       ip += 2;
       if (res == 0) {
         z = true;
@@ -272,7 +274,7 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::SET_FLAGS: {
-      int64_t res = (int64_t)registers[program[ip]];
+      int64_t res = (int64_t)registers[*(bc *)ip];
       if (res == 0) {
         z = true;
         p = false;
@@ -286,76 +288,82 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::GET_E: {
-      registers[program[ip++]] = z;
+      registers[*(bc *)ip] = z;
+      ++ip;
       break;
     }
     case OpCode::GET_NE: {
-      registers[program[ip++]] = !z;
+      registers[*(bc *)ip] = !z;
+      ++ip;
       break;
     }
     case OpCode::GET_G: {
-      registers[program[ip++]] = p;
+      registers[*(bc *)ip] = p;
+      ++ip;
       break;
     }
     case OpCode::GET_GE: {
-      registers[program[ip++]] = z || p;
+      registers[*(bc *)ip] = z || p;
+      ++ip;
       break;
     }
     case OpCode::GET_L: {
-      registers[program[ip++]] = !z && !p;
+      registers[*(bc *)ip] = !z && !p;
+      ++ip;
       break;
     }
     case OpCode::GET_LE: {
-      registers[program[ip++]] = z || !p;
+      registers[*(bc *)ip] = z || !p;
+      ++ip;
       break;
     }
     case OpCode::LOAD_B: {
-      registers[program[ip]] = *(uint8_t*)registers[program[ip+1]];
+      registers[*(bc *)ip] = *(uint8_t*)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::LOAD_W: {
-      registers[program[ip]] = *(uint16_t*)registers[program[ip+1]];
+      registers[*(bc *)ip] = *(uint16_t*)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::LOAD_D: {
-      registers[program[ip]] = *(uint32_t*)registers[program[ip+1]];
+      registers[*(bc *)ip] = *(uint32_t*)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::LOAD_Q: {
-      registers[program[ip]] = *(uint64_t*)registers[program[ip+1]];
+      registers[*(bc *)ip] = *(uint64_t*)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::STORE_B: {
-      *(uint8_t*)registers[program[ip]] = (uint8_t)registers[program[ip+1]];
+      *(uint8_t*)registers[*(bc *)ip] = (uint8_t)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::STORE_W: {
-      *(uint16_t*)registers[program[ip]] = (uint16_t)registers[program[ip+1]];
+      *(uint16_t*)registers[*(bc *)ip] = (uint16_t)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::STORE_D: {
-      *(uint32_t*)registers[program[ip]] = (uint32_t)registers[program[ip+1]];
+      *(uint32_t*)registers[*(bc *)ip] = (uint32_t)registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::STORE_Q: {
-      *(uint64_t*)registers[program[ip]] = registers[program[ip+1]];
+      *(uint64_t*)registers[*(bc *)ip] = registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::JUMP: {
-      ip = registers[program[ip + 1]];
+      ip = registers[*(bc *)(ip + 1)];
       break;
     }
     case OpCode::JUMP_E: {
       if (z) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
@@ -363,7 +371,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::JUMP_NE: {
       if (!z) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
@@ -371,7 +379,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::JUMP_G: {
       if (p) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
@@ -379,7 +387,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::JUMP_GE: {
       if (z || p) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
@@ -387,7 +395,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::JUMP_L: {
       if (!z && !p) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
@@ -395,19 +403,19 @@ int Interpreter::runProgram() {
     }
     case OpCode::JUMP_LE: {
       if (z || !p) {
-        ip = registers[program[ip + 1]];
+        ip = registers[*(bc *)(ip + 1)];
       } else {
         ip += 2;
       }
       break;
     }
     case OpCode::R_JUMP: {
-      ip += *(int16_t *)(program + ip) - 1;
+      ip += *(int16_t *)(ip) - 1;
       break;
     }
     case OpCode::R_JUMP_E: {
       if (z) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -415,7 +423,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_NE: {
       if (!z) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -423,7 +431,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_G: {
       if (p) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -431,7 +439,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_GE: {
       if (z || p) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -439,7 +447,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_L: {
       if (!z && !p) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -447,19 +455,19 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_LE: {
       if (z || !p) {
-        ip += *(int16_t *)(program + ip) - 1;
+        ip += *(int16_t *)(ip) - 1;
       } else {
         ip += 2;
       }
       break;
     }
     case OpCode::RS_JUMP: {
-      ip += (int8_t)program[ip] - 1;
+      ip += (int8_t)*(bc *)ip - 1;
       break;
     }
     case OpCode::RS_JUMP_E: {
       if (z) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
@@ -467,7 +475,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::RS_JUMP_NE: {
       if (!z) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
@@ -475,7 +483,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::RS_JUMP_G: {
       if (p) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
@@ -483,7 +491,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::RS_JUMP_GE: {
       if (z || p) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
@@ -491,7 +499,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::RS_JUMP_L: {
       if (!z && !p) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
@@ -499,84 +507,97 @@ int Interpreter::runProgram() {
     }
     case OpCode::RS_JUMP_LE: {
       if (z || !p) {
-        ip += (int8_t)program[ip] - 1;
+        ip += (int8_t)*(bc *)ip - 1;
       } else {
         ++ip;
       }
       break;
     }
     case OpCode::MOVE: {
-      registers[program[ip]] = registers[program[ip+1]];
+      registers[*(bc *)ip] = registers[*(bc *)(ip + 1)];
       ip += 2;
       break;
     }
     case OpCode::MOVE_SI: {
-      registers[program[ip]] = *(uint8_t *)(program + ip + 1);
+      registers[*(bc *)ip] = *(uint8_t *)(ip + 1);
       ip += 2;
       break;
     }
     case OpCode::MOVE_I: {
-      registers[program[ip]] = *(uint32_t *)(program + ip + 1);
+      registers[*(bc *)ip] = *(uint32_t *)(ip + 1);
       ip += 5;
       break;
     }
     case OpCode::MOVE_LI: {
-      registers[program[ip]] = *(uint64_t *)(program + ip + 1);
+      registers[*(bc *)ip] = *(uint64_t *)(ip + 1);
       ip += 9;
       break;
     }
     case OpCode::PUSH_B: {
       --sp;
-      *(uint8_t *)sp = (uint8_t)registers[program[ip++]];
+      *(uint8_t *)sp = (uint8_t)registers[*(bc *)ip];
+      ++ip;
       break;
     }
     case OpCode::PUSH_W: {
       sp -= 2;
-      *(uint16_t *)sp = (uint16_t)registers[program[ip++]];
+      *(uint16_t *)sp = (uint16_t)registers[*(bc *)ip];
+      ++ip;
       break;
     }
     case OpCode::PUSH_D: {
       sp -= 4;
-      *(uint32_t *)sp = (uint32_t)registers[program[ip++]];
+      *(uint32_t *)sp = (uint32_t)registers[*(bc *)ip];
+      ++ip;
       break;
     }
     case OpCode::PUSH_Q: {
       sp -= 8;
-      *(uint64_t *)sp = registers[program[ip++]];
+      *(uint64_t *)sp = registers[*(bc *)ip];
+      ++ip;
       break;
     }
     case OpCode::POP_B: {
-      registers[program[ip++]] = *(uint8_t *)sp;
+      registers[*(bc *)ip] = *(uint8_t *)sp;
+      ++ip;
       ++sp;
       break;
     }
     case OpCode::POP_W: {
-      registers[program[ip++]] = *(uint16_t *)sp;
+      registers[*(bc *)ip] = *(uint16_t *)sp;
+      ++ip;
       sp += 2;
       break;
     }
     case OpCode::POP_D: {
-      registers[program[ip++]] = *(uint32_t *)sp;
+      registers[*(bc *)ip] = *(uint32_t *)sp;
+      ++ip;
       sp += 4;
       break;
     }
     case OpCode::POP_Q: {
-      registers[program[ip++]] = *(uint64_t *)sp;
+      registers[*(bc *)ip] = *(uint64_t *)sp;
+      ++ip;
       sp += 8;
       break;
     }
     case OpCode::INC: {
-      ++registers[program[ip]];
+      ++registers[*(bc *)ip];
       ++ip;
       break;
     }
     case OpCode::DEC: {
-      --registers[program[ip]];
+      --registers[*(bc *)ip];
       ++ip;
       break;
     }
     case OpCode::NOT: {
-      registers[program[ip]] = !registers[program[ip]];
+      registers[*(bc *)ip] = !registers[*(bc *)ip];
+      ++ip;
+      break;
+    }
+    case OpCode::NEGATE: {
+      registers[*(bc *)ip] = -registers[*(bc *)ip];
       ++ip;
       break;
     }
@@ -661,12 +682,12 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::LOGICAL_OR: {
-      z = !(registers[program[ip]] || registers[program[ip+1]]);
+      z = !(registers[*(bc *)ip] || registers[*(bc *)(ip + 1)]);
       ip += 2;
       break;
     }
     case OpCode::LOGICAL_AND: {
-      z = !(registers[program[ip]] && registers[program[ip+1]]);
+      z = !(registers[*(bc *)ip] && registers[*(bc *)(ip + 1)]);
       ip += 2;
       break;
     }

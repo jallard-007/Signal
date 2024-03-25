@@ -90,6 +90,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       case OpCode::STORE_Q:
       case OpCode::MOVE:
       case OpCode::NOT:
+      case OpCode::NEGATE:
       case OpCode::ADD:
       case OpCode::SUB:
       case OpCode::MUL:
@@ -262,6 +263,7 @@ const char * bytecode_t_to_op [] = {
   "INC",
   "DEC",
   "NOT",
+  "NEGATE",
   "ADD",
   "ADD_I",
   "SUB",

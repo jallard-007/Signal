@@ -59,7 +59,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
-    CHECK(*(int32_t *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("max int32") {
     #define EXPRESSION INT32_MAX
@@ -74,10 +74,9 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
-    CHECK(*(int32_t *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("min int32") {
-    SKIP("Haven't implemented negative yet");
     #define EXPRESSION INT32_MIN
     auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
@@ -90,7 +89,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
-    CHECK(*(int32_t *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("max uint32") {
     #define EXPRESSION 4294967295
@@ -105,12 +104,11 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
-    CHECK(*(uint32_t *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("negative max uint32") {
-    SKIP("Haven't implemented negative yet");
-    #define EXPRESSION -UINT32_MAX
-    auto result = EXPRESSION;
+    #define EXPRESSION -4294967295U
+    auto result = (uint32_t)EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -121,8 +119,8 @@ TEST_CASE("constant expressions", "[codeGen]") {
     ExpressionResult expRes = codeGen.generateExpression(expression);
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
-    CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
-    CHECK(*(int64_t *)expRes.getData() == result);
+    CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("complex") {
     #define EXPRESSION 2.0 * 100 / 3
@@ -138,7 +136,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
-    CHECK(*(double *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("overflow") {
     #define EXPRESSION 9223372036854775807 + 1
@@ -154,7 +152,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
     CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
-    CHECK(*(int64_t *)expRes.getData() == result);
+    CHECK(*(decltype(result) *)expRes.getData() == result);
   }
   SECTION("ben expression 1") {
     #define EXPRESSION 55 % 6
