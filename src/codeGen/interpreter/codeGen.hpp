@@ -15,14 +15,17 @@ struct RegisterInfo {
 };
 
 struct ExpressionResult {
-  union {
-    uint64_t val {0};
-    bytecode_t reg;
-  };
+  private:
+  bytecode_t data [SIZE_OF_REGISTER] {0};
+  public:
   const TokenList *type {nullptr};
   OpCode jumpOp {OpCode::NOP};
   bool isReg {false};
   bool isTemp {false};
+  inline const void *getData() const { return (void *)data; }
+  void setData(const void *, uint8_t);
+  inline void setReg(bytecode_t reg) { data[0] = reg; }
+  inline bytecode_t getReg() const { return data[0]; }
 };
 
 struct StructInformation {
@@ -94,11 +97,25 @@ enum class BranchStatementResult: uint8_t {
   ALWAYS_FALSE,
 };
 
+enum class DataSectionEntryType {
+  STRING_LITERAL,
+  STATIC_DATA,
+};
+
+struct DataSectionEntry {
+  DataSectionEntryType type;
+  uint32_t indexInDataSection;
+  DataSectionEntry() = delete;
+  DataSectionEntry(DataSectionEntryType type, uint32_t indexInDataSection): type{type}, indexInDataSection{indexInDataSection} {}
+};
+
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
   std::map<std::string, uint32_t> nameToStackItemIndex;
   std::vector<unsigned char> byteCode;
+  std::vector<unsigned char> dataSection;
+  std::vector<DataSectionEntry> dataSectionEntries;
   std::vector<JumpMarker> jumpMarkers;
   std::vector<StackItem> stack;
   Tokenizer *tk{nullptr};
@@ -114,6 +131,8 @@ struct CodeGen {
   ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
   ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
   ExpressionResult generateExpressionUnOp(const UnOp&);
+
+  const DataSectionEntry& addToDataSection(DataSectionEntryType, void *data, uint32_t n);
 
   // binary ops
   ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
@@ -156,13 +175,13 @@ struct CodeGen {
   void add8ByteNum(const uint64_t);
   void addPointer();
   void addJumpOp(OpCode);
-  void expressionResWithOp(OpCode, OpCode, bytecode_t, const ExpressionResult&);
+  ExpressionResult expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
 
   void updateJumpOpTo(uint64_t, uint64_t);
 
 
   void alignForImm(uint32_t, uint32_t);
-  void moveImmToReg(uint8_t, const ExpressionResult&);
+  void moveImmToReg(uint8_t, ExpressionResult&);
 
   // stack stuff
   uint32_t getCurrStackPointerPosition();

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include "tokenizer.hpp"
 
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
@@ -475,6 +476,16 @@ Token Tokenizer::tokenizeNext() {
       } else {
         type = TokenType::DECIMAL_NUMBER;
         movePastNumber();
+      }
+      if (content[position] == '.' && type == TokenType::DECIMAL_NUMBER) {
+        uint32_t prevPosition = position;
+        // float
+        movePastNumber();
+        if (position > prevPosition + 1) {
+          type = TokenType::FLOAT_NUMBER;
+        } else {
+          position = prevPosition;
+        }
       }
       break;
     }

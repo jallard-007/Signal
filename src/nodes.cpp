@@ -3,13 +3,10 @@
 
 bool notFirstOfExpression(TokenType type) {
   return type != TokenType::IDENTIFIER &&
-    !isBinaryOp(type) && !isUnaryOp(type) &&
-    type != TokenType::DECIMAL_NUMBER &&
-    type != TokenType::OPEN_PAREN &&
-    type != TokenType::STRING_LITERAL &&
-    type != TokenType::CHAR_LITERAL &&
-    type != TokenType::BINARY_NUMBER &&
-    type != TokenType::HEX_NUMBER;
+    !isBinaryOp(type) &&
+    !isUnaryOp(type) &&
+    !isLiteral(type) &&
+    type != TokenType::OPEN_PAREN;
 }
 
 Expression::Expression(): binOp{nullptr} {}

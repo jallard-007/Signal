@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cassert>
+#include <cstring>
 #include "codeGen.hpp"
 #include "utils.hpp"
 
@@ -9,6 +10,12 @@
 #define miscReg registers[miscRegisterIndex] // used for temporary/intermediate values
 
 #define bc bytecode_t
+
+
+void ExpressionResult::setData(const void *newData, uint8_t size) {
+  assert(size <= sizeof(data));
+  memmove(data, newData, size);
+}
 
 JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
   start{start}, type{type} {}
@@ -121,40 +128,106 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool con
   }
 }
 
+const DataSectionEntry& CodeGen::addToDataSection(DataSectionEntryType type, void *data, uint32_t n) {
+  void *dest = dataSection.data() + dataSection.size();
+  dataSectionEntries.emplace_back(type, dataSection.size());
+  dataSection.resize(dataSection.size() + n);
+  memcpy(dest, data, n);
+  return dataSectionEntries.back();
+}
+
 ExpressionResult CodeGen::loadValue(const Token &token) {
+  ExpressionResult expRes;
   switch (token.type) {
     case TokenType::CHAR_LITERAL: {
       std::string charLiteral = tk->extractToken(token);
       // convert charLiteral to its numeric value and return it
+      // might do this during the tokenizer stage...
       if (charLiteral.size() == 3) {
-        return {.val = (uint64_t)charLiteral[1]};
+        expRes.setData(&charLiteral[1], 1);
+        return expRes;
       } else if (charLiteral.size() == 4) {
         if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          return {.val = (uint64_t)(charLiteral[2] - '0')};
+          charLiteral[2] -= '0';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
         } else if (charLiteral[2] == 'n') {
-          return {.val = '\n'};
+          charLiteral[2] = '\n';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        } else if (charLiteral[2] == '"') {
+          charLiteral[2] = '\"';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
         } else if (charLiteral[2] == '\\') {
-          return {.val = '\\'};
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
         } else if (charLiteral[2] == '\'') {
-          return {.val = '\''};
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
         }
       }
-      return {.type = &Checker::charValue};
+      assert(false);
+      return expRes;
     }
     case TokenType::STRING_LITERAL: { 
+      // place string literal in data section of bytecode, return offset to start of string, have to replace escaped characters
+      // check if string is already in data section
+      expRes.type = &Checker::stringValue;
       std::string stringLiteral = tk->extractToken(token);
-      // place string literal in data section of bytecode, return offset to start of string
-      return {.type = &Checker::stringValue};
+      for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
+        if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
+          continue;
+        }
+        const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
+        uint64_t stringLength = strlen(pString);
+        if (stringLiteral.length() == stringLength && stringLiteral == pString) {
+          expRes.setData(&i, sizeof(i));
+          return expRes;
+        }
+        i += stringLength;
+      }
+      const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, stringLiteral.data(), stringLiteral.length() + 1);
+      expRes.setData(&dataSectionEntry.indexInDataSection, sizeof(dataSectionEntry.indexInDataSection));
+      return expRes;
     }
     case TokenType::DECIMAL_NUMBER: {
       std::string decimalNumber = tk->extractToken(token);
       uint64_t num = std::stoull(decimalNumber);
-      return {.val = num, .type = &Checker::uint64Value};
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      return expRes;
     }
     case TokenType::BINARY_NUMBER: { 
       std::string binaryNumber = tk->extractToken(token);
       uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-      return {.val = num, .type = &Checker::uint64Value};
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      expRes.type = &Checker::uint64Value;
+      return expRes;
+    }
+    case TokenType::FLOAT_NUMBER: {
+      std::string binaryNumber = tk->extractToken(token);
+      double num = std::stod(binaryNumber);
+      expRes.setData(&num, sizeof(num));
+      expRes.type = &Checker::doubleValue;
+      return expRes;
     }
     case TokenType::HEX_NUMBER: { 
       std::string hexNumber = tk->extractToken(token);
@@ -163,49 +236,74 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::out_of_range
       */
       uint64_t num = std::stoull(hexNumber, nullptr, 16);
-      return {.val = num, .type = &Checker::uint64Value};
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      return expRes;
     }
-    case TokenType::FALSE: { 
-      return {.type = &Checker::boolValue};
+    case TokenType::FALSE: {
+      expRes.type = &Checker::boolValue;
+      return expRes;
     }
-    case TokenType::TRUE: { 
-      return {.val = 1, .type = &Checker::boolValue};
+    case TokenType::TRUE: {
+      uint8_t trueValue = 1;
+      expRes.setData(&trueValue, sizeof(trueValue));
+      expRes.type = &Checker::boolValue;
+      return expRes;
     }
     case TokenType::NULL_PTR: {
-      return {.type = &Checker::ptrValue};
+      expRes.type = &Checker::ptrValue;
+      return expRes;
     }
     case TokenType::IDENTIFIER: {
       std::string identifier = tk->extractToken(token);
       uint32_t stackItemIndex = nameToStackItemIndex[identifier];
       StackVariable &variableInfo = stack[stackItemIndex].variable;
+      expRes.type = &variableInfo.varDec.type;
       if (variableInfo.reg) {
-        return {.val = variableInfo.reg, .isReg = true, .type = &variableInfo.varDec.type};
+        expRes.setReg(variableInfo.reg);
+        expRes.isReg = true;
+        return expRes;
       }
       const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
       const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
       if (sizeOfVar > SIZE_OF_REGISTER) {
         // too large to fit into a reg, just return offset
         // TODO: figure out what to make the type in this scenario, maybe need another flag in exp res
-        return {.val = varOffset};
+        expRes.setData(&varOffset, sizeof(varOffset));
+        return expRes;
       }
       // load value into a register
       variableInfo.reg = allocateRegister();
       OpCode loadOp = getLoadOpForSize(sizeOfVar);
       if (varOffset) {
         addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-        ExpressionResult varOffsetExp = {
-          .val = varOffset,
-          .type = &Checker::uint64Value
-        };
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegisterIndex, varOffsetExp);
+        ExpressionResult varOffsetExp;
+        varOffsetExp.setData(&varOffset, sizeof(varOffset));
+        varOffsetExp.type = &Checker::uint64Value;
+        ExpressionResult miscRegExp;
+        miscRegExp.setReg(miscRegisterIndex);
+        miscRegExp.isReg = true;
+        varOffsetExp.type = &Checker::uint64Value;
+        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
         addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
       } else {
         addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
       }
-      return {.val = variableInfo.reg, .isReg = true, .type = &variableInfo.varDec.type};
+      expRes.isReg = true;
+      expRes.setData(&variableInfo.reg, sizeof(variableInfo.reg));
+      return expRes;
     }
     default: {
-      return {};
+      assert(false);
+      return expRes;
     }
   }
 }
@@ -222,7 +320,11 @@ OpCode getLoadOpForSize(const uint8_t size) {
   switch(size) {
     case 1: return OpCode::LOAD_B;
     case 2: return OpCode::LOAD_W;
+    case 3:
     case 4: return OpCode::LOAD_D;
+    case 5:
+    case 6:
+    case 7:
     case 8: return OpCode::LOAD_Q;
     default: std::cerr << "invalid size in getLoadOpForSize: " << (uint32_t)size << '\n'; exit(1);
   }
@@ -310,140 +412,242 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
 }
 
 /**
- * Problem with this is that we are using it for all numbers, including signed. need to rework
- * 
- * Returns true if any of the largest 32 bits are set, false otherwise
+ * Requires TokenType leftSideType, rightSideType be defined
+ * Requires ExpressionRes left, right, res be defined
 */
-bool topBitsSet(uint64_t val) {
-  return val & 0xFFFFFFFF00000000; // check if any bit in largest 4 bytes are set
+#define macroEvaluateStandardBinOpImm(op) { \
+  assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
+  assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE); \
+  if (leftSideType == TokenType::DOUBLE_TYPE) { \
+    if (rightSideType == TokenType::DOUBLE_TYPE) { \
+      double temp = *(double*)left.getData() op *(double*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::UINT64_TYPE) { \
+      double temp = *(double*)left.getData() op *(uint64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::INT64_TYPE) { \
+      double temp = *(double*)left.getData() op *(int64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } \
+  } else if (leftSideType == TokenType::UINT64_TYPE) { \
+    if (rightSideType == TokenType::DOUBLE_TYPE) { \
+      double temp = *(uint64_t*)left.getData() op *(double*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::UINT64_TYPE) { \
+      uint64_t temp = *(uint64_t*)left.getData() op *(uint64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::INT64_TYPE) { \
+      uint64_t temp = *(uint64_t*)left.getData() op *(int64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } \
+  } else if (leftSideType == TokenType::INT64_TYPE) { \
+    if (rightSideType == TokenType::DOUBLE_TYPE) { \
+      double temp = *(int64_t*)left.getData() op *(double*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::UINT64_TYPE) { \
+      uint64_t temp = *(int64_t*)left.getData() op *(uint64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::INT64_TYPE) { \
+      int64_t temp = *(int64_t*)left.getData() op *(int64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } \
+  } \
 }
 
-ExpressionResult evaluateBinOpImmExpression(OpCode op, const ExpressionResult& left, const ExpressionResult& right) {
-  const TokenType leftSideType = left.type->token.getType();
-  const TokenType rightSideType = right.type->token.getType();
+/**
+ * same requirements as macroEvaluateStandardBinOpImm
+*/
+#define macroEvaluateIntegralOnlyBinOp(op) { \
+  assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
+  assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
+  if (leftSideType == TokenType::UINT64_TYPE) { \
+    if (rightSideType == TokenType::UINT64_TYPE) { \
+      uint64_t temp = *(uint64_t*)left.getData() op *(uint64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::INT64_TYPE) { \
+      uint64_t temp = *(uint64_t*)left.getData() op *(int64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } \
+  } else if (leftSideType == TokenType::INT64_TYPE) { \
+    if (rightSideType == TokenType::UINT64_TYPE) { \
+      uint64_t temp = *(int64_t*)left.getData() op *(uint64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } else if (rightSideType == TokenType::INT64_TYPE) { \
+      int64_t temp = *(int64_t*)left.getData() op *(int64_t*)right.getData(); \
+      res.setData(&temp, sizeof(temp)); \
+    } \
+  } \
+}
+
+ExpressionResult evaluateBinOpImmExpression(TokenType op, ExpressionResult& left, ExpressionResult& right) {
+  assert(!left.isReg && !right.isReg);
+  assert(left.type && right.type);
   ExpressionResult res;
-  // is there a better way to do this? need to hard code every valid type combination, or promote all to 64 bit version
-  #define evaluateStandardBinOp(op) { \
-    assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
-    assert(rightSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
-    if (leftSideType == TokenType::DOUBLE_TYPE) { \
-      res.type = left.type; \
-      if (rightSideType == TokenType::DOUBLE_TYPE) { \
-        double temp = *(double*)(&left.val) op *(double*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } else if (rightSideType == TokenType::UINT64_TYPE) { \
-        double temp = *(double*)(&left.val) op right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } else if (rightSideType == TokenType::INT64_TYPE) { \
-        double temp = *(double*)(&left.val) op *(int64_t*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } \
-    } else if (leftSideType == TokenType::UINT64_TYPE) { \
-      res.type = left.type; \
-      if (rightSideType == TokenType::DOUBLE_TYPE) { \
-        res.type = right.type; \
-        double temp = left.val op *(double*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } else if (rightSideType == TokenType::UINT64_TYPE) { \
-        uint64_t temp = left.val op right.val; \
-        res.val = temp; \
-      } else if (rightSideType == TokenType::INT64_TYPE) { \
-        uint64_t temp = left.val op *(int64_t*)&right.val; \
-        res.val = temp; \
-      } \
-    } else if (leftSideType == TokenType::INT64_TYPE) { \
-      res.type = right.type; \
-      if (rightSideType == TokenType::DOUBLE_TYPE) { \
-        double temp = *(int64_t*)&left.val op *(double*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } else if (rightSideType == TokenType::UINT64_TYPE) { \
-        uint64_t temp = *(int64_t*)&left.val op right.val; \
-        res.val = temp; \
-      } else if (rightSideType == TokenType::INT64_TYPE) { \
-        int64_t temp = *(int64_t*)&left.val op *(int64_t*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } \
-    } \
+  TokenType leftSideType = left.type->token.getType();
+  TokenType rightSideType = right.type->token.getType();
+  assert(isBuiltInType(leftSideType) && leftSideType != TokenType::VOID && leftSideType != TokenType::STRING_TYPE);
+  assert(isBuiltInType(rightSideType) && rightSideType != TokenType::VOID && rightSideType != TokenType::STRING_TYPE);
+  
+  // assign to largest type, minimum of int32
+  res.type = &Checker::int32Value;
+  if (leftSideType > res.type->token.getType()) {
+    res.type = left.type;
   }
-  #define evaluateIntegralOnlyBinOp(op) { \
-    assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
-    assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE); \
-    if (leftSideType == TokenType::UINT64_TYPE) { \
-      res.type = left.type; \
-      if (rightSideType == TokenType::UINT64_TYPE) { \
-        uint64_t temp = left.val op right.val; \
-        res.val = temp; \
-      } else if (rightSideType == TokenType::INT64_TYPE) { \
-        uint64_t temp = left.val op *(int64_t*)&right.val; \
-        res.val = temp; \
-      } \
-    } else if (leftSideType == TokenType::INT64_TYPE) { \
-      res.type = right.type; \
-      if (rightSideType == TokenType::UINT64_TYPE) { \
-        uint64_t temp = *(int64_t*)&left.val op right.val; \
-        res.val = temp; \
-      } else if (rightSideType == TokenType::INT64_TYPE) { \
-        int64_t temp = *(int64_t*)&left.val op *(int64_t*)&right.val; \
-        res.val = *(uint64_t *)&temp; \
-      } \
-    } \
+  if (rightSideType > res.type->token.getType()) {
+    res.type = right.type;
+  }
+
+  if (isUnsigned(leftSideType) || leftSideType == TokenType::BOOL) {
+    // temporarily mark as uint64_t
+    leftSideType = TokenType::UINT64_TYPE;
+  } else if (isSigned(leftSideType)) {
+    // temporarily mark as int64_t
+    // sign extend
+    int64_t signExtended = 0;
+    switch (leftSideType) {
+      case TokenType::CHAR_TYPE:
+      case TokenType::INT8_TYPE: {
+        signExtended = *(int8_t*)left.getData();
+        break;
+      }
+      case TokenType::INT16_TYPE: {
+        signExtended = *(int16_t*)left.getData();
+        break;
+      }
+      case TokenType::INT32_TYPE: {
+        signExtended = *(int32_t*)left.getData();
+        break;
+      }
+      case TokenType::INT64_TYPE: break;
+      default: {
+        exit(1);
+      }
+    }
+    if (signExtended) {
+      left.setData(&signExtended, sizeof(signExtended));
+    }
+    leftSideType = TokenType::INT64_TYPE;
+  }
+  if (isUnsigned(rightSideType) || rightSideType == TokenType::BOOL) {
+    // temporarily mark as uint64_t
+    rightSideType = TokenType::UINT64_TYPE;
+  } else if (isSigned(rightSideType)) {
+    // temporarily mark as int64_t
+    // sign extend
+    int64_t signExtended = 0;
+    switch (rightSideType) {
+      case TokenType::CHAR_TYPE:
+      case TokenType::INT8_TYPE: {
+        signExtended = *(int8_t*)right.getData();
+        break;
+      }
+      case TokenType::INT16_TYPE: {
+        signExtended = *(int16_t*)right.getData();
+        break;
+      }
+      case TokenType::INT32_TYPE: {
+        signExtended = *(int32_t*)right.getData();
+        break;
+      }
+      case TokenType::INT64_TYPE: break;
+      default: {
+        exit(1);
+      }
+    }
+    if (signExtended) {
+      right.setData(&signExtended, sizeof(signExtended));
+    }
+    rightSideType = TokenType::INT64_TYPE;
   }
   switch (op) {
-    case OpCode::ADD: {
-      evaluateStandardBinOp(+)
+    case TokenType::ADDITION: {
+      // macroEvaluateStandardBinOpImm(+)
+      assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
+      assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE);
+      if (leftSideType == TokenType::DOUBLE_TYPE) {
+        if (rightSideType == TokenType::DOUBLE_TYPE) {
+          double temp = *(double*)left.getData() + *(double*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::UINT64_TYPE) {
+          double temp = *(double*)left.getData() + *(uint64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::INT64_TYPE) {
+          double temp = *(double*)left.getData() + *(int64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        }
+      } else if (leftSideType == TokenType::UINT64_TYPE) {
+        if (rightSideType == TokenType::DOUBLE_TYPE) {
+          double temp = *(uint64_t*)left.getData() + *(double*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::UINT64_TYPE) {
+          uint64_t temp = *(uint64_t*)left.getData() + *(uint64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::INT64_TYPE) {
+          uint64_t temp = *(uint64_t*)left.getData() + *(int64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        }
+      } else if (leftSideType == TokenType::INT64_TYPE) {
+        if (rightSideType == TokenType::DOUBLE_TYPE) {
+          double temp = *(int64_t*)left.getData() + *(double*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::UINT64_TYPE) {
+          uint64_t temp = *(int64_t*)left.getData() + *(uint64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        } else if (rightSideType == TokenType::INT64_TYPE) {
+          int64_t temp = *(int64_t*)left.getData() + *(int64_t*)right.getData();
+          res.setData(&temp, sizeof(temp));
+        }
+      }
       break;
     }
-    case OpCode::SUB: {
-      evaluateStandardBinOp(-)
+    case TokenType::SUBTRACTION: {
+      macroEvaluateStandardBinOpImm(-)
       break;
     }
-    case OpCode::MUL: {
-      evaluateStandardBinOp(*)
+    case TokenType::MULTIPLICATION: {
+      macroEvaluateStandardBinOpImm(*)
       break;
     }
-    case OpCode::DIV: {
-      evaluateStandardBinOp(/)
+    case TokenType::DIVISION: {
+      macroEvaluateStandardBinOpImm(/)
       break;
     }
-    case OpCode::MOD: {
-      evaluateIntegralOnlyBinOp(%)
+    case TokenType::MODULO: {
+      macroEvaluateIntegralOnlyBinOp(%)
       break;
     }
-    case OpCode::OR: {
-      evaluateIntegralOnlyBinOp(|)
+    case TokenType::BITWISE_OR: {
+      macroEvaluateIntegralOnlyBinOp(|)
       break;
     }
-    case OpCode::AND: {
-      evaluateIntegralOnlyBinOp(&)
+    case TokenType::BITWISE_AND: {
+      macroEvaluateIntegralOnlyBinOp(&)
       break;
     }
-    case OpCode::XOR: {
-      evaluateIntegralOnlyBinOp(^)
+    case TokenType::BITWISE_XOR: {
+      macroEvaluateIntegralOnlyBinOp(^)
       break;
     }
-    case OpCode::SHIFT_L: {
-      evaluateIntegralOnlyBinOp(<<)
+    case TokenType::SHIFT_LEFT: {
+      macroEvaluateIntegralOnlyBinOp(<<)
       break;
     }
-    case OpCode::SHIFT_R: {
-      evaluateIntegralOnlyBinOp(>>)
+    case TokenType::SHIFT_RIGHT: {
+      macroEvaluateIntegralOnlyBinOp(>>)
       break;
     }
     default: {
-      std::cerr << "Invalid OpCode in evaluateExpression [" << (uint32_t)op  << "]\n";
+      std::cerr << "Invalid TokenType in evaluateExpression [" << (uint32_t)op  << "]\n";
       exit(1);
     }
   }
   return res;
-  #undef evaluateStandardBinOp
-  #undef evaluateIntegralOnlyBinOp
 }
 
-ExpressionResult evaluateBooleanBinOpImmExpression(TokenType op, const ExpressionResult& left, const ExpressionResult& right) {
-  const TokenType leftSideType = left.type->token.getType();
-  const TokenType rightSideType = right.type->token.getType();
-  ExpressionResult res;
-  #define evaluateStandardBinOp(op) \
+/**
+ * Same requirements as macroEvaluateStandardBinOpImm
+*/
+#define macroEvaluateStandardBooleanBinOpImm(op) { \
   assert( \
     leftSideType == TokenType::DOUBLE_TYPE || \
     leftSideType == TokenType::UINT64_TYPE || \
@@ -454,75 +658,71 @@ ExpressionResult evaluateBooleanBinOpImmExpression(TokenType op, const Expressio
     rightSideType == TokenType::UINT64_TYPE || \
     rightSideType == TokenType::INT64_TYPE \
   ); \
+  bool booleanBinOpVal = false; \
   if (leftSideType == TokenType::DOUBLE_TYPE) { \
-    res.type = left.type; \
     if (rightSideType == TokenType::DOUBLE_TYPE) { \
-      double temp = *(double*)(&left.val) op *(double*)&right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(double*)right.getData(); \
     } else if (rightSideType == TokenType::UINT64_TYPE) { \
-      double temp = *(double*)(&left.val) op right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(uint64_t*)right.getData(); \
     } else if (rightSideType == TokenType::INT64_TYPE) { \
-      double temp = *(double*)(&left.val) op *(int64_t*)&right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(int64_t*)right.getData(); \
     } \
   } else if (leftSideType == TokenType::UINT64_TYPE) { \
-    res.type = left.type; \
     if (rightSideType == TokenType::DOUBLE_TYPE) { \
-      res.type = right.type; \
-      double temp = left.val op *(double*)&right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(double*)right.getData(); \
     } else if (rightSideType == TokenType::UINT64_TYPE) { \
-      uint64_t temp = left.val op right.val; \
-      res.val = temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(uint64_t*)right.getData(); \
     } else if (rightSideType == TokenType::INT64_TYPE) { \
-      uint64_t temp = left.val op *(int64_t*)&right.val; \
-      res.val = temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(int64_t*)right.getData(); \
     } \
   } else if (leftSideType == TokenType::INT64_TYPE) { \
-    res.type = right.type; \
     if (rightSideType == TokenType::DOUBLE_TYPE) { \
-      double temp = *(int64_t*)&left.val op *(double*)&right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(double*)right.getData(); \
     } else if (rightSideType == TokenType::UINT64_TYPE) { \
-      uint64_t temp = *(int64_t*)&left.val op right.val; \
-      res.val = temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(uint64_t*)right.getData(); \
     } else if (rightSideType == TokenType::INT64_TYPE) { \
-      int64_t temp = *(int64_t*)&left.val op *(int64_t*)&right.val; \
-      res.val = *(uint64_t *)&temp; \
+      booleanBinOpVal = *(double*)left.getData() op *(int64_t*)right.getData(); \
     } \
-  }
+  } \
+  res.setData(&booleanBinOpVal, sizeof(booleanBinOpVal)); \
+}
+
+ExpressionResult evaluateBooleanBinOpImmExpression(TokenType op, const ExpressionResult& left, const ExpressionResult& right) {
+  const TokenType leftSideType = left.type->token.getType();
+  const TokenType rightSideType = right.type->token.getType();
+  ExpressionResult res;
+  res.type = &Checker::boolValue;
   switch (op) {
     case TokenType::EQUAL: {
-      evaluateStandardBinOp(==)
+      macroEvaluateStandardBooleanBinOpImm(==)
       break;
     }
     case TokenType::NOT_EQUAL: {
-      evaluateStandardBinOp(!=)
+      macroEvaluateStandardBooleanBinOpImm(!=)
       break;
     }
     case TokenType::LOGICAL_AND: {
-      evaluateStandardBinOp(&&)
+      macroEvaluateStandardBooleanBinOpImm(&&)
       break;
     }
     case TokenType::LOGICAL_OR: {
-      evaluateStandardBinOp(||)
+      macroEvaluateStandardBooleanBinOpImm(||)
       break;
     }
     case TokenType::LESS_THAN: {
-      evaluateStandardBinOp(<)
+      macroEvaluateStandardBooleanBinOpImm(<)
       break;
     }
     case TokenType::LESS_THAN_EQUAL: {
-      evaluateStandardBinOp(<=)
+      macroEvaluateStandardBooleanBinOpImm(<=)
       break;
     }
     case TokenType::GREATER_THAN: {
-      evaluateStandardBinOp(>)
+      macroEvaluateStandardBooleanBinOpImm(>)
       break;
     }
     case TokenType::GREATER_THAN_EQUAL: {
-      evaluateStandardBinOp(>=)
+      macroEvaluateStandardBooleanBinOpImm(>=)
       break;
     }
     default: {
@@ -544,19 +744,64 @@ bool isCommutative(OpCode op) {
 }
 
 /**
- * Moves any integer size val into a register.
- * Does bit shifting as necessary with 4 byte immediate limit
+ * Moves any val into a register.
+ * Updates exp by setting isReg and isTemp to true, as well as setting the register to the register parameter
 */
-void CodeGen::moveImmToReg(const bytecode_t reg, const ExpressionResult& exp) {
-  if (topBitsSet(val)) { // check if any bit in largest 4 bytes are set
+void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
+  assert(!exp.isReg);
+  exp.isTemp = true;
+  exp.isReg = true;
+  const TokenType rightSideExpType = exp.type->token.getType();
+  assert(
+    rightSideExpType == TokenType::DOUBLE_TYPE ||
+    rightSideExpType == TokenType::UINT64_TYPE ||
+    rightSideExpType == TokenType::INT64_TYPE ||
+    rightSideExpType == TokenType::INT32_TYPE ||
+    rightSideExpType == TokenType::UINT32_TYPE
+  );
+  bool large;
+  if (rightSideExpType == TokenType::DOUBLE_TYPE) {
+    large = true;
+  }
+  else if (rightSideExpType == TokenType::INT64_TYPE || rightSideExpType == TokenType::INT32_TYPE) {
+    int64_t val;
+    if (rightSideExpType == TokenType::INT32_TYPE) {
+      val = *(int32_t*)exp.getData();
+    } else {
+      val = *(int64_t*)exp.getData();
+    }
+    if (val <= INT8_MAX && val >= INT8_MIN) {
+      addBytes({{(bc)OpCode::MOVE_SI, reg, (bc)val}});
+      exp.setReg(reg);
+      return;
+    }
+    large = val > INT32_MAX || val < INT32_MIN;
+  }
+  else {
+    uint64_t val;
+    if (rightSideExpType == TokenType::UINT32_TYPE) {
+      val = *(uint32_t*)exp.getData();
+    } else {
+      val = *(uint64_t*)exp.getData();
+    }
+    if (val <= UINT8_MAX) {
+      addBytes({{(bc)OpCode::MOVE_SI, reg, (bc)val}});
+      exp.setReg(reg);
+      return;
+    }
+    large = val > UINT32_MAX;
+  }
+  if (large) {
+    // have to use full 8 byte
     alignForImm(2, 8);
     addBytes({{(bc)OpCode::MOVE_LI, reg}});
-    add8ByteNum(val);
+    add8ByteNum(*(uint64_t *)exp.getData());
   } else {
     alignForImm(2, 4);
     addBytes({{(bc)OpCode::MOVE_I, reg}});
-    add4ByteNum(val);
+    add4ByteNum(*(uint32_t *)exp.getData());
   }
+  exp.setReg(reg);
 }
 
 /**
@@ -582,44 +827,22 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
   // left imm, right imm
   if (leftImm && rightImm) {
     // both operands are immediate values, return the result
-    return evaluateBinOpImmExpression(op, leftResult, rightResult);
+    return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
   }
   // beyond this point, only one of left or right can possibly be an imm
-
-  // move any immediate values larger than 32 bits into registers, we only have 4 byte immediate instructions
-  if (leftImm) {
-    if (topBitsSet(leftResult.val)) {
-      const bc reg = allocateRegister();
-      moveImmToReg(reg, leftResult.val);
-      leftResult.val = reg;
-      leftResult.isReg = true;
-    }
-  }
-  else if (rightImm) {
-    if (topBitsSet(rightResult.val)) {
-      const bc reg = allocateRegister();
-      moveImmToReg(reg, rightResult.val);
-      rightResult.reg = reg;
-      rightResult.isReg = true;
-    }
-  }
 
   // left temp
   if (leftResult.isTemp) {
     // right imm
     if (!rightResult.isReg) {
-      alignForImm(2, 4);
-      addBytes({{(bc)opImm, leftResult.reg}});
-      add4ByteNum((uint32_t)rightResult.val);
-      return {.reg = leftResult.reg, .isReg = true, .isTemp = true};
+      return expressionResWithOp(op, opImm, leftResult, rightResult);
     }
     // right temp / var
     else {
-      addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
       if (rightResult.isTemp) {
-        freeRegister(rightResult.reg);
+        freeRegister(rightResult.getReg());
       }
-      return {.reg = leftResult.reg, .isReg = true, .isTemp = true};
+      return expressionResWithOp(op, opImm, leftResult, rightResult);
     }
   }
   // left imm
@@ -629,59 +852,37 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     // right temp
     if (rightResult.isTemp) {
       if (isCommutative(op)) {
-        alignForImm(2, 4);
-        addBytes({{(bc)opImm, rightResult.reg}});
-        add4ByteNum((uint32_t)leftResult.val);
-        return {.reg = rightResult.reg, .isReg = true, .isTemp = true};
+        return expressionResWithOp(op, opImm, rightResult, leftResult);
       }
       // cannot flip args
-      else {
-        bc reg = allocateRegister();
-        moveImmToReg(reg, leftResult.val);
-        addBytes({{(bc)op, reg, rightResult.reg}});
-        freeRegister(rightResult.reg);
-        return {.val = reg, .isReg = true, .isTemp = true};
-      }
+      moveImmToReg(allocateRegister(), leftResult);
+      freeRegister(rightResult.getReg());
+      return expressionResWithOp(op, opImm, leftResult, rightResult);
     }
     // right var
-    else {
-      bc reg = allocateRegister();
-      moveImmToReg(reg, leftResult.val);
-      addBytes({{(bc)op, reg, rightResult.reg}});
-      return {.val = reg, .isReg = true, .isTemp = true};
-    }
+    moveImmToReg(allocateRegister(), leftResult);
+    return expressionResWithOp(op, opImm, leftResult, rightResult);
   }
   // left var
   {
-    // right imm
-    if (!rightResult.isReg) {
-      bc reg = allocateRegister();
-      addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
-      alignForImm(2, 4);
-      addBytes({{(bc)op, reg}});
-      add4ByteNum(uint32_t(rightResult.val));
-      return {.val = reg, .isReg = true, .isTemp = true};
-    }
     // right temp
-    else if (rightResult.isTemp) {
+    if (rightResult.isReg && rightResult.isTemp) {
       if (isCommutative(op)) {
-        addBytes({{(bc)op, rightResult.reg, leftResult.reg}});
-        return rightResult;
-      } else {
-        bc reg = allocateRegister();
-        addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
-        addBytes({{(bc)op, reg, rightResult.reg}});
-        freeRegister(rightResult.reg);
-        return {.reg = reg, .isReg = true, .isTemp = true};
+        return expressionResWithOp(op, opImm, rightResult, leftResult);
       }
-    }
-    // right var
-    else {
       bc reg = allocateRegister();
-      addBytes({{(bc)OpCode::MOVE, reg, leftResult.reg}});
-      addBytes({{(bc)op, reg, rightResult.reg}});
-      return {.reg = reg, .isReg = true, .isTemp = true};
+      addBytes({{(bc)OpCode::MOVE, reg, leftResult.getReg()}});
+      leftResult.setReg(reg);
+      leftResult.isTemp = true;
+      freeRegister(rightResult.getReg());
+      return expressionResWithOp(op, opImm, leftResult, rightResult);
     }
+    // right var / imm
+    bc reg = allocateRegister();
+    addBytes({{(bc)OpCode::MOVE, reg, leftResult.getReg()}});
+    leftResult.setReg(reg);
+    leftResult.isTemp = true;
+    return expressionResWithOp(op, opImm, leftResult, rightResult);
   }
 }
 
@@ -695,21 +896,10 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
   assert(!leftResult.isTemp);
   assert(leftResult.isReg);
-  registers[leftResult.val].changed = true;
-  if (!rightResult.isReg) {
-    if (topBitsSet(rightResult.val)) {
-      moveImmToReg(miscRegisterIndex, rightResult.val);
-      addBytes({{(bc)op, leftResult.reg, miscRegisterIndex}});
-    } else {
-      alignForImm(2, 4);
-      addBytes({{(bc)opImm, leftResult.reg}});
-      add4ByteNum((uint32_t)rightResult.val);
-    }
-  } else {
-    addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
-    if (rightResult.isTemp){
-      freeRegister(rightResult.reg);
-    }
+  registers[leftResult.getReg()].changed = true;
+  expressionResWithOp(op, opImm, leftResult, rightResult);
+  if (rightResult.isTemp){
+    freeRegister(rightResult.getReg());
   }
   // write new value to stack
   // have to know where leftResult is. it could be on the stack or heap
@@ -723,7 +913,7 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
  * Generates the expression and returns the address of the result.
  * the expression must be of a type that has a resulting address.
  * Valid expression types: value (value must be an identifier, which is a valid variable), array access, binary op member access, unary op dereference
- * \returns an ExpressionResult object. isTemp is true if isReg is true
+ * \returns an ExpressionResult object. isTemp is true if isReg is true.
  * if isReg is set to false, it means there is something wrong with the expression. this should have been caught in the checker stage
 */
 ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
@@ -758,9 +948,10 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       const std::string& memberName = tk->extractToken(binOp->rightSide.getToken());
       const uint32_t offsetInStruct = structInfo.offsetMap.at(memberName);
       if (offsetInStruct) {
-        alignForImm(2, 4);
-        addBytes({{(bc)OpCode::ADD_I, expRes.reg}});
-        add4ByteNum(offsetInStruct);
+        ExpressionResult offsetExpression;
+        offsetExpression.type = &Checker::uint32Value;
+        offsetExpression.setData(&offsetInStruct, sizeof(offsetInStruct));
+        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExpression);
       }
       // get offset of member and add to structVar
       return expRes;
@@ -776,14 +967,14 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       // otherwise it's a stack variable so get offset from stack pointer
       const std::string& ident = tk->extractToken(expression.getToken());
       uint32_t stackItemIndex = nameToStackItemIndex[ident];
-      expRes.reg = allocateRegister();
-      addBytes({{(bc)OpCode::MOVE, expRes.reg, stackPointerIndex}});
+      expRes.setReg(allocateRegister());
+      addBytes({{(bc)OpCode::MOVE, expRes.getReg(), stackPointerIndex}});
       const StackVariable& stackVar = stack[stackItemIndex].variable;
-      ExpressionResult varOffsetExp {
-        .val = getVarOffsetFromSP(stackVar),
-        .type = &Checker::uint64Value
-      };
-      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes.reg, varOffsetExp);
+      uint32_t offset = getVarOffsetFromSP(stackVar);
+      ExpressionResult varOffsetExp;
+      varOffsetExp.setData(&offset, sizeof(offset));
+      varOffsetExp.type = &Checker::uint32Value;
+      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, varOffsetExp);
       expRes.type = &stackVar.varDec.type;
       if (expRes.type->token.getType() == TokenType::REFERENCE) {
         // always move past references
@@ -803,7 +994,7 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       (void)offset;
       expRes.isReg = true;
       expRes.isTemp = true;
-      expRes.reg = array.reg;
+      expRes.setReg(array.getReg());
       return expRes;
     }
     default: {
@@ -818,50 +1009,66 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
 /**
  * 
 */
-void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, bytecode_t resReg, const ExpressionResult& expRes) {
-  if (!expRes.isReg) {
-    bool large = false;
-    TokenType expType = expRes.type->token.getType();
-    assert(isBuiltInType(expType));
-    if (expType == TokenType::DOUBLE_TYPE) {
-      // need floating point equivalent op
-      return;
-    }
-    if (isSigned(expRes.type->token.getType())) {
-      if ((int64_t)expRes.val <= INT16_MAX && (int64_t)expRes.val >= INT16_MIN) {
-        alignForImm(2, 2);
-        addBytes({{(bc)immOp, resReg}});
-        add2ByteNum((int16_t)expRes.val);
-        return;
-      }
-      if ((int64_t)expRes.val > INT32_MAX || (int64_t)expRes.val < INT32_MIN) {
-        large = true;
-      }
-    } else {
-      if (expRes.val <= UINT16_MAX) {
-        alignForImm(2, 2);
-        addBytes({{(bc)immOp, resReg}});
-        add2ByteNum((uint16_t)expRes.val);
-        return;
-      }
-      if (expRes.val > UINT32_MAX) {
-        large = true;
-      }
-    }
-    if (large) {
-      alignForImm(2, 8);
-      addBytes({{(bc)OpCode::MOVE_LI, miscRegisterIndex}});
-      add8ByteNum(expRes.val);
-    } else {
-      // have to use full 8 byte
-      alignForImm(2, 4);
-      addBytes({{(bc)OpCode::MOVE_I, miscRegisterIndex}});
-      add4ByteNum((uint32_t)expRes.val);
-    }
-    addBytes({{(bc)op, resReg, miscRegisterIndex}});
-  } else {
-    addBytes({{(bc)op, resReg, expRes.reg}});
+ExpressionResult CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResult& left, const ExpressionResult& right) {
+  assert(left.isReg);
+  ExpressionResult expRes;
+  const bytecode_t resReg = left.getReg();
+  if (right.isReg) {
+    addBytes({{(bc)op, resReg, right.getReg()}});
+    return expRes;
   }
+  bool large;
+  TokenType rightSideExpType = right.type->token.getType();
+  assert(isBuiltInType(rightSideExpType));
+  // need to covert types to their highest level (uint64_t, int64_t, or double)
+
+  assert(
+    rightSideExpType == TokenType::UINT64_TYPE ||
+    rightSideExpType == TokenType::INT64_TYPE ||
+    rightSideExpType == TokenType::INT32_TYPE ||
+    rightSideExpType == TokenType::UINT32_TYPE
+  );
+  if (rightSideExpType == TokenType::INT64_TYPE || rightSideExpType == TokenType::INT32_TYPE) {
+    int64_t val;
+    if (rightSideExpType == TokenType::INT32_TYPE) {
+      val = *(int32_t*)right.getData();
+    } else {
+      val = *(int64_t*)right.getData();
+    }
+    if (val <= INT16_MAX && val >= INT16_MIN) {
+      alignForImm(2, 2);
+      addBytes({{(bc)immOp, resReg}});
+      add2ByteNum((int16_t)val);
+      return expRes;
+    }
+    large = val > INT32_MAX || val < INT32_MIN;
+  } else {
+    uint64_t val;
+    if (rightSideExpType == TokenType::UINT32_TYPE) {
+      val = *(uint32_t*)right.getData();
+    } else {
+      val = *(uint64_t*)right.getData();
+    }
+    if (val <= UINT16_MAX) {
+      alignForImm(2, 2);
+      addBytes({{(bc)immOp, resReg}});
+      add2ByteNum((uint16_t)val);
+      return expRes;
+    }
+    large = val > UINT32_MAX;
+  }
+  if (large) {
+    // have to use full 8 byte
+    alignForImm(2, 8);
+    addBytes({{(bc)OpCode::MOVE_LI, miscRegisterIndex}});
+    add8ByteNum(*(uint64_t *)right.getData());
+  } else {
+    alignForImm(2, 4);
+    addBytes({{(bc)OpCode::MOVE_I, miscRegisterIndex}});
+    add4ByteNum(*(uint32_t *)right.getData());
+  }
+  addBytes({{(bc)op, resReg, miscRegisterIndex}});
+  return expRes;
 }
 
 /**
@@ -881,16 +1088,16 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     ExpressionResult leftResult = generateExpression(binOp.leftSide);
     if (!leftResult.isReg) {
       // left side is immediate value
-      if (!leftResult.val) {
+      if (!*(bool*)leftResult.getData()) {
         // for &&, expression is false, don't generate anymore
         if (binOp.op.type == TokenType::LOGICAL_AND) {
-          return {.val = false};
+          return leftResult;
         }
         // for ||, need to check next, but can remove left side
       } else {
         // for ||, expression is true, don't generate anymore
         if (binOp.op.type == TokenType::LOGICAL_OR) {
-          return {.val = true};
+          return leftResult;
         }
         // for &&, need to check next, but can remove left side
       }
@@ -898,12 +1105,12 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       // short-circuit logical ops
       shortCircuitIndexStart = byteCode.size();
       if (binOp.op.type == TokenType::LOGICAL_AND) {
-        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.reg}});
+        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
       }
       else {
-        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.reg}});
+        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_NE); // if leftResult is true, skip right side
       }
@@ -917,25 +1124,26 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       }
       // left result is not an immediate, clear out short circuit code
       byteCode.resize(shortCircuitIndexStart);
-      if (!rightResult.val) {
+      // have to use type to check this
+      if (!*(bool*)rightResult.getData()) {
         // for &&, cond is always false
         if (binOp.op.type == TokenType::LOGICAL_AND) {
-          return {.val = false};
+          return rightResult;
         }
         // for ||, depends on left side
       } else {
         // for ||, cond is always true
         if (binOp.op.type == TokenType::LOGICAL_AND) {
-          return {.val = true};
+          return rightResult;
         }
         // for &&, depends on left side
       }
-      addBytes({{(bc)OpCode::SET_FLAGS, (bc)leftResult.val}});
+      addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
     } else {
       if (!leftResult.isReg) {
-        addBytes({{(bc)OpCode::SET_FLAGS, (bc)rightResult.val}});
+        addBytes({{(bc)OpCode::SET_FLAGS, rightResult.getReg()}});
       } else {
-        addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
+        addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
       }
     }
@@ -947,7 +1155,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       expRes.isTemp = true;
       const bc reg = allocateRegister();
       addBytes({{(bc)getOp, reg}});
-      expRes.val = reg;
+      expRes.setReg(reg);
     }
     return expRes;
   }
@@ -959,23 +1167,23 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       return evaluateBooleanBinOpImmExpression(binOp.op.type, leftResult, rightResult);
     }
     const bc reg = allocateRegister();
-    moveImmToReg(reg, leftResult.val);
+    moveImmToReg(reg, leftResult);
     leftResult.isReg = true;
-    leftResult.val = reg;
+    leftResult.setReg(reg);
     leftResult.isTemp = true;
   } else if (!rightResult.isReg) {
     const bc reg = allocateRegister();
-    moveImmToReg(reg, rightResult.val);
+    moveImmToReg(reg, rightResult);
     rightResult.isReg = true;
-    rightResult.val = reg;
+    rightResult.setReg(reg);
     rightResult.isTemp = true;
   }
-  addBytes({{(bc)op, leftResult.reg, rightResult.reg}});
+  addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
   if (rightResult.isTemp) {
-    freeRegister(rightResult.reg);
+    freeRegister(rightResult.getReg());
   }
   if (leftResult.isTemp) {
-    freeRegister(leftResult.reg);
+    freeRegister(leftResult.getReg());
   }
   ExpressionResult expRes;
   if (controlFlow) {
@@ -985,7 +1193,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     expRes.isTemp = true;
     const bc reg = allocateRegister();
     addBytes({{(bc)getOp, reg}});
-    expRes.val = reg;
+    expRes.setReg(reg);
   }
   return expRes;
 }
@@ -1102,22 +1310,19 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 
 ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   ExpressionResult expRes = generateExpression(unOp.operand);
+  // TokenType expType = expRes.type->token.getType();
   switch (unOp.op.type) {
     case TokenType::NOT: {
       if (!expRes.isReg) {
-        const bc reg = allocateRegister();
-        moveImmToReg(reg, expRes.val);
-        expRes.val = reg;
-        expRes.isReg = true;
-        expRes.isTemp = true;
+        // evaluate imm
       } else if (!expRes.isTemp) {
         const bc reg = allocateRegister();
-        addBytes({{(bc)OpCode::MOVE, reg, expRes.reg}});
-        expRes.val = reg;
+        addBytes({{(bc)OpCode::MOVE, reg, expRes.getReg()}});
+        expRes.setReg(reg);
         expRes.isReg = true;
         expRes.isTemp = true;
       }
-      addBytes({{(bc)OpCode::NOT, expRes.reg}});
+      addBytes({{(bc)OpCode::NOT, expRes.getReg()}});
       return expRes;
     }
     case TokenType::ADDRESS_OF: {
@@ -1262,19 +1467,23 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
       if (!expRes.isReg) {
         reg = allocateRegister();
-        moveImmToReg(reg, expRes.val);
+        moveImmToReg(reg, expRes);
       } else {
-        reg = expRes.reg;
+        reg = expRes.getReg();
       }
       stackVar.reg = reg;
     }
-    assert(size == 1 || size == 2 || size == 4 || size == 8);
+    assert(size >= 1 && size <= 8);
     if (!reg) {
-      ExpressionResult paddingToAdd = {
-        .val = size + padding,
-        .type = &Checker::uint64Value
-      };
-      expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerIndex, paddingToAdd);
+      uint32_t spaceToAdd = size + padding;
+      ExpressionResult spaceToAddExp;
+      spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
+      spaceToAddExp.type = &Checker::uint32Value;
+      ExpressionResult stackPointerExp;
+      stackPointerExp.setReg(stackPointerIndex);
+      stackPointerExp.isReg = true;
+      stackPointerExp.type = &Checker::uint64Value;
+      expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
     } else {
       switch (size) {
         case 1: {
@@ -1291,11 +1500,14 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         case 4: {
           // add padding to align
           if (padding) {
-            ExpressionResult paddingToAdd = {
-              .val = padding,
-              .type = &Checker::uint64Value
-            };
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerIndex, paddingToAdd);
+            ExpressionResult paddingToAdd;
+            paddingToAdd.setData(&padding, sizeof(padding));
+            paddingToAdd.type = &Checker::uint64Value;
+            ExpressionResult stackPointerExp;
+            stackPointerExp.setReg(stackPointerIndex);
+            stackPointerExp.isReg = true;
+            stackPointerExp.type = &Checker::uint64Value;
+            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
           }
           // push value to stack
           addBytes({{(bc)OpCode::PUSH_D, reg}});
@@ -1303,11 +1515,14 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         }
         case 8: {
           if (padding) {
-            ExpressionResult paddingToAdd = {
-              .val = padding,
-              .type = &Checker::uint64Value
-            };
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerIndex, paddingToAdd);
+            ExpressionResult paddingToAdd;
+            paddingToAdd.setData(&padding, sizeof(padding));
+            paddingToAdd.type = &Checker::uint64Value;
+            ExpressionResult stackPointerExp;
+            stackPointerExp.setReg(stackPointerIndex);
+            stackPointerExp.isReg = true;
+            stackPointerExp.type = &Checker::uint64Value;
+            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
           }
           addBytes({{(bc)OpCode::PUSH_Q, reg}});
           break;
@@ -1320,12 +1535,15 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     }
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
-    ExpressionResult paddingToAdd = {
-      .val = size + padding,
-      .type = &Checker::uint64Value
-    };
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerIndex, paddingToAdd);
-    // generateVariableDeclarationStructType(varDec, initialize);
+    uint32_t spaceToAdd = size + padding;
+    ExpressionResult spaceToAddExp;
+    spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
+    spaceToAddExp.type = &Checker::uint64Value;
+    ExpressionResult stackPointerExp;
+    stackPointerExp.setReg(stackPointerIndex);
+    stackPointerExp.isReg = true;
+    stackPointerExp.type = &Checker::uint64Value;
+    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
   }
   else {
     std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
@@ -1436,15 +1654,16 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
   ExpressionResult expRes = generateExpression(ifStatement.condition, true);
   if (expRes.jumpOp == OpCode::NOP) {
     if (!expRes.isReg) {
-      // condition is a constant value, don't need to test
-      if (expRes.val) {
+      // condition is a constant value, can test at compile time
+      // TODO: have to evaluate this based on type
+      if (*(uint32_t *)expRes.getData()) {
         // condition always true
         generateScope(ifStatement.body);
         return BranchStatementResult::ALWAYS_TRUE;
       } // else condition always false, don't generate
       return BranchStatementResult::ALWAYS_FALSE;
     }
-    addBytes({{(bc)OpCode::SET_FLAGS, expRes.reg}});
+    addBytes({{(bc)OpCode::SET_FLAGS, expRes.getReg()}});
     expRes.jumpOp = OpCode::RS_JUMP_E;
   }
   addJumpMarker(JumpMarkerType::TO_BRANCH_END);
@@ -1563,10 +1782,10 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     case ControlFlowStatementType::EXIT_STATEMENT: {
       ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
       if (!expRes.isReg) {
-        moveImmToReg(miscRegisterIndex, expRes.val);
-        expRes.val = miscRegisterIndex;
+        moveImmToReg(miscRegisterIndex, expRes);
+        expRes.setReg(miscRegisterIndex);
       }
-      addBytes({{(bc)OpCode::EXIT, expRes.reg}});
+      addBytes({{(bc)OpCode::EXIT, expRes.getReg()}});
       break;
     }
     case ControlFlowStatementType::SWITCH_STATEMENT: {
@@ -1625,11 +1844,14 @@ void CodeGen::endSoftScope() {
     assert(!stack.empty()); // paired with marker comment above
   }
   if (stackUsage) {
-    ExpressionResult stackUsageExp = {
-      .val = stackUsage,
-      .type = &Checker::uint64Value
-    };
-    expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerIndex, stackUsageExp);
+    ExpressionResult stackUsageExp;
+    stackUsageExp.setData(&stackUsage, sizeof(stackUsage));
+    stackUsageExp.type = &Checker::uint32Value;
+    ExpressionResult stackPointerExp;
+    stackPointerExp.setReg(stackPointerIndex);
+    stackPointerExp.isReg = true;
+    stackPointerExp.type = &Checker::uint64Value;
+    expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerExp, stackUsageExp);
   }
 }
 

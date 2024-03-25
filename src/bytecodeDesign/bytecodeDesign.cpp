@@ -17,6 +17,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       case OpCode::CALL_B: {
         const char *built_in_function = bytecode_t_to_builtin_function[vec[++i]];
         os << " " << built_in_function;
+        break;
       }
 
       // one register arg

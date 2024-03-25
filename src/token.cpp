@@ -32,12 +32,27 @@ bool isAssignment(TokenType type) {
   return type >= TokenType::ASSIGNMENT && type <= TokenType::SHIFT_RIGHT_ASSIGNMENT;
 }
 
+bool isFloat(TokenType type) {
+  return type == TokenType::DOUBLE_TYPE; // || type == TokenType::FLOAT
+}
+
 bool isUnsigned(TokenType type) {
-  return !isSigned(type);
+  return (
+    type == TokenType::UINT8_TYPE ||
+    type == TokenType::UINT16_TYPE ||
+    type == TokenType::UINT32_TYPE ||
+    type == TokenType::UINT64_TYPE
+  );
 }
 
 bool isSigned(TokenType type) {
-  return type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE || type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE;
+  return (
+    type == TokenType::CHAR_TYPE ||
+    type == TokenType::INT8_TYPE ||
+    type == TokenType::INT16_TYPE ||
+    type == TokenType::INT32_TYPE ||
+    type == TokenType::INT64_TYPE
+  );
 }
 
 Token::Token(const Token& tk): type{tk.type}, length{tk.length}, position{tk.position} {}
@@ -50,6 +65,117 @@ Token& Token::operator=(const Token& tk) {
   position = tk.position;
   return *this;
 }
+
+std::ostream& operator<<(std::ostream& os, const TokenType& obj) {
+  os << tokenTypeToString[(uint8_t)obj];
+  return os;
+}
+
+const char* tokenTypeToString [] = {
+  "NONE",
+  "BAD_VALUE",
+  "END_OF_FILE",
+  "CHAR_LITERAL",
+  "STRING_LITERAL",
+  "DECIMAL_NUMBER",
+  "BINARY_NUMBER",
+  "FLOAT_NUMBER",
+  "HEX_NUMBER",
+  "FALSE", //
+  "TRUE", //
+  "NULL_PTR", //
+  "AS", //
+  "BREAK",
+  "CASE", //
+  "CONTINUE",
+  "CREATE", //
+  "DEFAULT", //
+  "ELIF",
+  "ELSE",
+  "IF",
+  "FOR",
+  "SWITCH", //
+  "RETURN",
+  "EXIT",
+  "WHILE",
+  "ENUM",
+  "FUNC",
+  "INCLUDE", //
+  "EXTERN",
+  "STRUCT",
+  "TEMPLATE",
+  "IDENTIFIER",
+  "COMMENT",
+  "NEWLINE",
+  "OPEN_PAREN",
+  "OPEN_BRACE",
+  "OPEN_BRACKET",
+  "CLOSE_PAREN",
+  "CLOSE_BRACE",
+  "CLOSE_BRACKET",
+  "SEMICOLON",
+  "BACK_SLASH",
+  "COLON",
+  "COMMA",
+  "TERNARY",
+  "DOT",
+  "PTR_MEMBER_ACCESS",
+  "ADDITION",
+  "SUBTRACTION",
+  "MULTIPLICATION",
+  "DIVISION",
+  "MODULO",
+  "BITWISE_OR",
+  "BITWISE_AND",
+  "BITWISE_XOR",
+  "SHIFT_LEFT",
+  "SHIFT_RIGHT",
+  "ASSIGNMENT",
+  "ADDITION_ASSIGNMENT",
+  "SUBTRACTION_ASSIGNMENT",
+  "MULTIPLICATION_ASSIGNMENT",
+  "DIVISION_ASSIGNMENT",
+  "MODULO_ASSIGNMENT",
+  "BITWISE_OR_ASSIGNMENT",
+  "BITWISE_XOR_ASSIGNMENT",
+  "BITWISE_AND_ASSIGNMENT",
+  "SHIFT_LEFT_ASSIGNMENT",
+  "SHIFT_RIGHT_ASSIGNMENT",
+  "EQUAL",
+  "NOT_EQUAL",
+  "LOGICAL_AND",
+  "LOGICAL_OR",
+  "LESS_THAN",
+  "LESS_THAN_EQUAL",
+  "GREATER_THAN",
+  "GREATER_THAN_EQUAL",
+  "NOT",
+  "ADDRESS_OF",
+  "DEREFERENCE",
+  "INCREMENT_POSTFIX",
+  "INCREMENT_PREFIX",
+  "DECREMENT_POSTFIX",
+  "DECREMENT_PREFIX",
+  "NEGATIVE",
+  "BOOL",
+  "CHAR_TYPE",
+  "STRING_TYPE",
+  "INT8_TYPE",
+  "UINT8_TYPE",
+  "INT16_TYPE",
+  "UINT16_TYPE",
+  "INT32_TYPE",
+  "UINT32_TYPE",
+  "INT64_TYPE",
+  "UINT64_TYPE",
+  "POINTER",
+  "DOUBLE_TYPE",
+  "VOID",
+  "REFERENCE",
+  "TYPE",
+  "OPERATOR",
+  "DEC_PTR",
+};
 
 const TokenType numToType [128] {
   TokenType::END_OF_FILE , // 0 null character

@@ -5,6 +5,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define bc bytecode_t
 
 #define testBoilerPlate(str) \
@@ -41,10 +44,13 @@ void alignForImm(std::vector<bc>& byteCode, const uint32_t offset, const uint32_
   }
 }
 
-TEST_CASE("expressions", "[codeGen]") {
-  {
-    // constant expression, should return the actual value of the expression
-    const std::string str = " 4 + 4 ;";
+TEST_CASE("constant expressions", "[codeGen]") {
+  // should return the actual value of the expression, and the correct type (smallest type that supports that value, min int32_t)
+  SECTION("4 + 4") {
+    #define EXPRESSION 4 + 4
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
     testBoilerPlate(str);
     Expression expression;
     ParseExpressionErrorType errorType = parser.parseExpression(expression);
@@ -52,7 +58,103 @@ TEST_CASE("expressions", "[codeGen]") {
     ExpressionResult expRes = codeGen.generateExpression(expression);
     CHECK_FALSE(expRes.isReg);
     CHECK_FALSE(expRes.isTemp);
-    CHECK(expRes.val == 8);
+    CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+    CHECK(*(int32_t *)expRes.getData() == result);
+  }
+  SECTION("max int32") {
+    #define EXPRESSION INT32_MAX
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+    CHECK(*(int32_t *)expRes.getData() == result);
+  }
+  SECTION("min int32") {
+    SKIP("Haven't implemented negative yet");
+    #define EXPRESSION INT32_MIN
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+    CHECK(*(int32_t *)expRes.getData() == result);
+  }
+  SECTION("max uint32") {
+    #define EXPRESSION 4294967295
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
+    CHECK(*(uint32_t *)expRes.getData() == result);
+  }
+  SECTION("negative max uint32") {
+    SKIP("Haven't implemented negative yet");
+    #define EXPRESSION -UINT32_MAX
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::UNARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+    CHECK(*(int64_t *)expRes.getData() == result);
+  }
+  SECTION("complex") {
+    #define EXPRESSION 2.0 * 100 / 3
+    auto result = EXPRESSION;
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
+    CHECK(*(double *)expRes.getData() == result);
+  }
+  SECTION("overflow") {
+    #define EXPRESSION 9223372036854775807 + 1
+    auto result = (int64_t)((uint64_t)EXPRESSION); // doing cast to bypass compiler warning
+    const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
+    #undef EXPRESSION
+    testBoilerPlate(str);
+    Expression expression;
+    ParseExpressionErrorType errorType = parser.parseExpression(expression);
+    REQUIRE(errorType == ParseExpressionErrorType::NONE);
+    REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
+    ExpressionResult expRes = codeGen.generateExpression(expression);
+    CHECK_FALSE(expRes.isReg);
+    CHECK_FALSE(expRes.isTemp);
+    CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+    CHECK(*(int64_t *)expRes.getData() == result);
   }
 }
 

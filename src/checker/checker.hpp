@@ -93,7 +93,7 @@ struct Checker {
   static TokenList uint64Value;
   static TokenList charValue;
   static TokenList stringValue;
-  static TokenList floatValue;
+  // static TokenList floatValue;
   static TokenList doubleValue;
   static TokenList ptrValue;
   static TokenList nullptrValue;

@@ -22,6 +22,8 @@ TEST_CASE("Unit Test - Literals", "[tokenizer][tokenType]") {
    CHECK(firstToken("' '") == TokenType::CHAR_LITERAL);
    CHECK(firstToken(R"("\\")") == TokenType::STRING_LITERAL);
    CHECK(firstToken("0") == TokenType::DECIMAL_NUMBER);
+   CHECK(firstToken("0.0") == TokenType::FLOAT_NUMBER);
+   CHECK(firstToken("0.") == TokenType::DECIMAL_NUMBER);
    CHECK(firstToken("0b") == TokenType::BINARY_NUMBER);
    CHECK(firstToken("1b") == TokenType::DECIMAL_NUMBER);
    CHECK(firstToken("0x") == TokenType::HEX_NUMBER);

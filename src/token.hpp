@@ -2,6 +2,7 @@
 
 #include <string>
 #include <cstdint>
+#include <iostream>
 #include <unordered_map>
 
 enum class TokenType : uint8_t {
@@ -15,6 +16,7 @@ enum class TokenType : uint8_t {
   STRING_LITERAL,
   DECIMAL_NUMBER,
   BINARY_NUMBER,
+  FLOAT_NUMBER,
   HEX_NUMBER,
   FALSE, //
   TRUE, //
@@ -138,7 +140,7 @@ enum class TokenType : uint8_t {
 */
 struct Token {
   private:
-  char padding __attribute__((__unused__));
+  [[maybe_unused]] char padding;
   public:
   TokenType type{TokenType::NONE};
   uint16_t length{0};
@@ -165,3 +167,7 @@ bool isSigned(TokenType);
 
 extern const TokenType numToType [128];
 extern const std::unordered_map<TokenType, std::string> typeToString;
+
+std::ostream& operator<<(std::ostream& os, const TokenType& obj);
+
+extern const char * tokenTypeToString [];
