@@ -1,5 +1,6 @@
-#include "checker.hpp"
 #include <iostream>
+#include <cassert>
+#include "checker.hpp"
 
 Token getTokenOfExpression(Expression& exp) {
   switch (exp.getType()) {
@@ -468,7 +469,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
               exit(1);
             }
             ResultingType res = checkExpression(tk, forLoop.statement.condition);
-            if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NONE && !canBeConvertedToBool(*res.type)) {
+            if (res.type->token.type != TokenType::BAD_VALUE && res.type->token.type != TokenType::NONE && !canBeConvertedToBool(res.type)) {
               addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &forLoop.statement.condition});
             }
             checkExpression(tk, forLoop.iteration);
@@ -484,7 +485,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
             {
               ResultingType res = checkExpression(tk, cond.ifStatement.condition);
               if (res.type->token.type != TokenType::BAD_VALUE && 
-              !canBeConvertedToBool(*res.type)) {
+              !canBeConvertedToBool(res.type)) {
                 addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &cond.ifStatement.condition});
               }
             }
@@ -492,7 +493,7 @@ bool Checker::checkScope(Tokenizer& tk, Scope& scope, TokenList& returnType, boo
             for(ElifStatementList* elifList = cond.elifStatement; elifList; elifList = elifList->next) {
               ResultingType res = checkExpression(tk, elifList->elif.condition);
               if (res.type->token.type != TokenType::BAD_VALUE && 
-              !canBeConvertedToBool(*res.type)) {
+              !canBeConvertedToBool(res.type)) {
                 addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &cond.ifStatement.condition});
               }
               checkScope(tk, elifList->elif.body, returnType, isLoop, isSwitch);
@@ -628,12 +629,12 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
 
       if (expression.getBinOp()->op.type == TokenType::LOGICAL_AND || expression.getBinOp()->op.type == TokenType::LOGICAL_OR) {
         if (leftSide.type->token.type != TokenType::BAD_VALUE) {
-          if (!canBeConvertedToBool(*leftSide.type)) {
+          if (!canBeConvertedToBool(leftSide.type)) {
             addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &expression.getBinOp()->leftSide});
           }
         }
         ResultingType rightSide = checkExpression(tk, expression.getBinOp()->rightSide);
-        if (!canBeConvertedToBool(*rightSide.type)) {
+        if (!canBeConvertedToBool(rightSide.type)) {
           addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, &expression.getBinOp()->rightSide});
         }
         return {&boolValue, false};
@@ -744,7 +745,7 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
       }
       if (expression.getUnOp()->op.type == TokenType::NOT) {
         ResultingType res = checkExpression(tk, expression.getUnOp()->operand);
-        if (!canBeConvertedToBool(*res.type)) {
+        if (!canBeConvertedToBool(res.type)) {
           addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk.tokenizerIndex, expression.getUnOp()->op});
         }
         return {&boolValue, false};
@@ -942,6 +943,7 @@ bool Checker::checkType(Tokenizer& tk, TokenList& type) {
   uint8_t typeType = 0;
 
   CheckerErrorType errorType = CheckerErrorType::NONE;
+  TokenType prevType = TokenType::NONE;
   TokenList *list = &type;
   do {
     if (isBuiltInType(list->token.type)) {
@@ -974,6 +976,12 @@ bool Checker::checkType(Tokenizer& tk, TokenList& type) {
       }
       typeType = 1;
     }
+    else if (list->token.getType() == TokenType::CONST) {
+      if (typeType == 0 || typeType == 1 || prevType == TokenType::CONST) {
+        errorType = CheckerErrorType::EXPECTING_TYPE;
+        break;
+      }
+    }
     else {
       if (typeType == 3) {
         errorType = CheckerErrorType::CANNOT_HAVE_MULTI_TYPE;
@@ -997,6 +1005,7 @@ bool Checker::checkType(Tokenizer& tk, TokenList& type) {
       list->next->next = (TokenList *)&typeDec;
       return true;
     }
+    prevType = list->token.getType();
     list = list->next;
   } while (list);
   if (errorType == CheckerErrorType::NONE) {
@@ -1045,7 +1054,11 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
   if (leftSide.token.type == TokenType::POINTER) {
     if (rightSide.token.type != TokenType::POINTER) {
       if (leftSide.next->token.type == TokenType::CHAR_TYPE && rightSide.token.type == TokenType::STRING_TYPE) {
-        return true;
+        if (!leftSide.next->next) {
+          // cannot assign const char ptr to char ptr
+          return false;
+        }
+        return leftSide.next->next->token.getType() == TokenType::CONST;
       }
       return rightSide.token.type == TokenType::NULL_PTR;
     }
@@ -1078,9 +1091,13 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
   return true;
 }
 
-// only builtin types can be converted to bool, except for void.
-bool canBeConvertedToBool(TokenList& type) {
-  return isBuiltInType(type.token.type) && type.token.type != TokenType::VOID && type.token.type != TokenType::STRING_TYPE;
+// only builtin types can be converted to bool, except for void and string literal.
+bool canBeConvertedToBool(TokenList* type) {
+  if (type->token.getType() == TokenType::REFERENCE) {
+    assert(type->next);
+    type = type->next;
+  }
+  return isBuiltInType(type->token.type) && type->token.type != TokenType::VOID && type->token.type != TokenType::STRING_TYPE;
 }
 
 TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {

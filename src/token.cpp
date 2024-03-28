@@ -4,6 +4,10 @@ bool isBuiltInType(TokenType type) {
   return type >= TokenType::BOOL && type <= TokenType::VOID;
 }
 
+bool isTypeModifier(TokenType type) {
+  return type == TokenType::CONST;
+}
+
 bool isBinaryOp(TokenType type) {
   return type >= TokenType::DOT && type <= TokenType::GREATER_THAN_EQUAL;
 }
@@ -172,6 +176,7 @@ const char* tokenTypeToString [] = {
   "DOUBLE_TYPE",
   "VOID",
   "REFERENCE",
+  "CONST",
   "TYPE",
   "OPERATOR",
   "DEC_PTR",
@@ -394,6 +399,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::BOOL, "bool"},
   {TokenType::NULL_PTR, "nullptr"},
   {TokenType::REFERENCE, "ref"},
+  {TokenType::CONST, "const"},
   {TokenType::STRING_LITERAL, "\""},
   {TokenType::CHAR_LITERAL, "'"},
   {TokenType::IDENTIFIER, "identifier"},

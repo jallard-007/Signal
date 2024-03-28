@@ -145,15 +145,19 @@ Token Tokenizer::tokenizeNext() {
             }
           }
           else if (content[position] == 'o') {
-            if (
-              content[++position] == 'n' &&
-              content[++position] == 't' &&
-              content[++position] == 'i' &&
-              content[++position] == 'n' &&
-              content[++position] == 'u' &&
-              content[++position] == 'e'
-            ) {
-              END_OF_IDENTIFIER(TokenType::CONTINUE)
+            if (content[++position] == 'n') {
+              if (content[++position] == 't') {
+                if (
+                  content[++position] == 'i' &&
+                  content[++position] == 'n' &&
+                  content[++position] == 'u' &&
+                  content[++position] == 'e'
+                ) {
+                  END_OF_IDENTIFIER(TokenType::CONTINUE)
+                } 
+              } else if (content[position] == 's' && content[++position] == 't') {
+                END_OF_IDENTIFIER(TokenType::CONST)
+              }
             }
           }
           else if (content[position] == 'h') {

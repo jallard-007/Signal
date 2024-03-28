@@ -118,5 +118,5 @@ struct Checker {
   static TokenList& largestType(TokenList&, TokenList&);
 };
 
-bool canBeConvertedToBool(TokenList&);
+bool canBeConvertedToBool(TokenList*);
 bool checkAssignment(const TokenList&, const TokenList&);

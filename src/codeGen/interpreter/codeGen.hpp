@@ -59,7 +59,6 @@ struct JumpMarker {
   JumpMarkerType type;
   JumpMarker() = delete;
   JumpMarker(uint64_t, JumpMarkerType);
-  // bool operator==(const Marker) const;
 };
 
 enum class StackMarkerType: uint8_t {
@@ -207,3 +206,27 @@ hard scope change: starting a new function (variables can take on any identifier
 soft scope change: scope within a function (variables within cannot take the same identifier as variables outside)
 
 */
+
+
+
+// ========================================
+// PRINTING
+// ========================================
+
+
+
+std::ostream& operator<<(std::ostream& os, const StackVariable& obj);
+std::ostream& operator<<(std::ostream& os, const StackMarkerType& obj);
+
+std::ostream& operator<<(std::ostream& os, const StackItem& obj);
+std::ostream& operator<<(std::ostream& os, const std::vector<StackItem>& obj);
+
+
+
+
+// ========================================
+// COMPARING
+// ========================================
+
+bool std::operator==(const StackItem &x, const StackItem &y);
+

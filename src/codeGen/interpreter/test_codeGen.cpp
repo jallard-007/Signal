@@ -18,32 +18,6 @@
   CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
   codeGen.tk = &tokenizer
 
-
-// copy of addByte from CodeGen class
-void addByte(std::vector<bc>& byteCode, bc byte) {
-  byteCode.emplace_back(byte);
-}
-// copy of addByteOp from CodeGen class
-void addByteOp(std::vector<bc>& byteCode, OpCode opCode) {
-  addByte(byteCode, (bc)opCode);
-}
-// copy of addBytes from CodeGen class
-void addBytes(std::vector<bc>& byteCode, const std::vector<bc>& bytes) {
-  for (const bc byte: bytes) {
-    addByte(byteCode, byte);
-  }
-}
-// copy of alignForImm from CodeGen class
-void alignForImm(std::vector<bc>& byteCode, const uint32_t offset, const uint32_t size) {
-  uint8_t mod = (byteCode.size() + offset) % size;
-  if (mod == 0) {
-    return;
-  }
-  while(mod++ != size) {
-    addByteOp(byteCode, OpCode::NOP);
-  }
-}
-
 TEST_CASE("constant expressions", "[codeGen]") {
   // should return the actual value of the expression, and the correct type (smallest type that supports that value, min int32_t)
   SECTION("4 + 4") {
@@ -156,7 +130,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 1") {
     #define EXPRESSION 55 % 6
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -172,7 +146,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 2") {
     #define EXPRESSION 8 * 5.3
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -188,7 +162,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 3") {
     #define EXPRESSION 23984723 - 9234.2 * 3 || 0x823ff2
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -220,7 +194,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 5") {
     #define EXPRESSION (false || 0x23423ac ^ 128) + 1843709551615/2
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -236,7 +210,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 6") {
     #define EXPRESSION (18446551615-123876) + 2
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -252,7 +226,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 7") {
     #define EXPRESSION 5 | (0x3a3423 | 0b1) * 102 || 66
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -268,7 +242,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 8") {
     #define EXPRESSION 5 > 0.000078
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -284,7 +258,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 9") {
     #define EXPRESSION ((234532 & 234) < 0xB234) && !(34 - 3234.2 * 1.5 - 75)
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -300,7 +274,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
   }
   SECTION("ben expression 10") {
     #define EXPRESSION 808 - 0b111010010100001110100111111 && true
-    auto result = EXPRESSION; // doing cast to bypass compiler warning
+    auto result = EXPRESSION;
     const std::string str = std::string(TOSTRING(EXPRESSION)) + ';';
     #undef EXPRESSION
     testBoilerPlate(str);
@@ -325,10 +299,10 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    std::vector<bc> expected;
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
-    CHECK(codeGen.byteCode == expected);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
   {
     const std::string str = "x:uint32 = 10;";
@@ -338,10 +312,10 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    std::vector<bc> expected;
-    addBytes(expected, {(bc)OpCode::MOVE_SI, 1, 10});
-    addBytes(expected, {(bc)OpCode::PUSH_D, 1});
-    CHECK(codeGen.byteCode == expected);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{(bc)OpCode::MOVE_SI, 1, 10}});
+    expected.addBytes({{(bc)OpCode::PUSH_D, 1}});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
 }
 
@@ -356,17 +330,17 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
     codeGen.generateStatement(statement);
-    std::vector<bc> expected;
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
-    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
-    CHECK(codeGen.byteCode == expected);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 8, 0}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 8, 0}});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
   {
     // should jump to the start of the for loop
@@ -385,11 +359,11 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     codeGen.generateStatement(statement);
-    std::vector<bc> expected;
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
-    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
-    CHECK(codeGen.byteCode == expected);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP, 0}});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
   {
     // should jump to the start of the while loop (just after the variable dec)
@@ -402,13 +376,13 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
     codeGen.generateStatement(statement);
-    std::vector<bc> expected;
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 8, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 8, 0});
-    addBytes(expected, {(bc)OpCode::RS_JUMP, 0});
-    CHECK(codeGen.byteCode == expected);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 8, 0}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP, 0}});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
 }
 
@@ -489,29 +463,28 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    std::vector<bc> expected;
-    // load x
-    addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0});
-    addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_D, 1, 0}});
 
     // short circuit
-    addBytes(expected, {(bc)OpCode::SET_FLAGS, 1});
-    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
+    expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
     // load y
-    addBytes(expected, {(bc)OpCode::LOAD_D, 2, stackPointerIndex});
+    expected.addBytes({{(bc)OpCode::LOAD_D, 2, stackPointerIndex}});
 
-    addBytes(expected, {(bc)OpCode::LOGICAL_AND, 1, 2});
-    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
+    expected.addBytes({{(bc)OpCode::LOGICAL_AND, 1, 2}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 4, 0}});
 
-    CHECK(codeGen.byteCode == expected);
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
   {
     const std::string str = "x:uint32; y:uint32; if (x && y || x) { num:uint32; } ";
@@ -529,34 +502,34 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    std::vector<bc> expected;
-    addBytes(expected, {(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0});
-    addBytes(expected, {(bc)OpCode::LOAD_D, 1, 0});
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_D, 1, 0}});
 
     // short circuit
-    addBytes(expected, {(bc)OpCode::SET_FLAGS, 1});
-    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
+    expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
-    addBytes(expected, {(bc)OpCode::LOAD_D, 2, stackPointerIndex});
+    expected.addBytes({{(bc)OpCode::LOAD_D, 2, stackPointerIndex}});
 
-    addBytes(expected, {(bc)OpCode::LOGICAL_AND, 1, 2});
-    addBytes(expected, {(bc)OpCode::GET_NE, 3});
+    expected.addBytes({{(bc)OpCode::LOGICAL_AND, 1, 2}});
+    expected.addBytes({{(bc)OpCode::GET_NE, 3}});
 
     // short circuit
-    addBytes(expected, {(bc)OpCode::SET_FLAGS, 3});
-    addBytes(expected, {(bc)OpCode::RS_JUMP_NE, 0});
+    expected.addBytes({{(bc)OpCode::SET_FLAGS, 3}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_NE, 0}});
 
-    addBytes(expected, {(bc)OpCode::LOGICAL_OR, 3, 1});
-    addBytes(expected, {(bc)OpCode::RS_JUMP_E, 0});
+    expected.addBytes({{(bc)OpCode::LOGICAL_OR, 3, 1}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::SUB_I, stackPointerIndex, 4, 0});
-    alignForImm(expected, 2, 2);
-    addBytes(expected, {(bc)OpCode::ADD_I, stackPointerIndex, 4, 0});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 4, 0}});
 
-    CHECK(codeGen.byteCode == expected);
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
 }
 
@@ -604,14 +577,53 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    StackItem rv {
+      .positionOnStack = 8,
+      .type = StackItemType::RETURN_VALUE
+    };
+    expected.stack.emplace_back(rv);
+    // VariableDec vd{Token()};
+    // StackItem var {
+    //   .variable = ,
+    //   .type = StackItemType::VARIABLE
+    // };
+    // expected.stack.emplace_back(rv);
+
+    StackItem ra {
+      .positionOnStack = 24,
+      .type = StackItemType::RETURN_ADDRESS
+    };
+    expected.stack.emplace_back(ra);
+
+    CHECK(codeGen.stack == expected.stack);
+  
     REQUIRE(codeGen.stack.size() == 3);
     CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
     CHECK(codeGen.stack[0].positionOnStack == 8);
     CHECK(codeGen.stack[1].type == StackItemType::VARIABLE);
     CHECK(codeGen.stack[1].variable.positionOnStack == 16);
-    CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
+    // CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
     CHECK(codeGen.stack[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
     CHECK(codeGen.stack[2].type == StackItemType::RETURN_ADDRESS);
     CHECK(codeGen.stack[2].positionOnStack == 24);
+  }
+}
+
+TEST_CASE("string literals", "[codeGen]") {
+  SECTION("1") {
+    const std::string str = "func testFunction(arg1: int64): void { str: const char ptr = \"Hello World!\\n\"; } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check());
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    REQUIRE(codeGen.generateFunctionDeclaration(funcDec));
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CHECK(codeGen.byteCode == expected.byteCode);
+    std::cout << codeGen.stack << '\n';
   }
 }

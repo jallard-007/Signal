@@ -132,6 +132,8 @@ struct VariableDec {
   void prettyPrintDefinition(Tokenizer&, std::string&);
   VariableDec deepCopy(NodeMemPool&);
 };
+std::ostream& operator<<(std::ostream& os, const VariableDec& obj);
+
 
 // statementList:= statement statementList | nothing
 struct StatementList {

@@ -250,6 +250,7 @@ const char * bytecode_t_to_op [] = {
   "RS_JUMP_L",
   "RS_JUMP_LE",
   "MOVE",
+  "MOVE_SI",
   "MOVE_I",
   "MOVE_LI",
   "PUSH_B",

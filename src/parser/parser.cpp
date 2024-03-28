@@ -1057,19 +1057,18 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
 ParseTypeErrorType Parser::getType(TokenList& type) {
   Token tp = tokenizer->peekNext();
   TokenList *curr = memPool.makeTokenList();
-  if (isConcreteType(tp.type)) {
-    tokenizer->consumePeek();
-    curr->token = tp;
-    TokenList *prev = curr;
-    curr = memPool.makeTokenList();
-    curr->next = prev;
-    tp = tokenizer->peekNext();
-  } else {
+  if (!isBuiltInType(tp.type) && !isTypeModifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
     expected.emplace_back(ExpectedType::TOKEN, tp, TokenType::TYPE, tokenizer->tokenizerIndex);
     return ParseTypeErrorType::REPORTED;
   }
+  tokenizer->consumePeek();
+  curr->token = tp;
+  TokenList *prev = curr;
+  curr = memPool.makeTokenList();
+  curr->next = prev;
+  tp = tokenizer->peekNext();
   while (tp.type != TokenType::END_OF_FILE) {
-    if (tp.type < TokenType::POINTER) {
+    if (!isBuiltInType(tp.type) && !isTypeModifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
       break;
     }
     tokenizer->consumePeek();

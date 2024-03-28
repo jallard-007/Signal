@@ -127,6 +127,9 @@ enum class TokenType : uint8_t {
   VOID,
   REFERENCE,
 
+  // type modifiers
+  CONST,
+
   // extra types used by parser to report errors
   TYPE,
   OPERATOR,
@@ -155,6 +158,7 @@ struct Token {
 
 
 bool isBuiltInType(TokenType);
+bool isTypeModifier(TokenType);
 bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);

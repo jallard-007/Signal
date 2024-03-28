@@ -35,6 +35,7 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("break") == TokenType::BREAK);
    CHECK(firstToken("case") == TokenType::CASE);
    CHECK(firstToken("continue") == TokenType::CONTINUE);
+   CHECK(firstToken("const") == TokenType::CONST);
    CHECK(firstToken("create") == TokenType::CREATE);
    CHECK(firstToken("default") == TokenType::DEFAULT);
    CHECK(firstToken("elif") == TokenType::ELIF);

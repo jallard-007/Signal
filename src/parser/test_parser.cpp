@@ -293,7 +293,7 @@ TEST_CASE("Expected tokens/expressions", "[parser]") {
     Parser parser{tokenizer, memPool};
     parser.parse();
     REQUIRE(parser.expected.size() == 1);
-    CHECK(parser.expected[0].tokenWhereExpected.position == 11);
+    CHECK(parser.expected[0].tokenWhereExpected.position == 16);
     CHECK(parser.expected[0].expectedTokenType == TokenType::SEMICOLON);
     CHECK(parser.expected[0].expectedType == ExpectedType::TOKEN);
   }
