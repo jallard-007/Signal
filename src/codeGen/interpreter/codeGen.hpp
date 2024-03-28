@@ -124,49 +124,14 @@ struct CodeGen {
 
   CodeGen(Program&, std::vector<Tokenizer>&, std::map<std::string, GeneralDec *>&);
 
-  // expression gen
-  ExpressionResult generateExpression(const Expression&, bool = false);
-  ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
-  ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
-  ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
-  ExpressionResult generateExpressionUnOp(const UnOp&);
+  // main driver
+  bool generate();
 
   const DataSectionEntry& addToDataSection(DataSectionEntryType, void *data, uint32_t n);
 
-  // binary ops
-  ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
-  ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
-  ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
-  ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
-
-  uint32_t getVarOffsetFromSP(const StackVariable &);
-  ExpressionResult loadValue(const Token&);
-  ExpressionResult getAddressOfExpression(const Expression&);
-
-  bool generate();
-  bool generateGeneralDeclaration(const GeneralDec&);
-  bool generateFunctionDeclaration(const FunctionDec&);
-  bool generateVariableDeclaration(const VariableDec&, bool = true);
-  void generateVariableDeclarationStructType(const VariableDec&, bool);
-  StructInformation& getStructInfo(const std::string&);
-
-  void generateStatement(const Statement&);
-  void generateControlFlowStatement(const ControlFlowStatement&);
-  BranchStatementResult generateBranchStatement(const BranchStatement&);
-  void updateJumpMarkersTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE, bool = false);
-  uint64_t addJumpMarker(JumpMarkerType);
-
-  // scopes
-  void generateScope(const Scope&);
-  void addFunctionSignatureToVirtualStack(const FunctionDec&);
-  void startSoftScope();
-  void endSoftScope();
-  void startFunctionScope(const FunctionDec&);
-  void endFunctionScope(const FunctionDec&);
-
-  // adding to the bytecode
-  void addByteOp(OpCode);
+// ADDING TO BYTECODE
   void addByte(bytecode_t);
+  void addByteOp(OpCode);
   void addBytes(const std::span<const bytecode_t>);
   void addNumBytes(const void *, uint64_t);
   void add2ByteNum(const uint16_t);
@@ -174,23 +139,64 @@ struct CodeGen {
   void add8ByteNum(const uint64_t);
   void addPointer();
   void addJumpOp(OpCode);
-  ExpressionResult expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
-
-  void updateJumpOpTo(uint64_t, uint64_t);
-
-
   void alignForImm(uint32_t, uint32_t);
   void moveImmToReg(uint8_t, ExpressionResult&);
 
-  // stack stuff
+// JUMP MARKERS
+  uint64_t addJumpMarker(JumpMarkerType);
+  void updateJumpMarkersTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE, bool = false);
+
+// DECLARATIONS
+  bool generateGeneralDeclaration(const GeneralDec&);
+  bool generateVariableDeclaration(const VariableDec&, bool = true);
+
+// GENERAL EXPRESSIONS
+  ExpressionResult generateExpression(const Expression&, bool = false);
+  ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
+  ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
+  ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
+  ExpressionResult expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
+  ExpressionResult getAddressOfExpression(const Expression&);
+  ExpressionResult loadValue(const Token&);
+
+// BINARY EXPRESSIONS
+  ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
+  ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
+  ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
+  ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
+
+// UNARY EXPRESSIONS
+  ExpressionResult generateExpressionUnOp(const UnOp&);
+
+// STRUCTS
+  StructInformation& getStructInfo(const std::string&);
+
+// SCOPES
+  void generateScope(const Scope&);
+  void startSoftScope();
+  void endSoftScope();
+
+// FUNCTIONS
+  bool generateFunctionDeclaration(const FunctionDec&);
+  void startFunctionScope(const FunctionDec&);
+  void endFunctionScope(const FunctionDec&);
+
+// STATEMENTS
+  void generateStatement(const Statement&);
+  void generateControlFlowStatement(const ControlFlowStatement&);
+  BranchStatementResult generateBranchStatement(const BranchStatement&);
+  void generateReturnStatement(const ReturnStatement&);
+
+// STACK MANAGEMENT
+  uint32_t getPositionPushingItemToStack(Token, uint32_t = 0);
+  StackVariable& addVarDecToVirtualStack(const VariableDec&);
   uint32_t getCurrStackPointerPosition();
   void makeRoomOnVirtualStack(Token, uint32_t = 0);
-  StackVariable& addVarDecToVirtualStack(const VariableDec&);
   void addExpressionResToStack(const ExpressionResult&);
-  void addTokenToStack(Token);
-  uint32_t getPositionPushingItemToStack(Token, uint32_t = 0);
-  int getStackOffset(const std::string&);
+  void addFunctionSignatureToVirtualStack(const FunctionDec&);
+  uint32_t getVarOffsetFromSP(const StackVariable &);
 
+// OTHER
   bytecode_t allocateRegister();
   void freeRegister(bytecode_t);
   uint32_t sizeOfType(Token);
@@ -198,8 +204,8 @@ struct CodeGen {
 };
 
 OpCode getLoadOpForSize(unsigned char);
-ExpressionResult evaluateUnaryOpImmExpression(TokenType, ExpressionResult&);
-ExpressionResult evaluateBinOpImmExpression(TokenType, ExpressionResult&, ExpressionResult&);
+// ExpressionResult evaluateUnaryOpImmExpression(TokenType, ExpressionResult&);
+// ExpressionResult evaluateBinOpImmExpression(TokenType, ExpressionResult&, ExpressionResult&);
 
 /*
 hard scope change: starting a new function (variables can take on any identifier not in the global scope)

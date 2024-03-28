@@ -54,242 +54,10 @@ const DataSectionEntry& CodeGen::addToDataSection(DataSectionEntryType type, voi
   return dataSectionEntries.back();
 }
 
-ExpressionResult CodeGen::loadValue(const Token &token) {
-  ExpressionResult expRes;
-  switch (token.type) {
-    case TokenType::CHAR_LITERAL: {
-      std::string charLiteral = tk->extractToken(token);
-      // convert charLiteral to its numeric value and return it
-      // might do this during the tokenizer stage...
-      if (charLiteral.size() == 3) {
-        expRes.setData(&charLiteral[1], 1);
-        return expRes;
-      } else if (charLiteral.size() == 4) {
-        if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          charLiteral[2] -= '0';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == 'n') {
-          charLiteral[2] = '\n';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '"') {
-          charLiteral[2] = '\"';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '\\') {
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '\'') {
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        }
-      }
-      assert(false);
-      return expRes;
-    }
-    case TokenType::STRING_LITERAL: { 
-      // place string literal in data section of bytecode, return offset to start of string, have to replace escaped characters
-      // check if string is already in data section
-      expRes.type = &Checker::stringValue;
-      std::string stringLiteral = tk->extractToken(token);
-      for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
-        if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
-          continue;
-        }
-        const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
-        uint64_t stringLength = strlen(pString);
-        if (stringLiteral.length() == stringLength && stringLiteral == pString) {
-          expRes.setData(&i, sizeof(i));
-          return expRes;
-        }
-        i += stringLength;
-      }
-      const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, stringLiteral.data(), stringLiteral.length() + 1);
-      if (dataSectionEntry.indexInDataSection) {
-        ExpressionResult stringExp;
-        stringExp.setReg(allocateRegister());
-        stringExp.isReg = true;
-        stringExp.isTemp = true;
-        ExpressionResult dataPointerExp;
-        dataPointerExp.setReg(dataPointerIndex);
-        dataPointerExp.isReg = true;
-        expRes = expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
-        ExpressionResult offsetExp;
-        offsetExp.setData(&dataSectionEntry.indexInDataSection, sizeof(dataSectionEntry.indexInDataSection));
-        offsetExp.type = &Checker::uint32Value;
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
-      }
-      expRes.setReg(dataPointerIndex);
-      expRes.isReg = true;
-      expRes.isTemp = true;
-      return expRes;
-    }
-    case TokenType::DECIMAL_NUMBER: {
-      std::string decimalNumber = tk->extractToken(token);
-      uint64_t num = std::stoull(decimalNumber);
-      expRes.setData(&num, sizeof(num));
-      if (num <= INT32_MAX) {
-        expRes.type = &Checker::int32Value;
-      } else if (num <= UINT32_MAX) {
-        expRes.type = &Checker::uint32Value;
-      } else if (num <= INT64_MAX) {
-        expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
-      return expRes;
-    }
-    case TokenType::BINARY_NUMBER: {
-      assert(token.length > 2);
-      std::string binaryNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::BINARY_NUMBER});
-      uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-      expRes.setData(&num, sizeof(num));
-      if (num <= INT32_MAX) {
-        expRes.type = &Checker::int32Value;
-      } else if (num <= UINT32_MAX) {
-        expRes.type = &Checker::uint32Value;
-      } else if (num <= INT64_MAX) {
-        expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
-      return expRes;
-    }
-    case TokenType::FLOAT_NUMBER: {
-      std::string binaryNumber = tk->extractToken(token);
-      double num = std::stod(binaryNumber);
-      expRes.setData(&num, sizeof(num));
-      expRes.type = &Checker::doubleValue;
-      return expRes;
-    }
-    case TokenType::HEX_NUMBER: { 
-      assert(token.length > 2);
-      std::string hexNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::HEX_NUMBER});
-      /*
-      std::invalid_argument
-      std::out_of_range
-      */
-      uint64_t num = std::stoull(hexNumber, nullptr, 16);
-      expRes.setData(&num, sizeof(num));
-      if (num <= INT32_MAX) {
-        expRes.type = &Checker::int32Value;
-      } else if (num <= UINT32_MAX) {
-        expRes.type = &Checker::uint32Value;
-      } else if (num <= INT64_MAX) {
-        expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
-      return expRes;
-    }
-    case TokenType::FALSE: {
-      expRes.type = &Checker::boolValue;
-      return expRes;
-    }
-    case TokenType::TRUE: {
-      uint8_t trueValue = 1;
-      expRes.setData(&trueValue, sizeof(trueValue));
-      expRes.type = &Checker::boolValue;
-      return expRes;
-    }
-    case TokenType::NULL_PTR: {
-      expRes.type = &Checker::ptrValue;
-      return expRes;
-    }
-    case TokenType::IDENTIFIER: {
-      std::string identifier = tk->extractToken(token);
-      uint32_t stackItemIndex = nameToStackItemIndex[identifier];
-      StackVariable &variableInfo = stack[stackItemIndex].variable;
-      expRes.type = &variableInfo.varDec.type;
-      if (variableInfo.reg) {
-        expRes.setReg(variableInfo.reg);
-        expRes.isReg = true;
-        return expRes;
-      }
-      const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
-      const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
-      if (sizeOfVar > SIZE_OF_REGISTER) {
-        // too large to fit into a reg, just return offset
-        // TODO: figure out what to make the type in this scenario, maybe need another flag in exp res
-        expRes.setData(&varOffset, sizeof(varOffset));
-        return expRes;
-      }
-      // load value into a register
-      variableInfo.reg = allocateRegister();
-      OpCode loadOp = getLoadOpForSize(sizeOfVar);
-      if (varOffset) {
-        addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-        ExpressionResult varOffsetExp;
-        varOffsetExp.setData(&varOffset, sizeof(varOffset));
-        varOffsetExp.type = &Checker::uint64Value;
-        ExpressionResult miscRegExp;
-        miscRegExp.setReg(miscRegisterIndex);
-        miscRegExp.isReg = true;
-        varOffsetExp.type = &Checker::uint64Value;
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
-        addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
-      } else {
-        addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
-      }
-      expRes.isReg = true;
-      expRes.setData(&variableInfo.reg, sizeof(variableInfo.reg));
-      return expRes;
-    }
-    default: {
-      assert(false);
-      return expRes;
-    }
-  }
-}
-
-uint32_t CodeGen::getVarOffsetFromSP(const StackVariable &variableInfo) {
-  // |                   | <- sp
-  // |       | <- positionOnStack
-  // | value |
-  return getCurrStackPointerPosition() - variableInfo.positionOnStack;
-}
-
-OpCode getLoadOpForSize(const uint8_t size) {
-  switch(size) {
-    case 1: return OpCode::LOAD_B;
-    case 2: return OpCode::LOAD_W;
-    case 3:
-    case 4: return OpCode::LOAD_D;
-    case 5:
-    case 6:
-    case 7:
-    case 8: return OpCode::LOAD_Q;
-    default: std::cerr << "invalid size in getLoadOpForSize: " << (uint32_t)size << '\n'; exit(1);
-  }
-}
-
-bytecode_t CodeGen::allocateRegister() {
-  for (uint8_t i = 0; i < NUM_REGISTERS; ++i) {
-    if (!registers[i].inUse) {
-      registers[i].inUse = true;
-      return i;
-    }
-  }
-  std::cerr << "Compiler Error: Failed to allocate a register; zero available registers\n";
-  exit(1);
-}
-
-void CodeGen::freeRegister(bytecode_t regNum) {
-  RegisterInfo& regInfo = registers[regNum];
-  if (regInfo.changed) {
-    // SUB_I misc, bp, regInfo.stackOffset
-    // STORE misc, currReg
-  }
-  regInfo.changed = false;
-  regInfo.inUse = false;
-}
-
 
 // ========================================
 // ADDING TO BYTECODE
 // ========================================
-
 
 void CodeGen::addByte(bc byte) {
   byteCode.emplace_back(byte);
@@ -413,6 +181,213 @@ void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     add4ByteNum(*(uint32_t *)exp.getData());
   }
   exp.setReg(reg);
+}
+
+
+// ========================================
+// JUMP MARKERS
+// ========================================
+
+uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
+  jumpMarkers.emplace_back(byteCode.size(), type);
+  return byteCode.size();
+}
+
+/**
+ * Updates jump markers with destination. Sets type of each updated marker to none
+ * \param destination the destination
+ * \param type type of jump marker to update
+ * \param until keep updating markers till this type is reached. if none, updates the first marker and stops
+ * \param clear set the 'until' marker to type none if reached
+*/
+void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, JumpMarkerType until, bool clear) {
+  for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
+    if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
+      if (clear) {
+        jumpMarker->type = JumpMarkerType::NONE;
+      }
+      break;
+    }
+    if (jumpMarker->type == type) {
+      jumpMarker->destination = destination;
+      jumpMarker->type = JumpMarkerType::NONE;
+      if (until == JumpMarkerType::NONE) {
+        break;
+      }
+    }
+  }
+  // clean up
+  // while (!jumpMarkers.empty() && jumpMarkers.back().type == JumpMarkerType::NONE) {
+  //   jumpMarkers.pop_back();
+  // }
+}
+
+
+// ========================================
+// DECLARATIONS
+// ========================================
+
+bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
+  switch(genDec.type) {
+    case GeneralDecType::NONE: {
+      break;
+    }
+    case GeneralDecType::STRUCT: {
+      // generate the functions within, add a parameter for 'this'
+      std::cerr << "Unsupported dec STRUCT\n";
+      exit(1);
+    }
+    case GeneralDecType::VARIABLE: {
+      return generateVariableDeclaration(*genDec.varDec);
+    }
+    case GeneralDecType::FUNCTION: {
+      return generateFunctionDeclaration(*genDec.funcDec);
+    }
+    case GeneralDecType::ENUM: {
+      // assign values for each item in the enum
+      std::cerr << "Unsupported dec ENUM\n";
+      exit(1);
+    }
+    case GeneralDecType::TEMPLATE: {
+      // don't do anything
+      std::cerr << "Unsupported dec TEMPLATE\n";
+      exit(1);
+    }
+    case GeneralDecType::TEMPLATE_CREATE: {
+      // generate whatever is in the template with the template type
+      // might handle the copy during checker stage, in that case don't do anything
+      std::cerr << "Unsupported dec TEMPLATE_CREATE\n";
+      exit(1);
+    }
+    case GeneralDecType::INCLUDE_DEC: {
+      // don't do anything, handled by parser
+      break;
+    }
+  }
+  return true;
+}
+
+/**
+ * Have to figure out stack alignment
+ * \returns the size of the type
+*/
+bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+  bc reg = 0;
+  const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
+  StackVariable& stackVar = addVarDecToVirtualStack(varDec);
+  const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
+  const Token typeToken = getTypeFromTokenList(varDec.type);
+  const uint32_t size = sizeOfType(typeToken);
+  const uint32_t padding = diff - size;
+  assert(padding < size);
+  if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
+    if (initialize && varDec.initialAssignment) {
+      ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
+      if (!expRes.isReg) {
+        reg = allocateRegister();
+        moveImmToReg(reg, expRes);
+      } else {
+        reg = expRes.getReg();
+      }
+      stackVar.reg = reg;
+    }
+    assert(size >= 1 && size <= 8);
+    if (!reg) {
+      uint32_t spaceToAdd = size + padding;
+      ExpressionResult spaceToAddExp;
+      spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
+      spaceToAddExp.type = &Checker::uint32Value;
+      ExpressionResult stackPointerExp;
+      stackPointerExp.setReg(stackPointerIndex);
+      stackPointerExp.isReg = true;
+      stackPointerExp.type = &Checker::uint64Value;
+      expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+    } else {
+      switch (size) {
+        case 1: {
+          addBytes({{(bc)OpCode::PUSH_B, reg}});
+          break;
+        }
+        case 2: {
+          if (padding) {
+            addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
+          }
+          addBytes({{(bc)OpCode::PUSH_W, reg}});
+          break;
+        }
+        case 4: {
+          // add padding to align
+          if (padding) {
+            ExpressionResult paddingToAdd;
+            paddingToAdd.setData(&padding, sizeof(padding));
+            paddingToAdd.type = &Checker::uint64Value;
+            ExpressionResult stackPointerExp;
+            stackPointerExp.setReg(stackPointerIndex);
+            stackPointerExp.isReg = true;
+            stackPointerExp.type = &Checker::uint64Value;
+            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
+          }
+          // push value to stack
+          addBytes({{(bc)OpCode::PUSH_D, reg}});
+          break;
+        }
+        case 8: {
+          if (padding) {
+            ExpressionResult paddingToAdd;
+            paddingToAdd.setData(&padding, sizeof(padding));
+            paddingToAdd.type = &Checker::uint64Value;
+            ExpressionResult stackPointerExp;
+            stackPointerExp.setReg(stackPointerIndex);
+            stackPointerExp.isReg = true;
+            stackPointerExp.type = &Checker::uint64Value;
+            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
+          }
+          addBytes({{(bc)OpCode::PUSH_Q, reg}});
+          break;
+        }
+        default: {
+          std::cerr << "Invalid Size [" << size << "] in generateVariableDeclaration\n";
+          exit(1);
+        }
+      }
+    }
+  }
+  else if (typeToken.type == TokenType::IDENTIFIER) {
+    uint32_t spaceToAdd = size + padding;
+    ExpressionResult spaceToAddExp;
+    spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
+    spaceToAddExp.type = &Checker::uint64Value;
+    ExpressionResult stackPointerExp;
+    stackPointerExp.setReg(stackPointerIndex);
+    stackPointerExp.isReg = true;
+    stackPointerExp.type = &Checker::uint64Value;
+    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+  }
+  else {
+    std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
+    exit(1);
+  }
+  // adding to stack
+  // uint32_t offset = size;
+  // for (StackItem &item : stack) {
+  //   if (item.type == StackItemType::MARKER) {
+  //     if (item.marker == StackMarkerType::HARD_SCOPE_START) {
+  //       break;
+  //     }
+  //   } else if (item.type == StackItemType::VARIABLE) {
+  //     offset = item.variable.offset + size;
+  //     break;
+  //   }
+  // }
+  // StackItem stackItem {
+  //   .variable = {
+  //     .varDec = varDec,
+  //     .offset = offset,
+  //   },
+  //   .type = StackItemType::VARIABLE,
+  // };
+  // stack.emplace_back(stackItem);
+  return true;
 }
 
 
@@ -879,6 +854,36 @@ ExpressionResult evaluateUnaryOpImmExpression(TokenType op, ExpressionResult& op
 // GENERAL EXPRESSIONS
 // ========================================
 
+ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
+  switch (currExp.getType()) {
+    case ExpressionType::ARRAY_ACCESS: {
+      return generateExpressionArrAccess(*currExp.getArrayAccess());
+    }
+    // case ExpressionType::ARRAY_LITERAL:
+    // case ExpressionType::STRUCT_LITERAL: {
+    //   return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
+    // }
+    case ExpressionType::BINARY_OP: {
+      return generateExpressionBinOp(*currExp.getBinOp(), controlFlow);
+    }
+    case ExpressionType::FUNCTION_CALL: {
+      return generateExpressionFunctionCall(*currExp.getFunctionCall());
+    }
+    case ExpressionType::NONE: {
+      return {};
+    }
+    case ExpressionType::UNARY_OP: {
+      return generateExpressionUnOp(*currExp.getUnOp());
+    }
+    case ExpressionType::VALUE: {
+      return loadValue(currExp.getToken());
+    }
+    default: {
+      std::cerr << "Code generation not implemented for this expression type\n";
+      exit(1);
+    }
+  }
+}
 
 /*
 
@@ -932,37 +937,6 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   addByteOp(OpCode::JUMP);
   add4ByteNum(0);
   return {};
-}
-
-ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
-  switch (currExp.getType()) {
-    case ExpressionType::ARRAY_ACCESS: {
-      return generateExpressionArrAccess(*currExp.getArrayAccess());
-    }
-    // case ExpressionType::ARRAY_LITERAL:
-    // case ExpressionType::STRUCT_LITERAL: {
-    //   return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
-    // }
-    case ExpressionType::BINARY_OP: {
-      return generateExpressionBinOp(*currExp.getBinOp(), controlFlow);
-    }
-    case ExpressionType::FUNCTION_CALL: {
-      return generateExpressionFunctionCall(*currExp.getFunctionCall());
-    }
-    case ExpressionType::NONE: {
-      return {};
-    }
-    case ExpressionType::UNARY_OP: {
-      return generateExpressionUnOp(*currExp.getUnOp());
-    }
-    case ExpressionType::VALUE: {
-      return loadValue(currExp.getToken());
-    }
-    default: {
-      std::cerr << "Code generation not implemented for this expression type\n";
-      exit(1);
-    }
-  }
 }
 
 
@@ -1131,10 +1105,199 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
 }
 
 
+ExpressionResult CodeGen::loadValue(const Token &token) {
+  ExpressionResult expRes;
+  switch (token.type) {
+    case TokenType::CHAR_LITERAL: {
+      std::string charLiteral = tk->extractToken(token);
+      // convert charLiteral to its numeric value and return it
+      // might do this during the tokenizer stage...
+      if (charLiteral.size() == 3) {
+        expRes.setData(&charLiteral[1], 1);
+        return expRes;
+      } else if (charLiteral.size() == 4) {
+        if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
+          charLiteral[2] -= '0';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        } else if (charLiteral[2] == 'n') {
+          charLiteral[2] = '\n';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        } else if (charLiteral[2] == '"') {
+          charLiteral[2] = '\"';
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        } else if (charLiteral[2] == '\\') {
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        } else if (charLiteral[2] == '\'') {
+          expRes.setData(&charLiteral[2], 1);
+          return expRes;
+        }
+      }
+      assert(false);
+      return expRes;
+    }
+    case TokenType::STRING_LITERAL: { 
+      // place string literal in data section of bytecode, return offset to start of string, have to replace escaped characters
+      // check if string is already in data section
+      expRes.type = &Checker::stringValue;
+      std::string stringLiteral = tk->extractToken(token);
+      for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
+        if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
+          continue;
+        }
+        const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
+        uint64_t stringLength = strlen(pString);
+        if (stringLiteral.length() == stringLength && stringLiteral == pString) {
+          expRes.setData(&i, sizeof(i));
+          return expRes;
+        }
+        i += stringLength;
+      }
+      const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, stringLiteral.data(), stringLiteral.length() + 1);
+      if (dataSectionEntry.indexInDataSection) {
+        ExpressionResult stringExp;
+        stringExp.setReg(allocateRegister());
+        stringExp.isReg = true;
+        stringExp.isTemp = true;
+        ExpressionResult dataPointerExp;
+        dataPointerExp.setReg(dataPointerIndex);
+        dataPointerExp.isReg = true;
+        expRes = expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
+        ExpressionResult offsetExp;
+        offsetExp.setData(&dataSectionEntry.indexInDataSection, sizeof(dataSectionEntry.indexInDataSection));
+        offsetExp.type = &Checker::uint32Value;
+        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+      }
+      expRes.setReg(dataPointerIndex);
+      expRes.isReg = true;
+      expRes.isTemp = true;
+      return expRes;
+    }
+    case TokenType::DECIMAL_NUMBER: {
+      std::string decimalNumber = tk->extractToken(token);
+      uint64_t num = std::stoull(decimalNumber);
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      return expRes;
+    }
+    case TokenType::BINARY_NUMBER: {
+      assert(token.length > 2);
+      std::string binaryNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::BINARY_NUMBER});
+      uint64_t num = std::stoull(binaryNumber, nullptr, 2);
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      return expRes;
+    }
+    case TokenType::FLOAT_NUMBER: {
+      std::string binaryNumber = tk->extractToken(token);
+      double num = std::stod(binaryNumber);
+      expRes.setData(&num, sizeof(num));
+      expRes.type = &Checker::doubleValue;
+      return expRes;
+    }
+    case TokenType::HEX_NUMBER: { 
+      assert(token.length > 2);
+      std::string hexNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::HEX_NUMBER});
+      /*
+      std::invalid_argument
+      std::out_of_range
+      */
+      uint64_t num = std::stoull(hexNumber, nullptr, 16);
+      expRes.setData(&num, sizeof(num));
+      if (num <= INT32_MAX) {
+        expRes.type = &Checker::int32Value;
+      } else if (num <= UINT32_MAX) {
+        expRes.type = &Checker::uint32Value;
+      } else if (num <= INT64_MAX) {
+        expRes.type = &Checker::int64Value;
+      } else {
+        expRes.type = &Checker::uint64Value;
+      }
+      return expRes;
+    }
+    case TokenType::FALSE: {
+      expRes.type = &Checker::boolValue;
+      return expRes;
+    }
+    case TokenType::TRUE: {
+      uint8_t trueValue = 1;
+      expRes.setData(&trueValue, sizeof(trueValue));
+      expRes.type = &Checker::boolValue;
+      return expRes;
+    }
+    case TokenType::NULL_PTR: {
+      expRes.type = &Checker::ptrValue;
+      return expRes;
+    }
+    case TokenType::IDENTIFIER: {
+      std::string identifier = tk->extractToken(token);
+      uint32_t stackItemIndex = nameToStackItemIndex[identifier];
+      StackVariable &variableInfo = stack[stackItemIndex].variable;
+      expRes.type = &variableInfo.varDec.type;
+      if (variableInfo.reg) {
+        expRes.setReg(variableInfo.reg);
+        expRes.isReg = true;
+        return expRes;
+      }
+      const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
+      const uint32_t sizeOfVar = sizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
+      if (sizeOfVar > SIZE_OF_REGISTER) {
+        // too large to fit into a reg, just return offset
+        // TODO: figure out what to make the type in this scenario, maybe need another flag in exp res
+        expRes.setData(&varOffset, sizeof(varOffset));
+        return expRes;
+      }
+      // load value into a register
+      variableInfo.reg = allocateRegister();
+      OpCode loadOp = getLoadOpForSize(sizeOfVar);
+      if (varOffset) {
+        addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        ExpressionResult varOffsetExp;
+        varOffsetExp.setData(&varOffset, sizeof(varOffset));
+        varOffsetExp.type = &Checker::uint64Value;
+        ExpressionResult miscRegExp;
+        miscRegExp.setReg(miscRegisterIndex);
+        miscRegExp.isReg = true;
+        varOffsetExp.type = &Checker::uint64Value;
+        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
+        addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
+      } else {
+        addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
+      }
+      expRes.isReg = true;
+      expRes.setData(&variableInfo.reg, sizeof(variableInfo.reg));
+      return expRes;
+    }
+    default: {
+      assert(false);
+      return expRes;
+    }
+  }
+}
+
+
 // ========================================
 // BINARY EXPRESSIONS
 // ========================================
-
 
 bool isCommutative(OpCode op) {
   return !(
@@ -1499,7 +1662,6 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 // UNARY EXPRESSIONS
 // ========================================
 
-
 ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   ExpressionResult expRes = generateExpression(unOp.operand);
   // TokenType expType = expRes.type->token.getType();
@@ -1559,224 +1721,6 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
   }
 }
 
-/**
- * Returns the size of a type
- * \param token the token of the type
- * \returns the size of the type
-*/
-uint32_t CodeGen::sizeOfType(const Token token) {
-  switch (token.type) {
-    case TokenType::BOOL: {
-      return sizeof (bool);
-    }
-    case TokenType::CHAR_TYPE: {
-      return sizeof (char);
-    }
-    case TokenType::STRING_TYPE: {
-      return sizeof (char *);
-    }
-    case TokenType::INT8_TYPE:
-    case TokenType::UINT8_TYPE: {
-      return sizeof (uint8_t);
-    }
-    case TokenType::INT16_TYPE:
-    case TokenType::UINT16_TYPE: {
-      return sizeof (uint16_t);
-    }
-    case TokenType::INT32_TYPE:
-    case TokenType::UINT32_TYPE: {
-      return sizeof (uint32_t);
-    }
-    case TokenType::INT64_TYPE:
-    case TokenType::UINT64_TYPE: {
-      return sizeof (uint64_t);
-    }
-    case TokenType::POINTER: {
-      return sizeof (void *);
-    }
-    case TokenType::DOUBLE_TYPE: {
-      return sizeof (double);
-    }
-    case TokenType::VOID: {
-      return 0;
-    }
-    case TokenType::REFERENCE: {
-      return sizeof (void *);
-    }
-    case TokenType::IDENTIFIER: {
-      return getStructInfo(tk->extractToken(token)).size;
-    }
-    default: {
-      std::cerr << "Invalid TokenType ["<< (uint32_t)token.type << "] in CodeGen::sizeOfType\n";
-      exit(1);
-    }
-  }
-}
-
-
-bool CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
-  switch(genDec.type) {
-    case GeneralDecType::NONE: {
-      break;
-    }
-    case GeneralDecType::STRUCT: {
-      // generate the functions within, add a parameter for 'this'
-      std::cerr << "Unsupported dec STRUCT\n";
-      exit(1);
-    }
-    case GeneralDecType::VARIABLE: {
-      return generateVariableDeclaration(*genDec.varDec);
-    }
-    case GeneralDecType::FUNCTION: {
-      return generateFunctionDeclaration(*genDec.funcDec);
-    }
-    case GeneralDecType::ENUM: {
-      // assign values for each item in the enum
-      std::cerr << "Unsupported dec ENUM\n";
-      exit(1);
-    }
-    case GeneralDecType::TEMPLATE: {
-      // don't do anything
-      std::cerr << "Unsupported dec TEMPLATE\n";
-      exit(1);
-    }
-    case GeneralDecType::TEMPLATE_CREATE: {
-      // generate whatever is in the template with the template type
-      // might handle the copy during checker stage, in that case don't do anything
-      std::cerr << "Unsupported dec TEMPLATE_CREATE\n";
-      exit(1);
-    }
-    case GeneralDecType::INCLUDE_DEC: {
-      // don't do anything, handled by parser
-      break;
-    }
-  }
-  return true;
-}
-
-/**
- * Have to figure out stack alignment
- * \returns the size of the type
-*/
-bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
-  bc reg = 0;
-  const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
-  StackVariable& stackVar = addVarDecToVirtualStack(varDec);
-  const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
-  const Token typeToken = getTypeFromTokenList(varDec.type);
-  const uint32_t size = sizeOfType(typeToken);
-  const uint32_t padding = diff - size;
-  assert(padding < size);
-  if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
-    if (initialize && varDec.initialAssignment) {
-      ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
-      if (!expRes.isReg) {
-        reg = allocateRegister();
-        moveImmToReg(reg, expRes);
-      } else {
-        reg = expRes.getReg();
-      }
-      stackVar.reg = reg;
-    }
-    assert(size >= 1 && size <= 8);
-    if (!reg) {
-      uint32_t spaceToAdd = size + padding;
-      ExpressionResult spaceToAddExp;
-      spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
-      spaceToAddExp.type = &Checker::uint32Value;
-      ExpressionResult stackPointerExp;
-      stackPointerExp.setReg(stackPointerIndex);
-      stackPointerExp.isReg = true;
-      stackPointerExp.type = &Checker::uint64Value;
-      expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
-    } else {
-      switch (size) {
-        case 1: {
-          addBytes({{(bc)OpCode::PUSH_B, reg}});
-          break;
-        }
-        case 2: {
-          if (padding) {
-            addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
-          }
-          addBytes({{(bc)OpCode::PUSH_W, reg}});
-          break;
-        }
-        case 4: {
-          // add padding to align
-          if (padding) {
-            ExpressionResult paddingToAdd;
-            paddingToAdd.setData(&padding, sizeof(padding));
-            paddingToAdd.type = &Checker::uint64Value;
-            ExpressionResult stackPointerExp;
-            stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.isReg = true;
-            stackPointerExp.type = &Checker::uint64Value;
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
-          }
-          // push value to stack
-          addBytes({{(bc)OpCode::PUSH_D, reg}});
-          break;
-        }
-        case 8: {
-          if (padding) {
-            ExpressionResult paddingToAdd;
-            paddingToAdd.setData(&padding, sizeof(padding));
-            paddingToAdd.type = &Checker::uint64Value;
-            ExpressionResult stackPointerExp;
-            stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.isReg = true;
-            stackPointerExp.type = &Checker::uint64Value;
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
-          }
-          addBytes({{(bc)OpCode::PUSH_Q, reg}});
-          break;
-        }
-        default: {
-          std::cerr << "Invalid Size [" << size << "] in generateVariableDeclaration\n";
-          exit(1);
-        }
-      }
-    }
-  }
-  else if (typeToken.type == TokenType::IDENTIFIER) {
-    uint32_t spaceToAdd = size + padding;
-    ExpressionResult spaceToAddExp;
-    spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
-    spaceToAddExp.type = &Checker::uint64Value;
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.isReg = true;
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
-  }
-  else {
-    std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
-    exit(1);
-  }
-  // adding to stack
-  // uint32_t offset = size;
-  // for (StackItem &item : stack) {
-  //   if (item.type == StackItemType::MARKER) {
-  //     if (item.marker == StackMarkerType::HARD_SCOPE_START) {
-  //       break;
-  //     }
-  //   } else if (item.type == StackItemType::VARIABLE) {
-  //     offset = item.variable.offset + size;
-  //     break;
-  //   }
-  // }
-  // StackItem stackItem {
-  //   .variable = {
-  //     .varDec = varDec,
-  //     .offset = offset,
-  //   },
-  //   .type = StackItemType::VARIABLE,
-  // };
-  // stack.emplace_back(stackItem);
-  return true;
-}
-
 
 // ========================================
 // STRUCTS
@@ -1831,63 +1775,10 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
   return info;
 }
 
-/**
- * UNUSED
-*/
-void CodeGen::generateVariableDeclarationStructType(const VariableDec& varDec, bool initialize) {
-  assert (false);
-  std::string structName = tk->extractToken(varDec.type.token);
-  GeneralDec const * const &generalDec = lookUp[structName];
-  Tokenizer *oldTk = tk;
-  tk = &tokenizers[generalDec->tokenizerIndex];
-  StructDecList *structDecList = &generalDec->structDec->decs;
-  while (structDecList) {
-    if (structDecList->type == StructDecType::VAR) {
-      generateVariableDeclaration(*structDecList->varDec, initialize);
-    }
-    structDecList = structDecList->next;
-  }
-  tk = oldTk;
-}
-
-uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
-  jumpMarkers.emplace_back(byteCode.size(), type);
-  return byteCode.size();
-}
-
-/**
- * Updates jump markers with destination. Sets type of each updated marker to none
- * \param destination the destination
- * \param type type of jump marker to update
- * \param until keep updating markers till this type is reached. if none, updates the first marker and stops
- * \param clear set the 'until' marker to type none if reached
-*/
-void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, JumpMarkerType until, bool clear) {
-  for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
-    if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
-      if (clear) {
-        jumpMarker->type = JumpMarkerType::NONE;
-      }
-      break;
-    }
-    if (jumpMarker->type == type) {
-      jumpMarker->destination = destination;
-      jumpMarker->type = JumpMarkerType::NONE;
-      if (until == JumpMarkerType::NONE) {
-        break;
-      }
-    }
-  }
-  // clean up
-  // while (!jumpMarkers.empty() && jumpMarkers.back().type == JumpMarkerType::NONE) {
-  //   jumpMarkers.pop_back();
-  // }
-}
 
 // ========================================
 // SCOPES
 // ========================================
-
 
 void CodeGen::generateScope(const Scope& scope) {
   startSoftScope();
@@ -1941,6 +1832,14 @@ void CodeGen::endSoftScope() {
 // FUNCTIONS
 // ========================================
 
+bool CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
+  // we want callee to handle unwinding arguments from stack
+  startFunctionScope(funcDec);
+  generateScope(funcDec.body);
+  // endFunctionScope(funcDec);
+  return true;
+}
+
 void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
   assert(stack.empty());
   addFunctionSignatureToVirtualStack(funcDec);
@@ -1965,19 +1864,10 @@ void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
   }
 }
 
-bool CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
-  // we want callee to handle unwinding arguments from stack
-  startFunctionScope(funcDec);
-  generateScope(funcDec.body);
-  // endFunctionScope(funcDec);
-  return true;
-}
-
 
 // ========================================
 // STATEMENTS
 // ========================================
-
 
 void CodeGen::generateStatement(const Statement& statement) {
   switch(statement.type) {
@@ -2096,7 +1986,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
-
+      break;
     }
     case ControlFlowStatementType::EXIT_STATEMENT: {
       ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
@@ -2146,13 +2036,10 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
   return BranchStatementResult::ADDED_JUMP;
 }
 
-
 /**
- * Returns the actual type from a token list
- * Once type qualifiers or similar things are supported, this will be handy
 */
-Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
-  return tokenList.token;
+void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
+
 }
 
 
@@ -2263,6 +2150,115 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
   };
   nameToStackItemIndex["-ra"] = stack.size();
   stack.emplace_back(returnAddress);
+}
+
+uint32_t CodeGen::getVarOffsetFromSP(const StackVariable &variableInfo) {
+  // |                   | <- sp
+  // |       | <- positionOnStack
+  // | value |
+  return getCurrStackPointerPosition() - variableInfo.positionOnStack;
+}
+
+
+// ========================================
+// OTHER
+// ========================================
+
+bytecode_t CodeGen::allocateRegister() {
+  for (uint8_t i = 0; i < NUM_REGISTERS; ++i) {
+    if (!registers[i].inUse) {
+      registers[i].inUse = true;
+      return i;
+    }
+  }
+  std::cerr << "Compiler Error: Failed to allocate a register; zero available registers\n";
+  exit(1);
+}
+
+void CodeGen::freeRegister(bytecode_t regNum) {
+  RegisterInfo& regInfo = registers[regNum];
+  if (regInfo.changed) {
+    // SUB_I misc, bp, regInfo.stackOffset
+    // STORE misc, currReg
+  }
+  regInfo.changed = false;
+  regInfo.inUse = false;
+}
+
+/**
+ * Returns the size of a type
+ * \param token the token of the type
+ * \returns the size of the type
+*/
+uint32_t CodeGen::sizeOfType(const Token token) {
+  switch (token.type) {
+    case TokenType::BOOL: {
+      return sizeof (bool);
+    }
+    case TokenType::CHAR_TYPE: {
+      return sizeof (char);
+    }
+    case TokenType::STRING_TYPE: {
+      return sizeof (char *);
+    }
+    case TokenType::INT8_TYPE:
+    case TokenType::UINT8_TYPE: {
+      return sizeof (uint8_t);
+    }
+    case TokenType::INT16_TYPE:
+    case TokenType::UINT16_TYPE: {
+      return sizeof (uint16_t);
+    }
+    case TokenType::INT32_TYPE:
+    case TokenType::UINT32_TYPE: {
+      return sizeof (uint32_t);
+    }
+    case TokenType::INT64_TYPE:
+    case TokenType::UINT64_TYPE: {
+      return sizeof (uint64_t);
+    }
+    case TokenType::POINTER: {
+      return sizeof (void *);
+    }
+    case TokenType::DOUBLE_TYPE: {
+      return sizeof (double);
+    }
+    case TokenType::VOID: {
+      return 0;
+    }
+    case TokenType::REFERENCE: {
+      return sizeof (void *);
+    }
+    case TokenType::IDENTIFIER: {
+      return getStructInfo(tk->extractToken(token)).size;
+    }
+    default: {
+      std::cerr << "Invalid TokenType ["<< (uint32_t)token.type << "] in CodeGen::sizeOfType\n";
+      exit(1);
+    }
+  }
+}
+
+/**
+ * Returns the actual type from a token list
+ * Once type qualifiers or similar things are supported, this will be handy
+*/
+Token CodeGen::getTypeFromTokenList(const TokenList& tokenList) {
+  return tokenList.token;
+}
+
+OpCode getLoadOpForSize(const uint8_t size) {
+  switch(size) {
+    case 1: return OpCode::LOAD_B;
+    case 2: return OpCode::LOAD_W;
+    case 3:
+    case 4: return OpCode::LOAD_D;
+    case 5:
+    case 6:
+    case 7:
+    case 8: return OpCode::LOAD_Q;
+    default: std::cerr << "invalid size in getLoadOpForSize: " << (uint32_t)size << '\n'; exit(1);
+  }
 }
 
 
