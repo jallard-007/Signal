@@ -69,9 +69,9 @@ struct CheckerError {
 };
 
 struct ResultingType {
-  TokenList *type{nullptr};
+  const TokenList *type{nullptr};
   bool isLValue{false};
-  ResultingType(TokenList*, bool);
+  ResultingType(const TokenList*, bool);
 };
 
 #define MAX_ERRORS 20
@@ -84,20 +84,20 @@ struct Checker {
   std::vector<Tokenizer>& tokenizers;
   NodeMemPool &memPool;
 
-  static TokenList noneValue;
-  static TokenList badValue;
-  static TokenList boolValue;
-  static TokenList int32Value;
-  static TokenList uint32Value;
-  static TokenList int64Value;
-  static TokenList uint64Value;
-  static TokenList charValue;
-  static TokenList stringValue;
+  const static TokenList noneValue;
+  const static TokenList badValue;
+  const static TokenList boolValue;
+  const static TokenList int32Value;
+  const static TokenList uint32Value;
+  const static TokenList int64Value;
+  const static TokenList uint64Value;
+  const static TokenList charValue;
+  const static TokenList stringValue;
   // static TokenList floatValue;
-  static TokenList doubleValue;
-  static TokenList ptrValue;
-  static TokenList nullptrValue;
-  static TokenList voidValue;
+  const static TokenList doubleValue;
+  const static TokenList ptrValue;
+  const static TokenList nullptrValue;
+  const static TokenList voidValue;
 
   Checker(Program&, std::vector<Tokenizer>&, NodeMemPool&);
   bool check();
@@ -115,8 +115,8 @@ struct Checker {
   bool checkType(Tokenizer&, TokenList&);
   void addError(const CheckerError&);
   void removeLastError();
-  static TokenList& largestType(TokenList&, TokenList&);
+  static const TokenList& largestType(const TokenList&, const TokenList&);
 };
 
-bool canBeConvertedToBool(TokenList*);
+bool canBeConvertedToBool(const TokenList*);
 bool checkAssignment(const TokenList&, const TokenList&);

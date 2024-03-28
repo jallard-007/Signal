@@ -28,18 +28,17 @@ Statement& Statement::operator=(const Statement& ref) {
 TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
 TokenList::TokenList(const Token& tk, TokenList* next): token{tk}, next{next} {}
 std::ostream& operator<<(std::ostream& os, const TokenList& obj) {
-  os << obj.token.getType();
   if (obj.next) {
-    os << ' ' << *obj.next;
+    os << *obj.next << ' ';
   }
+  os << obj.token.getType();
   return os;
 }
 
 
 VariableDec::VariableDec(const Token& tk): name{tk} {}
 std::ostream& operator<<(std::ostream& os, const VariableDec& obj) {
-  os << "Var dec at index: " << obj.name.position;
-  os << "With type: " << obj.type << '\n';
+  os << "Var dec at index " << obj.name.position << " in source, with type " << obj.type;
   return os;
 }
 

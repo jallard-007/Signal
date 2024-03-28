@@ -30,19 +30,20 @@ Token getTokenOfExpression(Expression& exp) {
   }
 }
 
-TokenList Checker::noneValue {Token{0,0,TokenType::NONE}};
-TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
-TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
-TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
-TokenList Checker::uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
-TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
-TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
-TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
-TokenList Checker::stringValue {Token{0,0,TokenType::STRING_TYPE}};
-TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
-TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
-TokenList Checker::ptrValue {Token{0,0,TokenType::POINTER}, &Checker::voidValue};
-TokenList Checker::nullptrValue {Token{0,0,TokenType::NULL_PTR}};
+const TokenList Checker::noneValue {Token{0,0,TokenType::NONE}};
+const TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
+const TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
+const TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
+const TokenList Checker::uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
+const TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
+const TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
+const TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
+const TokenList Checker::stringValue {Token{0,0,TokenType::STRING_TYPE}};
+const TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
+const TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
+TokenList _voidValue {Token{0,0,TokenType::VOID}};
+const TokenList Checker::ptrValue {Token{0,0,TokenType::POINTER}, &_voidValue};
+const TokenList Checker::nullptrValue {Token{0,0,TokenType::NULL_PTR}};
 
 CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Token token): token{token}, tkIndex{tkIndex}, type{type}  {}
 CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Token token, GeneralDec *decPtr): token{token}, dec{decPtr}, tkIndex{tkIndex}, type{type} {}
@@ -101,7 +102,7 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) co
   return message;
 }
 
-ResultingType::ResultingType(TokenList* type, bool isLValue): type{type}, isLValue{isLValue} {}
+ResultingType::ResultingType(const TokenList* type, bool isLValue): type{type}, isLValue{isLValue} {}
 
 Checker::Checker(Program& prog, std::vector<Tokenizer>& tks, NodeMemPool& mem):
 structsLookUp{}, lookUp{}, program{prog}, tokenizers{tks}, memPool{mem} {}
@@ -252,7 +253,7 @@ void Checker::secondTopLevelScan() {
       case GeneralDecType::TEMPLATE: {
         // parser validates that there is at least one type
         std::vector<std::string> templateTypes;
-        TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
+        const TokenList *templateIdentifiers = &list->curr.tempDec->templateTypes;
         // add templated types to global lookup
         bool errorFound = false;
         do {
@@ -296,7 +297,7 @@ void Checker::secondTopLevelScan() {
           break;
         }
         // check that the number of types match and that the types exist
-        TokenList *tempList = &dec->tempDec->templateTypes, *createList = &list->curr.tempCreate->templateTypes;
+        const TokenList *tempList = &dec->tempDec->templateTypes, *createList = &list->curr.tempCreate->templateTypes;
         for (;tempList && createList; tempList = tempList->next, createList = createList->next) {
           if (createList->token.type == TokenType::IDENTIFIER) {
             GeneralDec *templateType = lookUp[tk.extractToken(createList->token)];
@@ -370,7 +371,7 @@ void Checker::checkForStructCycles(GeneralDec &generalDec, std::vector<StructDec
       continue;
     }
     // check for cycle
-    TokenList* tokenList = &list->varDec->type;
+    const TokenList* tokenList = &list->varDec->type;
     if (tokenList->token.type == TokenType::REFERENCE) {
       tokenList = tokenList->next;
     }
@@ -727,7 +728,7 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
         addError({CheckerErrorType::OPERATION_ON_VOID, tk.tokenizerIndex, &expression});
         return {&badValue, false};
       }
-      TokenList& largest = largestType(*leftSide.type, *rightSide.type);
+      const TokenList& largest = largestType(*leftSide.type, *rightSide.type);
       if (largest.token.type < TokenType::INT32_TYPE) {
         return {&int32Value, false};
       }
@@ -758,7 +759,12 @@ ResultingType Checker::checkExpression(Tokenizer& tk, Expression& expression, st
         if (expression.getUnOp()->op.type == TokenType::ADDRESS_OF) {
           TokenList *ptrToType = memPool.makeTokenList();
           ptrToType->token.type = TokenType::POINTER;
-          ptrToType->next = res.type;
+          TokenList *ptrToTypeIter = ptrToType;
+          for (const TokenList *copy = res.type; copy; copy = copy->next) {
+            ptrToTypeIter->next = memPool.makeTokenList();
+            *ptrToTypeIter->next = *copy;
+            ptrToTypeIter = ptrToTypeIter->next;
+          }
           return {ptrToType, false};
         }
         return {res.type, false};
@@ -1092,7 +1098,7 @@ bool checkAssignment(const TokenList& leftSide, const TokenList& rightSide) {
 }
 
 // only builtin types can be converted to bool, except for void and string literal.
-bool canBeConvertedToBool(TokenList* type) {
+bool canBeConvertedToBool(const TokenList* type) {
   if (type->token.getType() == TokenType::REFERENCE) {
     assert(type->next);
     type = type->next;
@@ -1100,7 +1106,7 @@ bool canBeConvertedToBool(TokenList* type) {
   return isBuiltInType(type->token.type) && type->token.type != TokenType::VOID && type->token.type != TokenType::STRING_TYPE;
 }
 
-TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {
+const TokenList& Checker::largestType(const TokenList& typeA, const TokenList& typeB) {
   if (typeA.token.type == TokenType::POINTER || typeB.token.type == TokenType::POINTER) {
     return ptrValue;
   }

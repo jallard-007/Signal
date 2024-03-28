@@ -545,9 +545,9 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
-    REQUIRE(codeGen.stack.size() == 1);
-    CHECK(codeGen.stack[0].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[0].positionOnStack == 8);
+    REQUIRE(codeGen.stackItems.size() == 1);
+    CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stackItems[0].positionOnStack == 8);
   }
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
@@ -560,11 +560,11 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
-    REQUIRE(codeGen.stack.size() == 2);
-    CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
-    CHECK(codeGen.stack[0].positionOnStack == 8);
-    CHECK(codeGen.stack[1].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[1].positionOnStack == 16);
+    REQUIRE(codeGen.stackItems.size() == 2);
+    CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
+    CHECK(codeGen.stackItems[0].positionOnStack == 8);
+    CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stackItems[1].positionOnStack == 16);
   }
   SECTION("three") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
@@ -598,21 +598,21 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
 
     // CHECK(codeGen.stack == expected.stack);
   
-    REQUIRE(codeGen.stack.size() == 3);
-    CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
-    CHECK(codeGen.stack[0].positionOnStack == 8);
-    CHECK(codeGen.stack[1].type == StackItemType::VARIABLE);
-    CHECK(codeGen.stack[1].variable.positionOnStack == 16);
-    CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
-    CHECK(codeGen.stack[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
-    CHECK(codeGen.stack[2].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stack[2].positionOnStack == 24);
+    REQUIRE(codeGen.stackItems.size() == 3);
+    CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
+    CHECK(codeGen.stackItems[0].positionOnStack == 8);
+    CHECK(codeGen.stackItems[1].type == StackItemType::VARIABLE);
+    CHECK(codeGen.stackItems[1].variable.positionOnStack == 16);
+    CHECK(codeGen.tk->extractToken(codeGen.stackItems[1].variable.varDec.name) == "arg1");
+    CHECK(codeGen.stackItems[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
+    CHECK(codeGen.stackItems[2].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stackItems[2].positionOnStack == 24);
   }
 }
 
 TEST_CASE("string literals", "[codeGen]") {
   SECTION("1") {
-    const std::string str = "func testFunction(arg1: int64): void { str: const char ptr = \"Hello World!\\n\"; } ";
+    const std::string str = R"(func testFunction(arg1: int64 ptr): void { str: const char ptr = "Hello World!\n"; return; } )";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
     REQUIRE(checker.check());
@@ -621,9 +621,15 @@ TEST_CASE("string literals", "[codeGen]") {
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
-    REQUIRE(codeGen.generateFunctionDeclaration(funcDec));
+    CodeGen otherCodeGen{parser.program, tokenizers, checker.lookUp};
+    otherCodeGen.tk = &tokenizer;
+    otherCodeGen.generateFunctionDeclaration(funcDec);
+    codeGen.startFunctionScope(funcDec);
+    codeGen.generateStatementList(&funcDec.body.scopeStatements);
     CodeGen expected{parser.program, tokenizers, checker.lookUp};
     CHECK(codeGen.byteCode == expected.byteCode);
-    std::cout << codeGen.stack << '\n';
+    CHECK(otherCodeGen.byteCode == expected.byteCode);
+    std::cout << codeGen.stackItems << '\n';
+    std::cout << codeGen.dataSection.data() << '\n';
   }
 }

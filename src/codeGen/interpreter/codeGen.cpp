@@ -14,10 +14,41 @@
 #define bc bytecode_t
 
 
-void ExpressionResult::setData(const void *newData, uint8_t size) {
-  assert(size <= sizeof(data));
-  memmove(data, newData, size);
+void ExpressionResult::set(char c) {
+  *(decltype(c) *)data = c;
+  type = &Checker::charValue;
 }
+void ExpressionResult::set(uint32_t val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::uint32Value;
+}
+void ExpressionResult::set(uint64_t val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::uint64Value;
+}
+void ExpressionResult::set(int32_t val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::int32Value;
+}
+void ExpressionResult::set(int64_t val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::int64Value;
+}
+void ExpressionResult::set(double val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::doubleValue;
+}
+void ExpressionResult::set(bool val) {
+  *(decltype(val) *)data = val;
+  type = &Checker::boolValue;
+}
+
+template <class T>
+void ExpressionResult::setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
+  static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
+  *(decltype(t) *)data = t;
+}
+
 
 JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
   start{start}, type{type} {}
@@ -295,11 +326,9 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     if (!reg) {
       uint32_t spaceToAdd = size + padding;
       ExpressionResult spaceToAddExp;
-      spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
-      spaceToAddExp.type = &Checker::uint32Value;
+      spaceToAddExp.set(spaceToAdd);
       ExpressionResult stackPointerExp;
       stackPointerExp.setReg(stackPointerIndex);
-      stackPointerExp.isReg = true;
       stackPointerExp.type = &Checker::uint64Value;
       expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
     } else {
@@ -319,11 +348,9 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
           // add padding to align
           if (padding) {
             ExpressionResult paddingToAdd;
-            paddingToAdd.setData(&padding, sizeof(padding));
-            paddingToAdd.type = &Checker::uint64Value;
+            paddingToAdd.set(padding);
             ExpressionResult stackPointerExp;
             stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.isReg = true;
             stackPointerExp.type = &Checker::uint64Value;
             expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
           }
@@ -334,11 +361,9 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         case 8: {
           if (padding) {
             ExpressionResult paddingToAdd;
-            paddingToAdd.setData(&padding, sizeof(padding));
-            paddingToAdd.type = &Checker::uint64Value;
+            paddingToAdd.set(padding);
             ExpressionResult stackPointerExp;
             stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.isReg = true;
             stackPointerExp.type = &Checker::uint64Value;
             expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
           }
@@ -355,11 +380,10 @@ bool CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   else if (typeToken.type == TokenType::IDENTIFIER) {
     uint32_t spaceToAdd = size + padding;
     ExpressionResult spaceToAddExp;
-    spaceToAddExp.setData(&spaceToAdd, sizeof(spaceToAdd));
+    spaceToAddExp.set(spaceToAdd);
     spaceToAddExp.type = &Checker::uint64Value;
     ExpressionResult stackPointerExp;
     stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.isReg = true;
     stackPointerExp.type = &Checker::uint64Value;
     expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
   }
@@ -523,64 +547,68 @@ struct OperatorLessEqual {
 };
 
 template<template<typename, typename> class TFunctor>
-void doBinaryEvaluate(TokenType leftSideType, TokenType rightSideType, const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
+void doBinaryEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
+  const TokenType leftSideType = left.type->token.getType();
+  const TokenType rightSideType = right.type->token.getType();
   assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
   assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE);
   if (leftSideType == TokenType::DOUBLE_TYPE) {
     if (rightSideType == TokenType::DOUBLE_TYPE) {
       auto temp = TFunctor<double, double>()(*(double*)left.getData(), *(double*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::UINT64_TYPE) {
       auto temp = TFunctor<double, uint64_t>()(*(double*)left.getData(), *(uint64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::INT64_TYPE) {
       auto temp = TFunctor<double, int64_t>()(*(double*)left.getData(), *(int64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     }
   } else if (leftSideType == TokenType::UINT64_TYPE) {
     if (rightSideType == TokenType::DOUBLE_TYPE) {
       auto temp = TFunctor<uint64_t, double>()(*(uint64_t*)left.getData(), *(double*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::UINT64_TYPE) {
       auto temp = TFunctor<uint64_t, uint64_t>()(*(uint64_t*)left.getData(), *(uint64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::INT64_TYPE) {
       auto temp = TFunctor<uint64_t, int64_t>()(*(uint64_t*)left.getData(), *(int64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     }
   } else if (leftSideType == TokenType::INT64_TYPE) {
     if (rightSideType == TokenType::DOUBLE_TYPE) {
       auto temp = TFunctor<int64_t, double>()(*(int64_t*)left.getData(), *(double*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::UINT64_TYPE) {
       auto temp = TFunctor<int64_t, uint64_t>()(*(int64_t*)left.getData(), *(uint64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::INT64_TYPE) {
       auto temp = TFunctor<int64_t, int64_t>()(*(int64_t*)left.getData(), *(int64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     }
   }
 }
 
 template<template<typename, typename> class TFunctor>
-void doBinaryIntegralEvaluate(TokenType leftSideType, TokenType rightSideType, const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
+void doBinaryIntegralEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
+  const TokenType leftSideType = left.type->token.getType();
+  const TokenType rightSideType = right.type->token.getType();
   assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
   assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
   if (leftSideType == TokenType::UINT64_TYPE) {
     if (rightSideType == TokenType::UINT64_TYPE) {
       auto temp = TFunctor<uint64_t, uint64_t>()(*(uint64_t*)left.getData(), *(uint64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::INT64_TYPE) {
       auto temp = TFunctor<uint64_t, int64_t>()(*(uint64_t*)left.getData(), *(int64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     }
   } else if (leftSideType == TokenType::INT64_TYPE) {
     if (rightSideType == TokenType::UINT64_TYPE) {
       auto temp = TFunctor<int64_t, uint64_t>()(*(int64_t*)left.getData(), *(uint64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     } else if (rightSideType == TokenType::INT64_TYPE) {
       auto temp = TFunctor<int64_t, int64_t>()(*(int64_t*)left.getData(), *(int64_t*)right.getData());
-      res.setData(&temp, sizeof(temp));
+      res.setUntyped(temp);
     }
   }
 }
@@ -588,12 +616,11 @@ void doBinaryIntegralEvaluate(TokenType leftSideType, TokenType rightSideType, c
 ExpressionResult evaluateBinOpImmExpression(TokenType op, ExpressionResult& left, ExpressionResult& right) {
   assert(!left.isReg && !right.isReg);
   assert(left.type && right.type);
-  ExpressionResult res;
-  TokenType leftSideType = left.type->token.getType();
-  TokenType rightSideType = right.type->token.getType();
+  const TokenType leftSideType = left.type->token.getType();
+  const TokenType rightSideType = right.type->token.getType();
   assert(isBuiltInType(leftSideType) && leftSideType != TokenType::VOID && leftSideType != TokenType::STRING_TYPE);
   assert(isBuiltInType(rightSideType) && rightSideType != TokenType::VOID && rightSideType != TokenType::STRING_TYPE);
-  
+  ExpressionResult res;
   // assign to largest type, minimum of int32
   res.type = &Checker::int32Value;
   if (leftSideType > res.type->token.getType()) {
@@ -605,145 +632,117 @@ ExpressionResult evaluateBinOpImmExpression(TokenType op, ExpressionResult& left
 
   if (isUnsigned(leftSideType) || leftSideType == TokenType::BOOL) {
     // temporarily mark as uint64_t
-    leftSideType = TokenType::UINT64_TYPE;
+    left.type = &Checker::uint64Value;
   } else if (isSigned(leftSideType)) {
     // temporarily mark as int64_t
     // sign extend
-    int64_t signExtended = 0;
     switch (leftSideType) {
       case TokenType::CHAR_TYPE:
-      case TokenType::INT8_TYPE: {
-        signExtended = *(int8_t*)left.getData();
-        break;
-      }
-      case TokenType::INT16_TYPE: {
-        signExtended = *(int16_t*)left.getData();
-        break;
-      }
-      case TokenType::INT32_TYPE: {
-        signExtended = *(int32_t*)left.getData();
-        break;
-      }
+      case TokenType::INT8_TYPE: { left.set(static_cast<int64_t>(*(int8_t*)left.getData())); break; }
+      case TokenType::INT16_TYPE: { left.set(static_cast<int64_t>(*(int16_t*)left.getData())); break; }
+      case TokenType::INT32_TYPE: { left.set(static_cast<int64_t>(*(int32_t*)left.getData())); break; }
       case TokenType::INT64_TYPE: break;
       default: {
         exit(1);
       }
     }
-    if (signExtended) {
-      left.setData(&signExtended, sizeof(signExtended));
-    }
-    leftSideType = TokenType::INT64_TYPE;
   }
   if (isUnsigned(rightSideType) || rightSideType == TokenType::BOOL) {
     // temporarily mark as uint64_t
-    rightSideType = TokenType::UINT64_TYPE;
+    right.type = &Checker::uint64Value;
   } else if (isSigned(rightSideType)) {
     // temporarily mark as int64_t
     // sign extend
-    int64_t signExtended = 0;
     switch (rightSideType) {
       case TokenType::CHAR_TYPE:
-      case TokenType::INT8_TYPE: {
-        signExtended = *(int8_t*)right.getData();
-        break;
-      }
-      case TokenType::INT16_TYPE: {
-        signExtended = *(int16_t*)right.getData();
-        break;
-      }
-      case TokenType::INT32_TYPE: {
-        signExtended = *(int32_t*)right.getData();
-        break;
-      }
+      case TokenType::INT8_TYPE: { right.set(static_cast<int64_t>(*(int8_t*)right.getData())); break; }
+      case TokenType::INT16_TYPE: { right.set(static_cast<int64_t>(*(int16_t*)right.getData())); break; }
+      case TokenType::INT32_TYPE: { right.set(static_cast<int64_t>(*(int32_t*)right.getData())); break; }
       case TokenType::INT64_TYPE: break;
       default: {
         exit(1);
       }
     }
-    if (signExtended) {
-      right.setData(&signExtended, sizeof(signExtended));
-    }
-    rightSideType = TokenType::INT64_TYPE;
   }
   switch (op) {
     case TokenType::ADDITION: {
-      doBinaryEvaluate<OperatorAdd>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorAdd>(left, right, res);
       break;
     }
     case TokenType::SUBTRACTION: {
-      doBinaryEvaluate<OperatorSub>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorSub>(left, right, res);
       break;
     }
     case TokenType::MULTIPLICATION: {
-      doBinaryEvaluate<OperatorMul>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorMul>(left, right, res);
       break;
     }
     case TokenType::DIVISION: {
-      doBinaryEvaluate<OperatorDiv>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorDiv>(left, right, res);
       break;
     }
     case TokenType::MODULO: {
-      doBinaryIntegralEvaluate<OperatorModulo>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorModulo>(left, right, res);
       break;
     }
     case TokenType::BITWISE_OR: {
-      doBinaryIntegralEvaluate<OperatorBitwiseOr>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorBitwiseOr>(left, right, res);
       break;
     }
     case TokenType::BITWISE_AND: {
-      doBinaryIntegralEvaluate<OperatorBitwiseAnd>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorBitwiseAnd>(left, right, res);
       break;
     }
     case TokenType::BITWISE_XOR: {
-      doBinaryIntegralEvaluate<OperatorBitwiseXor>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorBitwiseXor>(left, right, res);
       break;
     }
     case TokenType::SHIFT_LEFT: {
-      doBinaryIntegralEvaluate<OperatorShiftLeft>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorShiftLeft>(left, right, res);
       break;
     }
     case TokenType::SHIFT_RIGHT: {
-      doBinaryIntegralEvaluate<OperatorShiftRight>(leftSideType, rightSideType, left, right, res);
+      doBinaryIntegralEvaluate<OperatorShiftRight>(left, right, res);
       break;
     }
     case TokenType::EQUAL: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorEqual>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorEqual>(left, right, res);
       break;
     }
     case TokenType::NOT_EQUAL: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorNotEqual>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorNotEqual>(left, right, res);
       break;
     }
     case TokenType::LOGICAL_AND: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorLogicalAnd>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorLogicalAnd>(left, right, res);
       break;
     }
     case TokenType::LOGICAL_OR: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorLogicalOr>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorLogicalOr>(left, right, res);
       break;
     }
     case TokenType::LESS_THAN: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorLess>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorLess>(left, right, res);
       break;
     }
     case TokenType::LESS_THAN_EQUAL: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorLessEqual>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorLessEqual>(left, right, res);
       break;
     }
     case TokenType::GREATER_THAN: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorGreater>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorGreater>(left, right, res);
       break;
     }
     case TokenType::GREATER_THAN_EQUAL: {
       res.type = &Checker::boolValue;
-      doBinaryEvaluate<OperatorGreaterEqual>(leftSideType, rightSideType, left, right, res);
+      doBinaryEvaluate<OperatorGreaterEqual>(left, right, res);
       break;
     }
     default: {
@@ -770,29 +769,25 @@ struct OperatorNot {
 };
 
 template<template<typename> class TFunctor>
-void doUnaryEvaluate(TokenType operandType, const ExpressionResult& operand, ExpressionResult& res)
-{
-  assert(
-    operandType == TokenType::DOUBLE_TYPE ||
-    operandType == TokenType::UINT64_TYPE ||
-    operandType == TokenType::INT64_TYPE
-  );
+void doUnaryEvaluate(const ExpressionResult& operand, ExpressionResult& res) {
+  TokenType operandType = operand.type->token.getType();
+  assert(operandType == TokenType::DOUBLE_TYPE || operandType == TokenType::UINT64_TYPE || operandType == TokenType::INT64_TYPE);
   if (operandType == TokenType::DOUBLE_TYPE) {
     auto unaryOpValue = TFunctor<double>()(*(double*)operand.getData());
-    res.setData(&unaryOpValue, sizeof(unaryOpValue));
+    res.setUntyped(unaryOpValue);
   } else if (operandType == TokenType::UINT64_TYPE) {
     auto unaryOpValue = TFunctor<uint64_t>()(*(uint64_t*)operand.getData());
-    res.setData(&unaryOpValue, sizeof(unaryOpValue));
+    res.setUntyped(unaryOpValue);
   } else if (operandType == TokenType::INT64_TYPE) {
     auto unaryOpValue = TFunctor<int64_t>()(*(int64_t*)operand.getData());
-    res.setData(&unaryOpValue, sizeof(unaryOpValue));
+    res.setUntyped(unaryOpValue);
   }
 }
 
 ExpressionResult evaluateUnaryOpImmExpression(TokenType op, ExpressionResult& operand) {
   assert(!operand.isReg && operand.type);
   ExpressionResult res;
-  TokenType operandType = operand.type->token.getType();
+  const TokenType operandType = operand.type->token.getType();
   assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::STRING_TYPE);
   
   // assign to largest type, minimum of int32
@@ -802,43 +797,29 @@ ExpressionResult evaluateUnaryOpImmExpression(TokenType op, ExpressionResult& op
   }
   if (isUnsigned(operandType) || operandType == TokenType::BOOL) {
     // temporarily mark as uint64_t
-    operandType = TokenType::UINT64_TYPE;
+    operand.type = &Checker::uint64Value;
   } else if (isSigned(operandType)) {
     // temporarily mark as int64_t
     // sign extend
-    int64_t signExtended = 0;
     switch (operandType) {
       case TokenType::CHAR_TYPE:
-      case TokenType::INT8_TYPE: {
-        signExtended = *(int8_t*)operand.getData();
-        break;
-      }
-      case TokenType::INT16_TYPE: {
-        signExtended = *(int16_t*)operand.getData();
-        break;
-      }
-      case TokenType::INT32_TYPE: {
-        signExtended = *(int32_t*)operand.getData();
-        break;
-      }
+      case TokenType::INT8_TYPE: { operand.set(static_cast<int64_t>(*(int8_t*)operand.getData())); break; }
+      case TokenType::INT16_TYPE: { operand.set(static_cast<int64_t>(*(int16_t*)operand.getData())); break; }
+      case TokenType::INT32_TYPE: { operand.set(static_cast<int64_t>(*(int32_t*)operand.getData())); break; }
       case TokenType::INT64_TYPE: break;
       default: {
         exit(1);
       }
     }
-    if (signExtended) {
-      operand.setData(&signExtended, sizeof(signExtended));
-    }
-    operandType = TokenType::INT64_TYPE;
   }
   switch (op) {
     case TokenType::NOT: {
       res.type = &Checker::boolValue;
-      doUnaryEvaluate<OperatorNot>(operandType, operand, res);
+      doUnaryEvaluate<OperatorNot>(operand, res);
       break;
     }
     case TokenType::NEGATIVE: {
-      doUnaryEvaluate<OperatorNegate>(operandType, operand, res);
+      doUnaryEvaluate<OperatorNegate>(operand, res);
       break;
     }
     default: {
@@ -1047,8 +1028,7 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       const uint32_t offsetInStruct = structInfo.offsetMap.at(memberName);
       if (offsetInStruct) {
         ExpressionResult offsetExpression;
-        offsetExpression.type = &Checker::uint32Value;
-        offsetExpression.setData(&offsetInStruct, sizeof(offsetInStruct));
+        offsetExpression.set(offsetInStruct);
         expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExpression);
       }
       // get offset of member and add to structVar
@@ -1063,22 +1043,20 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
     case ExpressionType::VALUE: {
       // a plain identifier, just need to look up if it's a reference and then use original
       // otherwise it's a stack variable so get offset from stack pointer
-      const std::string& ident = tk->extractToken(expression.getToken());
-      uint32_t stackItemIndex = nameToStackItemIndex[ident];
       expRes.setReg(allocateRegister());
       addBytes({{(bc)OpCode::MOVE, expRes.getReg(), stackPointerIndex}});
-      const StackVariable& stackVar = stack[stackItemIndex].variable;
+      const std::string& ident = tk->extractToken(expression.getToken());
+      uint32_t stackItemIndex = nameToStackItemIndex[ident];
+      const StackVariable& stackVar = stackItems[stackItemIndex].variable;
       uint32_t offset = getVarOffsetFromSP(stackVar);
       ExpressionResult varOffsetExp;
-      varOffsetExp.setData(&offset, sizeof(offset));
-      varOffsetExp.type = &Checker::uint32Value;
+      varOffsetExp.set(offset);
       expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, varOffsetExp);
       expRes.type = &stackVar.varDec.type;
       if (expRes.type->token.getType() == TokenType::REFERENCE) {
         // always move past references
         expRes.type = expRes.type->next;
       }
-      expRes.isReg = true;
       expRes.isTemp = true;
       return expRes;
     }
@@ -1090,9 +1068,8 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       // have to multiple offset by size of array type
       assert(array.isReg); // 
       (void)offset;
-      expRes.isReg = true;
-      expRes.isTemp = true;
       expRes.setReg(array.getReg());
+      expRes.isTemp = true;
       return expRes;
     }
     default: {
@@ -1113,37 +1090,30 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       // convert charLiteral to its numeric value and return it
       // might do this during the tokenizer stage...
       if (charLiteral.size() == 3) {
-        expRes.setData(&charLiteral[1], 1);
+        expRes.set(charLiteral[1]);
         return expRes;
       } else if (charLiteral.size() == 4) {
-        if (charLiteral[2] >= '0' && charLiteral[2] <= '9') {
-          charLiteral[2] -= '0';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == 'n') {
-          charLiteral[2] = '\n';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '"') {
-          charLiteral[2] = '\"';
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '\\') {
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
-        } else if (charLiteral[2] == '\'') {
-          expRes.setData(&charLiteral[2], 1);
-          return expRes;
+        assert(charLiteral[1] == '\\');
+        switch (charLiteral[2]) {
+          case '0': expRes.set('\0'); break;
+          case 'n': expRes.set('\n'); break;
+          case 't': expRes.set('\t'); break;
+          default: expRes.set(charLiteral[2]); break;
         }
+        return expRes;
       }
       assert(false);
       return expRes;
     }
     case TokenType::STRING_LITERAL: { 
-      // place string literal in data section of bytecode, return offset to start of string, have to replace escaped characters
-      // check if string is already in data section
+      // place string literal in data section of bytecode, return offset to start of string
       expRes.type = &Checker::stringValue;
       std::string stringLiteral = tk->extractToken(token);
+       // remove quotes around string
+      stringLiteral.erase(stringLiteral.end() - 1);
+      stringLiteral.erase(stringLiteral.begin());
+      // TODO: need to replace escaped characters with actual value
+      // check if string is already in data section
       for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
         if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
           continue;
@@ -1151,67 +1121,60 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
         const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
         uint64_t stringLength = strlen(pString);
         if (stringLiteral.length() == stringLength && stringLiteral == pString) {
-          expRes.setData(&i, sizeof(i));
+          expRes.set(i);
           return expRes;
         }
         i += stringLength;
       }
       const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, stringLiteral.data(), stringLiteral.length() + 1);
       if (dataSectionEntry.indexInDataSection) {
-        ExpressionResult stringExp;
-        stringExp.setReg(allocateRegister());
-        stringExp.isReg = true;
-        stringExp.isTemp = true;
-        ExpressionResult dataPointerExp;
-        dataPointerExp.setReg(dataPointerIndex);
-        dataPointerExp.isReg = true;
-        expRes = expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
+        {
+          ExpressionResult stringExp;
+          stringExp.setReg(allocateRegister());
+          ExpressionResult dataPointerExp;
+          dataPointerExp.setReg(dataPointerIndex);
+          expRes = expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
+        }
         ExpressionResult offsetExp;
-        offsetExp.setData(&dataSectionEntry.indexInDataSection, sizeof(dataSectionEntry.indexInDataSection));
-        offsetExp.type = &Checker::uint32Value;
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+        offsetExp.set(dataSectionEntry.indexInDataSection);
+        expRes = expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+      } else {
+        expRes.setReg(dataPointerIndex);
+        expRes.isTemp = true;
       }
-      expRes.setReg(dataPointerIndex);
-      expRes.isReg = true;
-      expRes.isTemp = true;
       return expRes;
     }
     case TokenType::DECIMAL_NUMBER: {
       std::string decimalNumber = tk->extractToken(token);
       uint64_t num = std::stoull(decimalNumber);
-      expRes.setData(&num, sizeof(num));
+      expRes.set(num);
       if (num <= INT32_MAX) {
         expRes.type = &Checker::int32Value;
       } else if (num <= UINT32_MAX) {
         expRes.type = &Checker::uint32Value;
       } else if (num <= INT64_MAX) {
         expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
+      } // already set to uint64_t
       return expRes;
     }
     case TokenType::BINARY_NUMBER: {
       assert(token.length > 2);
       std::string binaryNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::BINARY_NUMBER});
       uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-      expRes.setData(&num, sizeof(num));
+      expRes.set(num);
       if (num <= INT32_MAX) {
         expRes.type = &Checker::int32Value;
       } else if (num <= UINT32_MAX) {
         expRes.type = &Checker::uint32Value;
       } else if (num <= INT64_MAX) {
         expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
+      } // already set to uint64_t
       return expRes;
     }
     case TokenType::FLOAT_NUMBER: {
       std::string binaryNumber = tk->extractToken(token);
       double num = std::stod(binaryNumber);
-      expRes.setData(&num, sizeof(num));
-      expRes.type = &Checker::doubleValue;
+      expRes.set(num);
       return expRes;
     }
     case TokenType::HEX_NUMBER: { 
@@ -1222,26 +1185,22 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       std::out_of_range
       */
       uint64_t num = std::stoull(hexNumber, nullptr, 16);
-      expRes.setData(&num, sizeof(num));
+      expRes.set(num);
       if (num <= INT32_MAX) {
         expRes.type = &Checker::int32Value;
       } else if (num <= UINT32_MAX) {
         expRes.type = &Checker::uint32Value;
       } else if (num <= INT64_MAX) {
         expRes.type = &Checker::int64Value;
-      } else {
-        expRes.type = &Checker::uint64Value;
-      }
+      } // already set to uint64_t
       return expRes;
     }
     case TokenType::FALSE: {
-      expRes.type = &Checker::boolValue;
+      expRes.set(false);
       return expRes;
     }
     case TokenType::TRUE: {
-      uint8_t trueValue = 1;
-      expRes.setData(&trueValue, sizeof(trueValue));
-      expRes.type = &Checker::boolValue;
+      expRes.set(true);
       return expRes;
     }
     case TokenType::NULL_PTR: {
@@ -1251,11 +1210,10 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
     case TokenType::IDENTIFIER: {
       std::string identifier = tk->extractToken(token);
       uint32_t stackItemIndex = nameToStackItemIndex[identifier];
-      StackVariable &variableInfo = stack[stackItemIndex].variable;
+      StackVariable &variableInfo = stackItems[stackItemIndex].variable;
       expRes.type = &variableInfo.varDec.type;
       if (variableInfo.reg) {
         expRes.setReg(variableInfo.reg);
-        expRes.isReg = true;
         return expRes;
       }
       const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
@@ -1263,7 +1221,7 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       if (sizeOfVar > SIZE_OF_REGISTER) {
         // too large to fit into a reg, just return offset
         // TODO: figure out what to make the type in this scenario, maybe need another flag in exp res
-        expRes.setData(&varOffset, sizeof(varOffset));
+        expRes.set(varOffset);
         return expRes;
       }
       // load value into a register
@@ -1272,19 +1230,16 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       if (varOffset) {
         addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
         ExpressionResult varOffsetExp;
-        varOffsetExp.setData(&varOffset, sizeof(varOffset));
-        varOffsetExp.type = &Checker::uint64Value;
+        varOffsetExp.set(varOffset);
         ExpressionResult miscRegExp;
         miscRegExp.setReg(miscRegisterIndex);
-        miscRegExp.isReg = true;
         varOffsetExp.type = &Checker::uint64Value;
         expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
         addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
       } else {
         addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
       }
-      expRes.isReg = true;
-      expRes.setData(&variableInfo.reg, sizeof(variableInfo.reg));
+      expRes.setReg(variableInfo.reg);
       return expRes;
     }
     default: {
@@ -1782,14 +1737,15 @@ StructInformation& CodeGen::getStructInfo(const std::string& structName) {
 
 void CodeGen::generateScope(const Scope& scope) {
   startSoftScope();
-  for (
-    const StatementList *statementList = &scope.scopeStatements;
-    statementList;
-    statementList = statementList->next
-  ) {
-    generateStatement(statementList->curr);
-  }
+  generateStatementList(&scope.scopeStatements);
   endSoftScope();
+}
+
+void CodeGen::generateStatementList(const StatementList *statementList) {
+  while (statementList) {
+    generateStatement(statementList->curr);
+    statementList = statementList->next;
+  }
 }
 
 void CodeGen::startSoftScope() {
@@ -1797,31 +1753,29 @@ void CodeGen::startSoftScope() {
     .marker = StackMarkerType::SOFT_SCOPE_START,
     .type = StackItemType::MARKER
   };
-  stack.emplace_back(stackItem);
+  stackItems.emplace_back(stackItem);
 }
 
 void CodeGen::endSoftScope() {
   uint32_t stackUsage = 0;
-  while (!stack.empty()) {
+  while (!stackItems.empty()) {
     if (
-      stack.back().type == StackItemType::MARKER &&
-      stack.back().marker == StackMarkerType::SOFT_SCOPE_START
+      stackItems.back().type == StackItemType::MARKER &&
+      stackItems.back().marker == StackMarkerType::SOFT_SCOPE_START
     ) {
-      stack.pop_back();
+      stackItems.pop_back();
       break;
     }
     // TODO: run destructor for each item within this scope
-    stackUsage += sizeOfType(getTypeFromTokenList(stack.back().variable.varDec.type));
-    stack.pop_back();
-    assert(!stack.empty()); // paired with marker comment above
+    stackUsage += sizeOfType(getTypeFromTokenList(stackItems.back().variable.varDec.type));
+    stackItems.pop_back();
+    assert(!stackItems.empty()); // paired with marker comment above
   }
   if (stackUsage) {
     ExpressionResult stackUsageExp;
-    stackUsageExp.setData(&stackUsage, sizeof(stackUsage));
-    stackUsageExp.type = &Checker::uint32Value;
+    stackUsageExp.set(stackUsage);
     ExpressionResult stackPointerExp;
     stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.isReg = true;
     stackPointerExp.type = &Checker::uint64Value;
     expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerExp, stackUsageExp);
   }
@@ -1835,32 +1789,22 @@ void CodeGen::endSoftScope() {
 bool CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
   // we want callee to handle unwinding arguments from stack
   startFunctionScope(funcDec);
+  // have checker add empty return statement for void functions
   generateScope(funcDec.body);
-  // endFunctionScope(funcDec);
+  endFunctionScope(funcDec);
   return true;
 }
 
 void CodeGen::startFunctionScope(const FunctionDec& funcDec) {
-  assert(stack.empty());
+  assert(stackItems.empty());
   addFunctionSignatureToVirtualStack(funcDec);
 }
 
 void CodeGen::endFunctionScope(const FunctionDec& funcDec) {
   (void)funcDec;
-  while (!stack.empty()) {
-    // shouldn't need this marker as this *should* always be the first item in the stack
-    // for now we'll leave it in
-    if (
-      stack.back().type == StackItemType::MARKER &&
-      stack.back().marker == StackMarkerType::HARD_SCOPE_START
-    ) {
-      stack.pop_back();
-      assert(stack.empty());
-      break;
-    }
+  while (!stackItems.empty()) {
     // TODO: run destructor for each item within this scope
-    stack.pop_back();
-    assert(!stack.empty()); // paired with marker comment above
+    stackItems.pop_back();
   }
 }
 
@@ -1986,6 +1930,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
+      generateReturnStatement(*controlFlowStatement.returnStatement);
       break;
     }
     case ControlFlowStatementType::EXIT_STATEMENT: {
@@ -2040,6 +1985,18 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
 */
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
   (void)returnStatement;
+  // TODO: call destructor for all items in function scope, this includes function parameters
+  // don't clear the virtual stack though, still need it to potentially generate the rest of the function
+
+  // find where return address is
+  const uint32_t returnAddressStackIndex = nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER];
+  const StackItem& returnAddressItem = stackItems[returnAddressStackIndex];
+  ExpressionResult offsetExp;
+  offsetExp.set(getOffsetFromSP(returnAddressItem.positionOnStack));
+  ExpressionResult stackPointerExp;
+  stackPointerExp.setReg(stackPointerIndex);
+  stackPointerExp.type = &Checker::uint64Value;
+  expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerExp, offsetExp);
 }
 
 
@@ -2083,14 +2040,14 @@ StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
     },
     .type = StackItemType::VARIABLE,
   };
-  nameToStackItemIndex[tk->extractToken(varDec.name)] = stack.size();
-  stack.emplace_back(stackItem);
-  return stack.back().variable;
+  nameToStackItemIndex[tk->extractToken(varDec.name)] = stackItems.size();
+  stackItems.emplace_back(stackItem);
+  return stackItems.back().variable;
 }
 
 uint32_t CodeGen::getCurrStackPointerPosition() {
-  auto iter = stack.rbegin();
-  while (iter != stack.rend()) {
+  auto iter = stackItems.rbegin();
+  while (iter != stackItems.rend()) {
     if (iter->type == StackItemType::VARIABLE) {
       return iter->variable.positionOnStack;
     } else if (iter->type != StackItemType::MARKER) {
@@ -2130,8 +2087,8 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
       .positionOnStack = getPositionPushingItemToStack(getTypeFromTokenList(funcDec.returnType), 8),
       .type = StackItemType::RETURN_VALUE,
     };
-    nameToStackItemIndex["-rv"] = stack.size();
-    stack.emplace_back(returnValue);
+    nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER] = stackItems.size();
+    stackItems.emplace_back(returnValue);
   }
 
   // add parameters
@@ -2148,17 +2105,20 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
     .positionOnStack = getPositionPushingItemToStack(Token{0, 0, TokenType::POINTER}),
     .type = StackItemType::RETURN_ADDRESS,
   };
-  nameToStackItemIndex["-ra"] = stack.size();
-  stack.emplace_back(returnAddress);
+  nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER] = stackItems.size();
+  stackItems.emplace_back(returnAddress);
 }
 
 uint32_t CodeGen::getVarOffsetFromSP(const StackVariable &variableInfo) {
+  return getOffsetFromSP(variableInfo.positionOnStack);
+}
+
+uint32_t CodeGen::getOffsetFromSP(uint32_t positionOnStack) {
   // |                   | <- sp
   // |       | <- positionOnStack
   // | value |
-  return getCurrStackPointerPosition() - variableInfo.positionOnStack;
+  return getCurrStackPointerPosition() - positionOnStack;
 }
-
 
 // ========================================
 // OTHER
@@ -2268,25 +2228,16 @@ OpCode getLoadOpForSize(const uint8_t size) {
 
 std::ostream& operator<<(std::ostream& os, const StackMarkerType& obj) {
   switch (obj) {
-    case StackMarkerType::NONE: {
-      os << "NONE\n";
-      break;
-    }
-    case StackMarkerType::SOFT_SCOPE_START: {
-      os << "SOFT_SCOPE_START\n";
-      break;
-    }
-    case StackMarkerType::HARD_SCOPE_START: {
-      os << "HARD_SCOPE_START\n";
-      break;
-    }
+    case StackMarkerType::NONE: { os << "NONE"; break; }
+    case StackMarkerType::SOFT_SCOPE_START: { os << "SOFT_SCOPE_START"; break; }
+    case StackMarkerType::HARD_SCOPE_START: { os << "HARD_SCOPE_START"; break; }
   }
   return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const StackVariable& obj) {
-  os << obj.varDec;
-  os << "Position on stack: " << obj.positionOnStack << '\n';
+  os << obj.varDec << '\n';
+  os << "Position on stack: " << obj.positionOnStack;
   return os;
 }
 

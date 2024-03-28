@@ -4,6 +4,7 @@
 #include <array>
 #include <span>
 #include <cstdint>
+#include <cassert>
 #include "nodes.hpp"
 #include "tokenizer/tokenizer.hpp"
 #include "bytecodeDesign/bytecodeDesign.hpp"
@@ -14,6 +15,7 @@ struct RegisterInfo {
   bool changed {false};
 };
 
+
 struct ExpressionResult {
   private:
   bytecode_t data [SIZE_OF_REGISTER] {0};
@@ -23,9 +25,20 @@ struct ExpressionResult {
   bool isReg {false};
   bool isTemp {false};
   inline const void *getData() const { return (void *)data; }
-  void setData(const void *, uint8_t);
-  inline void setReg(bytecode_t reg) { data[0] = reg; }
-  inline bytecode_t getReg() const { return data[0]; }
+
+  template <class T> void set(T) = delete;
+  void set(char);
+  void set(uint32_t);
+  void set(uint64_t);
+  void set(int32_t);
+  void set(int64_t);
+  void set(double);
+  void set(bool);
+
+  template <class T> void setUntyped(T) requires (std::integral<T> || std::floating_point<T>);
+
+  inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true; }
+  inline bytecode_t getReg() const { assert(isReg); return data[0]; }
 };
 
 struct StructInformation {
@@ -108,6 +121,9 @@ struct DataSectionEntry {
   DataSectionEntry(DataSectionEntryType type, uint32_t indexInDataSection): type{type}, indexInDataSection{indexInDataSection} {}
 };
 
+#define STACK_RETURN_VALUE_IDENTIFIER "-rv"
+#define STACK_RETURN_ADDRESS_IDENTIFIER "-ra"
+
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
   std::map<std::string, StructInformation> structNameToInfoMap;
@@ -116,7 +132,7 @@ struct CodeGen {
   std::vector<unsigned char> dataSection;
   std::vector<DataSectionEntry> dataSectionEntries;
   std::vector<JumpMarker> jumpMarkers;
-  std::vector<StackItem> stack;
+  std::vector<StackItem> stackItems;
   Tokenizer *tk{nullptr};
   Program &program;
   std::map<std::string, GeneralDec *>& lookUp;
@@ -173,6 +189,7 @@ struct CodeGen {
 
 // SCOPES
   void generateScope(const Scope&);
+  void generateStatementList(const StatementList*);
   void startSoftScope();
   void endSoftScope();
 
@@ -195,6 +212,7 @@ struct CodeGen {
   void addExpressionResToStack(const ExpressionResult&);
   void addFunctionSignatureToVirtualStack(const FunctionDec&);
   uint32_t getVarOffsetFromSP(const StackVariable &);
+  uint32_t getOffsetFromSP(uint32_t);
 
 // OTHER
   bytecode_t allocateRegister();
