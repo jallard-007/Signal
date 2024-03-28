@@ -577,33 +577,33 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
-    StackItem rv {
-      .positionOnStack = 8,
-      .type = StackItemType::RETURN_VALUE
-    };
-    expected.stack.emplace_back(rv);
-    // VariableDec vd{Token()};
-    // StackItem var {
-    //   .variable = ,
-    //   .type = StackItemType::VARIABLE
+    // CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    // StackItem rv {
+    //   .positionOnStack = 8,
+    //   .type = StackItemType::RETURN_VALUE
     // };
     // expected.stack.emplace_back(rv);
+    // // VariableDec vd{Token()};
+    // // StackItem var {
+    // //   .variable = ,
+    // //   .type = StackItemType::VARIABLE
+    // // };
+    // // expected.stack.emplace_back(rv);
 
-    StackItem ra {
-      .positionOnStack = 24,
-      .type = StackItemType::RETURN_ADDRESS
-    };
-    expected.stack.emplace_back(ra);
+    // StackItem ra {
+    //   .positionOnStack = 24,
+    //   .type = StackItemType::RETURN_ADDRESS
+    // };
+    // expected.stack.emplace_back(ra);
 
-    CHECK(codeGen.stack == expected.stack);
+    // CHECK(codeGen.stack == expected.stack);
   
     REQUIRE(codeGen.stack.size() == 3);
     CHECK(codeGen.stack[0].type == StackItemType::RETURN_VALUE);
     CHECK(codeGen.stack[0].positionOnStack == 8);
     CHECK(codeGen.stack[1].type == StackItemType::VARIABLE);
     CHECK(codeGen.stack[1].variable.positionOnStack == 16);
-    // CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
+    CHECK(codeGen.tk->extractToken(codeGen.stack[1].variable.varDec.name) == "arg1");
     CHECK(codeGen.stack[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
     CHECK(codeGen.stack[2].type == StackItemType::RETURN_ADDRESS);
     CHECK(codeGen.stack[2].positionOnStack == 24);

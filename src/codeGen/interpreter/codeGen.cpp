@@ -2039,7 +2039,7 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
 /**
 */
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
-
+  (void)returnStatement;
 }
 
 

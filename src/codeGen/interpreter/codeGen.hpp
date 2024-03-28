@@ -234,5 +234,4 @@ std::ostream& operator<<(std::ostream& os, const std::vector<StackItem>& obj);
 // COMPARING
 // ========================================
 
-bool std::operator==(const StackItem &x, const StackItem &y);
 
