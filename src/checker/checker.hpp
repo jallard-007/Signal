@@ -20,6 +20,8 @@ enum class CheckerErrorType: uint8_t {
   NOT_ALL_CODE_PATHS_RETURN,
   EMPTY_STRUCT,
   STRUCT_CYCLE,
+  MISSING_MAIN_FUNCTION,
+  INVALID_MAIN_FUNCTION_SIGNATURE,
 
   // no such
   NO_SUCH_FUNCTION,
@@ -61,6 +63,7 @@ struct CheckerError {
   uint32_t tkIndex{0};
   CheckerErrorType type{CheckerErrorType::NONE};
   CheckerError() = delete;
+  CheckerError(CheckerErrorType);
   CheckerError(CheckerErrorType, uint32_t, Token);
   CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
   CheckerError(CheckerErrorType, uint32_t, Expression*);
@@ -69,9 +72,9 @@ struct CheckerError {
 };
 
 struct ResultingType {
-  const TokenList *type{nullptr};
+  TokenList *type{nullptr};
   bool isLValue{false};
-  ResultingType(const TokenList*, bool);
+  ResultingType(TokenList*, bool);
 };
 
 #define MAX_ERRORS 20
@@ -80,43 +83,48 @@ struct Checker {
   std::map<std::string, std::map<std::string, StructDecList *>> structsLookUp;
   std::map<std::string, GeneralDec *> lookUp;
   std::vector<CheckerError> errors;
+  std::vector<std::string> locals;
   Program& program;
   std::vector<Tokenizer>& tokenizers;
+  Tokenizer *tk;
   NodeMemPool &memPool;
 
-  const static TokenList noneValue;
-  const static TokenList badValue;
-  const static TokenList boolValue;
-  const static TokenList int32Value;
-  const static TokenList uint32Value;
-  const static TokenList int64Value;
-  const static TokenList uint64Value;
-  const static TokenList charValue;
-  const static TokenList stringValue;
+  static TokenList noneValue;
+  static TokenList badValue;
+  static TokenList boolValue;
+  static TokenList int32Value;
+  static TokenList uint32Value;
+  static TokenList int64Value;
+  static TokenList uint64Value;
+  static TokenList charValue;
+  static TokenList stringValue;
   // static TokenList floatValue;
-  const static TokenList doubleValue;
-  const static TokenList ptrValue;
-  const static TokenList nullptrValue;
-  const static TokenList voidValue;
+  static TokenList doubleValue;
+  static TokenList fileValue;
+  static TokenList ptrValue;
+  static TokenList nullptrValue;
+  static TokenList voidValue;
 
   Checker(Program&, std::vector<Tokenizer>&, NodeMemPool&);
-  bool check();
+  bool check(bool = false);
   void firstTopLevelScan();
-  void secondTopLevelScan();
+  void secondTopLevelScan(bool = false);
   void fullScan();
-  void checkFunction(Tokenizer&, FunctionDec&);
-  bool validateFunctionHeader(Tokenizer&, FunctionDec&);
-  void validateStructTopLevel(Tokenizer&, StructDec&);
+  void checkFunction(FunctionDec&);
+  bool validateFunctionHeader(FunctionDec&);
+  void validateStructTopLevel(StructDec&);
   void checkForStructCycles(GeneralDec&, std::vector<StructDec *>&);
-  bool checkScope(Tokenizer&, Scope&, TokenList&, bool, bool);
-  bool checkLocalVarDec(Tokenizer&, VariableDec&, std::vector<std::string>&);
-  ResultingType checkExpression(Tokenizer&, Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
-  ResultingType checkMemberAccess(Tokenizer&, ResultingType&, Expression&);
-  bool checkType(Tokenizer&, TokenList&);
+  bool checkStatement(Statement&, const TokenList&, bool, bool);
+  bool checkScope(Scope&, const TokenList&, bool, bool);
+  bool checkLocalVarDec(VariableDec&);
+  ResultingType checkExpression(Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
+  ResultingType checkMemberAccess(ResultingType&, Expression&);
+  bool checkType(TokenList&);
+  bool checkAssignment(const TokenList&, const TokenList&);
+
   void addError(const CheckerError&);
   void removeLastError();
-  static const TokenList& largestType(const TokenList&, const TokenList&);
+  static TokenList& largestType(TokenList&, TokenList&);
 };
 
 bool canBeConvertedToBool(const TokenList*);
-bool checkAssignment(const TokenList&, const TokenList&);

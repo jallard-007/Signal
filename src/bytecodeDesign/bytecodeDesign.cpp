@@ -52,6 +52,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       }
 
       // single 4 byte signed int arg
+      case OpCode::CALL:
       case OpCode::R_JUMP:
       case OpCode::R_JUMP_E:
       case OpCode::R_JUMP_NE:
@@ -208,10 +209,40 @@ const char * bytecode_t_to_builtin_function [] = {
   "SEEK",
 };
 
+const std::unordered_map<std::string, BuiltInFunction> builtin_function_to_bytecode_t = {
+  {"ALLOCATE", BuiltInFunction::ALLOCATE},
+  {"REALLOCATE", BuiltInFunction::REALLOCATE},
+  {"DEALLOCATE", BuiltInFunction::DEALLOCATE},
+  {"MEM_COPY", BuiltInFunction::MEM_COPY},
+  {"MEM_MOVE", BuiltInFunction::MEM_MOVE},
+  {"MEM_COMPARE", BuiltInFunction::MEM_COMPARE},
+  {"STR_LENGTH", BuiltInFunction::STR_LENGTH},
+  {"STR_COMPARE", BuiltInFunction::STR_COMPARE},
+  {"STR_N_COMPARE", BuiltInFunction::STR_N_COMPARE},
+  {"STR_COPY", BuiltInFunction::STR_COPY},
+  {"STR_N_COPY", BuiltInFunction::STR_N_COPY},
+  {"STR_CAT", BuiltInFunction::STR_CAT},
+  {"STR_N_CAT", BuiltInFunction::STR_N_CAT},
+  {"PRINT_STRING", BuiltInFunction::PRINT_STRING},
+  {"PRINT_CHAR", BuiltInFunction::PRINT_CHAR},
+  {"PRINT_SIGNED", BuiltInFunction::PRINT_SIGNED},
+  {"PRINT_UNSIGNED", BuiltInFunction::PRINT_UNSIGNED},
+  {"PRINT_HEX", BuiltInFunction::PRINT_HEX},
+  {"FFLUSH", BuiltInFunction::FFLUSH},
+  {"OPEN", BuiltInFunction::OPEN},
+  {"CLOSE", BuiltInFunction::CLOSE},
+  {"READ", BuiltInFunction::READ},
+  {"READ_LINE", BuiltInFunction::READ_LINE},
+  {"READ_CHAR", BuiltInFunction::READ_CHAR},
+  {"WRITE", BuiltInFunction::WRITE},
+  {"SEEK", BuiltInFunction::SEEK},
+};
+
 const char * bytecode_t_to_op [] = {
   "NOP",
   "EXIT",
   "CALL_B",
+  "CALL",
   "CMP",
   "SET_FLAGS",
   "GET_E",

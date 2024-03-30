@@ -3,20 +3,20 @@
 #include "testingMemPool.hpp"
 
 TEST_CASE("pretty print test", "[prettyPrinter]") {
-  SKIP();
+  // SKIP("Have to incorporate precedence in pretty printer; when the ast does not match precedence, wrap in parentheses");
   SECTION("ONE") {
     const std::string str = 
 R"(func getType(type: Type ref): Token {
   tp: Token = tokenizer.peekNext();
   prev: TokenList ptr = nullptr;
   curr: TokenList ptr = @type.tokens;
-  while (tp.type != TokenType.END_OF_FILE) {
-    if (isTypeDelimiter(tp.type)) {
-      if (curr->next) {
+  while tp.type != TokenType.END_OF_FILE {
+    if isTypeDelimiter(tp.type) {
+      if curr->next {
         memPool.release(curr->next);
         curr->next = nullptr;
       }
-      if (curr && curr->curr.type == TokenType.NONE) {
+      if curr && curr->curr.type == TokenType.NONE {
         prev->next = nullptr;
         memPool.release(curr);
       }
@@ -46,9 +46,9 @@ R"(func getType(type: Type ref): Token {
   SECTION("two") {
     const std::string str = 
 R"(func getType(type: Type ref): Token {
-  if (1) {
+  if 1 {
   }
-  elif (1) {
+  elif 1 {
   }
   else {
   }
@@ -60,6 +60,23 @@ R"(func getType(type: Type ref): Token {
     default {
     }
   }
+}
+)";
+    std::vector<Tokenizer> tks;
+    tks.emplace_back("./src/prettyPrint/test_prettyPrint.cpp", str);
+    Parser parser{tks.back(), memPool};
+    parser.parse();
+    REQUIRE(parser.expected.empty());
+    REQUIRE(parser.unexpected.empty());
+    std::string output;
+    parser.program.prettyPrint(tks, output);
+    CHECK(str == output);
+  }
+  SECTION("three") {
+    SKIP("Have to incorporate precedence in pretty printer; when the ast does not match precedence, wrap subexpression");
+    const std::string str = 
+R"(func getType(): void {
+  (1 + 2) * 3;
 }
 )";
     std::vector<Tokenizer> tks;

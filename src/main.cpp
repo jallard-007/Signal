@@ -174,9 +174,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   codeGen.tk = &tokenizers[parser.program.decs.curr.tokenizerIndex];
-  if (!codeGen.generate()) {
-    return 1;
-  }
+  codeGen.generate();
   if (!openAndWriteFile("out.bin", codeGen.byteCode)) {
     return 1;
   }

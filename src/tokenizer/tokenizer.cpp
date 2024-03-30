@@ -100,6 +100,22 @@ Token Tokenizer::tokenizeNext() {
   switch (type) {
     case TokenType::IDENTIFIER: {
       switch (c) {
+        case '_': {
+          if (
+            content[++position] == '_' &&
+            content[++position] == 'b' &&
+            content[++position] == 'u' &&
+            content[++position] == 'i' &&
+            content[++position] == 'l' &&
+            content[++position] == 't' &&
+            content[++position] == 'i' &&
+            content[++position] == 'n'
+          ) {
+            END_OF_IDENTIFIER(TokenType::BUILTIN)
+          }
+          movePastIdentifier();
+          break;
+        }
         case 'a': {
           // as
           if (content[++position] == 's') {
@@ -110,12 +126,14 @@ Token Tokenizer::tokenizeNext() {
         }
         case 'b': {
           // break bool
-          if (content[++position] == 'r' &&
-            content[++position] == 'e' &&
-            content[++position] == 'a' &&
-            content[++position] == 'k'
-          ) {
-            END_OF_IDENTIFIER(TokenType::BREAK)
+          if (content[++position] == 'r') {
+            if (
+              content[++position] == 'e' &&
+              content[++position] == 'a' &&
+              content[++position] == 'k'
+            ) {
+              END_OF_IDENTIFIER(TokenType::BREAK)
+            }
           }
           else if (
             content[position] == 'o' &&
@@ -171,13 +189,22 @@ Token Tokenizer::tokenizeNext() {
         case 'd': {
           // default double 
           if (content[++position] == 'e') {
-            if (content[++position] == 'f' &&
-            content[++position] == 'a' &&
-            content[++position] == 'u' &&
-            content[++position] == 'l' &&
-            content[++position] == 't'
-            ) {
-              END_OF_IDENTIFIER(TokenType::DEFAULT)
+            if (content[++position] == 'f') {
+              if (content[++position] == 'a') {
+                if (
+                  content[++position] == 'u' &&
+                  content[++position] == 'l' &&
+                  content[++position] == 't'
+                ) {
+                  END_OF_IDENTIFIER(TokenType::DEFAULT)
+                }
+              } else if (
+                content[position] == 'i' &&
+                content[++position] == 'n' &&
+                content[++position] == 'e'
+              ) {
+                END_OF_IDENTIFIER(TokenType::DEFINE)
+              }
             }
           }
           else if (
@@ -243,6 +270,15 @@ Token Tokenizer::tokenizeNext() {
           else if (content[position] == 'u') {
             if (content[++position] == 'n' && content[++position] == 'c') {
               END_OF_IDENTIFIER(TokenType::FUNC)
+            }
+          } else if (content[position] == 'i') {
+            if (
+              content[++position] == 'l' &&
+              content[++position] == 'e' &&
+              content[++position] == '_' &&
+              content[++position] == 't'
+            ) {
+              END_OF_IDENTIFIER(TokenType::FILE_TYPE)
             }
           }
           movePastIdentifier();
@@ -336,14 +372,29 @@ Token Tokenizer::tokenizeNext() {
               END_OF_IDENTIFIER(TokenType::SWITCH)
             }
           }
-          else if (
-            content[position] == 't' &&
-            content[++position] == 'r' &&
-            content[++position] == 'u' &&
-            content[++position] == 'c' &&
-            content[++position] == 't'
-          ) {
-            END_OF_IDENTIFIER(TokenType::STRUCT)
+          else if (content[position] == 't') {
+            if (content[++position] == 'r') {
+              if (
+                content[++position] == 'u' &&
+                content[++position] == 'c' &&
+                content[++position] == 't'
+              ) {
+                END_OF_IDENTIFIER(TokenType::STRUCT)
+              } 
+            } else if (content[position] == 'd') {
+              //stdout, stderr, stdin
+              if (content[++position] == 'e') {
+                if (content[++position] == 'r' && content[++position == 'r']) {
+                  END_OF_IDENTIFIER(TokenType::STDERR)
+                }
+              } else if (content[position] == 'o') {
+                if (content[++position] == 'u' && content[++position == 't']) {
+                  END_OF_IDENTIFIER(TokenType::STDOUT)
+                }
+              } else if (content[position] == 'i' && content[++position == 'n']) {
+                END_OF_IDENTIFIER(TokenType::STDIN)
+              }
+            }
           }
           movePastIdentifier();
           break;

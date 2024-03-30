@@ -223,6 +223,11 @@ GeneralDec* Parser::parseNext() {
   else if (token.type == TokenType::END_OF_FILE) {
     return &globalList->curr;
   }
+  else if (token.type == TokenType::BUILTIN) {
+    if (!parseBuiltin(globalList->curr)) {
+      return nullptr;
+    }
+  }
   else {
     unexpected.emplace_back(token, tokenizer->tokenizerIndex);
     return nullptr;
@@ -233,7 +238,37 @@ GeneralDec* Parser::parseNext() {
   return &globalPrev->curr;
 }
 
-bool Parser::parseFunction(FunctionDec& dec) {
+bool Parser::parseBuiltin(GeneralDec&) {
+  Token token = tokenizer->tokenizeNext();
+  if (token.type == TokenType::FUNC) {
+    token = tokenizer->tokenizeNext();
+    globalList->curr.type = GeneralDecType::BUILTIN_FUNCTION;
+    globalList->curr.builtinFunc = memPool.makeBuiltinFunc(token);
+    if (!parseFunctionHeader(globalList->curr.builtinFunc->funcDec)) {
+      return false;
+    }
+    token = tokenizer->tokenizeNext();
+    if (token.getType() != TokenType::SEMICOLON) {
+      expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
+      return false;
+    }
+
+  }
+  else if (token.getType() == TokenType::STRUCT) {
+    globalList->curr.type = GeneralDecType::BUILTIN_TYPE;
+    globalList->curr.builtinType = memPool.makeBuiltinType(token);
+    if (!parseStruct(globalList->curr.builtinType->structDec)) {
+      return false;
+    }
+  }
+  else {
+    unexpected.emplace_back(token, tokenizer->tokenizerIndex);
+    return false;
+  }
+  return true;
+}
+
+bool Parser::parseFunctionHeader(FunctionDec& dec) {
   Token name = tokenizer->peekNext();
   if (name.type != TokenType::IDENTIFIER) {
     expected.emplace_back(ExpectedType::TOKEN, name, TokenType::IDENTIFIER, tokenizer->tokenizerIndex);
@@ -291,6 +326,14 @@ bool Parser::parseFunction(FunctionDec& dec) {
   }
   tokenizer->consumePeek();
   if (getType(dec.returnType) != ParseTypeErrorType::NONE) {
+    return false;
+  }
+  return true;
+}
+
+
+bool Parser::parseFunction(FunctionDec& dec) {
+  if (!parseFunctionHeader(dec)) {
     return false;
   }
   if (tokenizer->peekNext().type != TokenType::OPEN_BRACE) {
@@ -1057,18 +1100,20 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
 ParseTypeErrorType Parser::getType(TokenList& type) {
   Token tp = tokenizer->peekNext();
   TokenList *curr = memPool.makeTokenList();
-  if (!isBuiltInType(tp.type) && !isTypeModifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
+  if (!isBuiltInType(tp.type) && !isTypeQualifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
     expected.emplace_back(ExpectedType::TOKEN, tp, TokenType::TYPE, tokenizer->tokenizerIndex);
     return ParseTypeErrorType::REPORTED;
   }
-  tokenizer->consumePeek();
-  curr->token = tp;
-  TokenList *prev = curr;
-  curr = memPool.makeTokenList();
-  curr->next = prev;
-  tp = tokenizer->peekNext();
+  {
+    tokenizer->consumePeek();
+    curr->token = tp;
+    TokenList *prev = curr;
+    curr = memPool.makeTokenList();
+    curr->next = prev;
+    tp = tokenizer->peekNext();
+  }
   while (tp.type != TokenType::END_OF_FILE) {
-    if (!isBuiltInType(tp.type) && !isTypeModifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
+    if (!isBuiltInType(tp.type) && !isTypeQualifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
       break;
     }
     tokenizer->consumePeek();

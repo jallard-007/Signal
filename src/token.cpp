@@ -4,7 +4,7 @@ bool isBuiltInType(TokenType type) {
   return type >= TokenType::BOOL && type <= TokenType::VOID;
 }
 
-bool isTypeModifier(TokenType type) {
+bool isTypeQualifier(TokenType type) {
   return type == TokenType::CONST;
 }
 
@@ -17,7 +17,7 @@ bool isUnaryOp(TokenType type) {
 }
 
 bool isConcreteType(TokenType type) {
-  return type == TokenType::IDENTIFIER || (type >= TokenType::BOOL && type <= TokenType::VOID);
+  return type == TokenType::IDENTIFIER || (isBuiltInType(type));
 }
 
 bool isLogicalOp(TokenType type) {
@@ -79,6 +79,8 @@ const char* tokenTypeToString [] = {
   "NONE",
   "BAD_VALUE",
   "END_OF_FILE",
+  "BUILTIN",
+  "DEFINE",
   "CHAR_LITERAL",
   "STRING_LITERAL",
   "DECIMAL_NUMBER",
@@ -87,6 +89,9 @@ const char* tokenTypeToString [] = {
   "HEX_NUMBER",
   "FALSE", //
   "TRUE", //
+  "STDIN",
+  "STDERR",
+  "STDOUT",
   "NULL_PTR", //
   "AS", //
   "BREAK",
@@ -173,6 +178,7 @@ const char* tokenTypeToString [] = {
   "INT64_TYPE",
   "UINT64_TYPE",
   "POINTER",
+  "FILE_TYPE",
   "DOUBLE_TYPE",
   "VOID",
   "REFERENCE",
@@ -368,6 +374,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
   {TokenType::DIVISION, " / "},
   {TokenType::DIVISION_ASSIGNMENT, " /= "},
   {TokenType::AS, "as "},
+  {TokenType::BUILTIN, "__builtin"},
   {TokenType::BREAK, "break"},
   {TokenType::CASE, "case "},
   {TokenType::CREATE, "create "},

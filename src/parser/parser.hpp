@@ -63,6 +63,8 @@ struct Parser {
   explicit Parser(Tokenizer&, NodeMemPool&);
   bool parse();
   GeneralDec *parseNext();
+  bool parseBuiltin(GeneralDec&);
+  bool parseFunctionHeader(FunctionDec&);
   bool parseFunction(FunctionDec&);
   bool parseStruct(StructDec&);
   bool parseTemplate(TemplateDec&);

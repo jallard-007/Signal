@@ -426,6 +426,20 @@ struct IncludeDec {
   void prettyPrint(Tokenizer&, std::string&);
 };
 
+struct BuiltinType {
+  const Token name;
+  StructDec structDec;
+  BuiltinType() = delete;
+  BuiltinType(const Token& name): name{name} {}
+};
+
+struct BuiltinFunc {
+  const Token name;
+  FunctionDec funcDec;
+  BuiltinFunc() = delete;
+  BuiltinFunc(const Token& name): name{name} {}
+};
+
 enum class GeneralDecType: uint8_t {
   NONE,
   STRUCT,
@@ -435,6 +449,8 @@ enum class GeneralDecType: uint8_t {
   TEMPLATE,
   TEMPLATE_CREATE,
   INCLUDE_DEC,
+  BUILTIN_FUNCTION,
+  BUILTIN_TYPE,
 };
 
 // globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
@@ -447,6 +463,8 @@ struct GeneralDec {
     TemplateDec *tempDec;
     TemplateCreation *tempCreate;
     IncludeDec *includeDec;
+    BuiltinType *builtinType;
+    BuiltinFunc *builtinFunc;
   };
   uint32_t tokenizerIndex{0};
   GeneralDecType type{GeneralDecType::NONE};

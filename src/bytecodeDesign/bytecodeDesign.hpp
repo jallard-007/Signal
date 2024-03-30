@@ -1,7 +1,13 @@
 #pragma once
 
 #include <vector>
+#include <string>
+#include <unordered_map>
 #include <iostream>
+
+#define stdoutDataIndex 0
+#define stdinDataIndex (stdoutDataIndex + sizeof (FILE *))
+#define stderrDataIndex (stdinDataIndex + sizeof (FILE *))
 
 #define SIZE_OF_REGISTER 8
 #define NUM_REGISTERS 32
@@ -78,6 +84,7 @@ enum class OpCode: bytecode_t {
   NOP, // do nothing
   EXIT, // EXIT src | exits the program with the code in src
   CALL_B, // CALL_B BuiltInFunction | call a built in function such as print, etc.
+  CALL, // CALL 4 byte relative offset | call a function located in the bytecode
 
   // CMP src1, src2 | sets flags based on the result of (signed) src1 - (signed) src2
   CMP, // CMP src1, src2
@@ -196,3 +203,4 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& obj);
 
 extern const char * bytecode_t_to_op [];
 extern const char * bytecode_t_to_builtin_function [];
+extern const std::unordered_map<std::string, BuiltInFunction> builtin_function_to_bytecode_t;

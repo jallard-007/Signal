@@ -10,7 +10,9 @@ enum class TokenType : uint8_t {
   NONE,
   BAD_VALUE,
   END_OF_FILE,
-  
+  BUILTIN,
+  DEFINE,
+
   // literals
   CHAR_LITERAL,
   STRING_LITERAL,
@@ -20,6 +22,9 @@ enum class TokenType : uint8_t {
   HEX_NUMBER,
   FALSE, //
   TRUE, //
+  STDIN,
+  STDERR,
+  STDOUT,
   NULL_PTR, //
 
   // keywords
@@ -123,6 +128,7 @@ enum class TokenType : uint8_t {
   INT64_TYPE,
   UINT64_TYPE,
   POINTER,
+  FILE_TYPE,
   DOUBLE_TYPE,
   VOID,
   REFERENCE,
@@ -158,7 +164,7 @@ struct Token {
 
 
 bool isBuiltInType(TokenType);
-bool isTypeModifier(TokenType);
+bool isTypeQualifier(TokenType);
 bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
 bool isUnaryOp(TokenType);

@@ -24,6 +24,7 @@ struct ExpressionResult {
   OpCode jumpOp {OpCode::NOP};
   bool isReg {false};
   bool isTemp {false};
+  bool isPointerToValue {false};
   inline const void *getData() const { return (void *)data; }
 
   template <class T> void set(T) = delete;
@@ -32,6 +33,7 @@ struct ExpressionResult {
   void set(uint64_t);
   void set(int32_t);
   void set(int64_t);
+  void set(FILE *);
   void set(double);
   void set(bool);
 
@@ -86,16 +88,22 @@ struct StackVariable {
   bytecode_t reg = 0;
 };
 
+struct TempStackValue {
+  uint32_t positionOnStack = 0;
+};
+
 enum class StackItemType: uint8_t {
   NONE,
   MARKER,
   VARIABLE,
   RETURN_ADDRESS,
   RETURN_VALUE,
+  TEMP_VALUE,
 };
 
 struct StackItem {
   union {
+    TempStackValue tempValue;
     StackVariable variable;
     StackMarkerType marker;
     uint32_t positionOnStack;
@@ -110,6 +118,9 @@ enum class BranchStatementResult: uint8_t {
 };
 
 enum class DataSectionEntryType {
+  STDIN,
+  STDOUT,
+  STDERR,
   STRING_LITERAL,
   STATIC_DATA,
 };
@@ -141,7 +152,7 @@ struct CodeGen {
   CodeGen(Program&, std::vector<Tokenizer>&, std::map<std::string, GeneralDec *>&);
 
   // main driver
-  bool generate();
+  void generate();
 
   const DataSectionEntry& addToDataSection(DataSectionEntryType, void *data, uint32_t n);
 
@@ -163,15 +174,15 @@ struct CodeGen {
   void updateJumpMarkersTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE, bool = false);
 
 // DECLARATIONS
-  bool generateGeneralDeclaration(const GeneralDec&);
-  bool generateVariableDeclaration(const VariableDec&, bool = true);
+  void generateGeneralDeclaration(const GeneralDec&);
+  void generateVariableDeclaration(const VariableDec&, bool = true);
 
 // GENERAL EXPRESSIONS
   ExpressionResult generateExpression(const Expression&, bool = false);
   ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
   ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
   ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
-  ExpressionResult expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
+  void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
   ExpressionResult getAddressOfExpression(const Expression&);
   ExpressionResult loadValue(const Token&);
 
@@ -194,9 +205,7 @@ struct CodeGen {
   void endSoftScope();
 
 // FUNCTIONS
-  bool generateFunctionDeclaration(const FunctionDec&);
-  void startFunctionScope(const FunctionDec&);
-  void endFunctionScope(const FunctionDec&);
+  void generateFunctionDeclaration(const FunctionDec&);
 
 // STATEMENTS
   void generateStatement(const Statement&);
@@ -205,23 +214,36 @@ struct CodeGen {
   void generateReturnStatement(const ReturnStatement&);
 
 // STACK MANAGEMENT
-  uint32_t getPositionPushingItemToStack(Token, uint32_t = 0);
+  uint32_t getPositionPushingTypeToStack(Token, uint32_t = 0);
+  uint32_t getPositionPushingStuctToStack(const StructInformation&);
+  uint32_t getPositionOnStack(uint32_t);
+  uint32_t getPositionPushingToStack(uint32_t, uint32_t);
+  uint32_t getPaddingNeededPushingToStack(uint32_t, uint32_t, uint32_t);
+  void addSpaceToStack(uint32_t);
   StackVariable& addVarDecToVirtualStack(const VariableDec&);
   uint32_t getCurrStackPointerPosition();
   void makeRoomOnVirtualStack(Token, uint32_t = 0);
-  void addExpressionResToStack(const ExpressionResult&);
+  uint32_t addExpressionResToStack(ExpressionResult&);
   void addFunctionSignatureToVirtualStack(const FunctionDec&);
+
+  void fakeClearStackFromTo(uint32_t, uint32_t);
   uint32_t getVarOffsetFromSP(const StackVariable &);
   uint32_t getOffsetFromSP(uint32_t);
+
 
 // OTHER
   bytecode_t allocateRegister();
   void freeRegister(bytecode_t);
-  uint32_t sizeOfType(Token);
-  Token getTypeFromTokenList(const TokenList&);
+  uint32_t getSizeOfType(Token);
+
 };
 
-OpCode getLoadOpForSize(unsigned char);
+Token getTypeFromTokenList(const TokenList&);
+const TokenList* getNextFromTokenList(const TokenList&);
+constexpr OpCode getLoadOpForSize(uint32_t);
+constexpr OpCode getStoreOpForSize(uint32_t);
+constexpr OpCode getPopOpForSize(uint32_t);
+constexpr OpCode getPushOpForSize(uint32_t);
 // ExpressionResult evaluateUnaryOpImmExpression(TokenType, ExpressionResult&);
 // ExpressionResult evaluateBinOpImmExpression(TokenType, ExpressionResult&, ExpressionResult&);
 

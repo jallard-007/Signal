@@ -9,6 +9,8 @@
 class NodeMemPool {
   MemPool<UnOp> unOps;
   MemPool<BinOp> binOps;
+  MemPool<BuiltinFunc> builtinFuncs;
+  MemPool<BuiltinType> builtinTypes;
   MemPool<GeneralDec> decs;
   MemPool<GeneralDecList> decLists;
   MemPool<VariableDec> varDecs;
@@ -39,6 +41,8 @@ public:
   void reset() {
     unOps.reset();
     binOps.reset();
+    builtinFuncs.reset();
+    builtinTypes.reset();
     decs.reset();
     decLists.reset();
     varDecs.reset();
@@ -68,6 +72,8 @@ public:
 
   UnOp* makeUnOp(const UnOp& ref) {return unOps.get(ref);}
   BinOp* makeBinOp(const BinOp& ref) {return binOps.get(ref);}
+  BuiltinFunc* makeBuiltinFunc(const BuiltinFunc& ref) {return builtinFuncs.get(ref);}
+  BuiltinType* makeBuiltinType(const BuiltinType& ref) {return builtinTypes.get(ref);}
   GeneralDec* makeGeneralDec() {return decs.get();}
   GeneralDecList* makeGeneralDecList() {return decLists.get();}
   VariableDec* makeVariableDec(const VariableDec& ref) {return varDecs.get(ref);}
@@ -96,6 +102,8 @@ public:
 
   void release(UnOp* ptr) { unOps.release(ptr);}
   void release(BinOp* ptr) { binOps.release(ptr);}
+  void release(BuiltinFunc* ptr) { builtinFuncs.release(ptr);}
+  void release(BuiltinType* ptr) { builtinTypes.release(ptr);}
   void release(GeneralDec* ptr) { decs.release(ptr);}
   void release(GeneralDecList* ptr) { decLists.release(ptr);}
   void release(VariableDec* ptr) { varDecs.release(ptr);}

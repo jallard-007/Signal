@@ -258,6 +258,12 @@ int Interpreter::runProgram() {
       }
       break;
     }
+    case OpCode::CALL: {
+      sp -= 8;
+      *(uint64_t *)sp = ip + 4;
+      ip = ip + *(uint32_t*)ip - 1;
+      break;
+    }
     case OpCode::CMP: {
       int64_t res = (int64_t)registers[*(bc *)ip] - (int64_t)registers[*(bc *)(ip + 1)];
       ip += 2;

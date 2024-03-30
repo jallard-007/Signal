@@ -1,0 +1,79 @@
+
+# ALLOCATE, // ALLOCATE arg1 | allocate arg1 bytes and return address
+__builtin func ALLOCATE allocate(dest: void ptr, src: void ptr, n: uint64): void ptr;
+
+# REALLOCATE, // REALLOCATE arg1, arg2 | reallocate memory pointed at by arg1 with new size arg2, return new address
+__builtin func REALLOCATE reallocate(src: void ptr, n: uint64): void ptr;
+
+# DEALLOCATE, // DEALLOCATE arg1 | deallocate memory at arg1
+__builtin func DEALLOCATE deallocate(src: void ptr): void;
+
+# MEM_COPY, // MEM_COPY arg1, arg2, arg3 | copy arg3 bytes from arg2 to arg1
+__builtin func MEM_COPY mem_copy(dest: void ptr, src: void ptr, n: uint64): void ptr;
+
+# MEM_MOVE, // MEM_MOVE arg1, arg2, arg3 | copy arg3 bytes from arg2 to arg1, handles arg1 and arg2 overlapping
+__builtin func MEM_MOVE mem_move(dest: void ptr, src: void ptr, n: uint64): void ptr;
+
+# MEM_COMPARE, // MEM_COMPARE arg1, arg2, arg3 | compare arg3 bytes from arg2 to arg1
+__builtin func MEM_COMPARE mem_compare(src1: void ptr, src2: void ptr, n: uint64): int32;
+
+# STR_LENGTH, // STR_LENGTH arg1 | returns the length of char array array at arg1
+__builtin func STR_LENGTH str_length(src: const char ptr): uint64;
+
+# STR_COMPARE, // STR_COMPARE arg1, arg2 | compares arg1 to arg1. returns 0 if same, >0 if str1 is greater <0 if str2 is greater
+__builtin func STR_COMPARE str_compare(src1: const char ptr, src2: const char ptr): int32;
+
+# STR_N_COMPARE, // STR_N_COMPARE arg1, arg2, arg3 | same as STR_COMPARE, but compares at most arg3 chars
+__builtin func STR_N_COMPARE str_n_compare(src1: const char ptr, src2: const char ptr, n: uint64): int32;
+
+# STR_COPY, // STR_COPY arg1, arg2 | copy arg2 into arg1, returns arg1
+__builtin func STR_COPY str_copy(dest: char ptr, src: const char ptr): char ptr;
+
+# STR_N_COPY, // STR_N_COPY arg1, arg2, arg3 | copy at most arg3 chars from arg2 into arg1, returns arg1
+__builtin func STR_N_COPY str_n_copy(dest: char ptr, src: const char ptr, n: uint64): char ptr;
+
+# STR_CAT, // STR_CAT arg1, arg2 | concatenate str2 to str1 
+__builtin func STR_CAT str_cat(dest: char ptr, src: const char ptr): char ptr;
+
+# STR_N_CAT, // STR_CAT arg1, arg2, arg3 | concatenate at most arg3 chars from str2 to str1
+__builtin func STR_N_CAT str_n_cat(dest: char ptr, src: const char ptr, n: uint64): char ptr;
+
+# PRINT_STRING, // PRINT_STRING arg1, arg2 | prints the string pointed at by arg2 to FILE* arg1
+__builtin func PRINT_STRING print_string(file: file_t, str: const char ptr): int32;
+
+# PRINT_CHAR, // PRINT_CHAR arg1, arg2 | prints arg2 as a character to FILE* arg1
+__builtin func PRINT_CHAR print_char(file: file_t, c: char): int32;
+
+# PRINT_SIGNED, // PRINT_SIGNED arg1, arg2 | prints arg2 as a signed integer to FILE* arg1
+__builtin func PRINT_SIGNED print_signed(file: file_t, src: int64): int32;
+
+# PRINT_UNSIGNED, // PRINT_UNSIGNED arg1, arg2 | prints arg2 as an unsigned integer to FILE* arg1
+__builtin func PRINT_UNSIGNED print_unsigned(file: file_t, src: uint64): int32;
+
+# PRINT_HEX, // PRINT_HEX arg1, arg2 | prints arg2 in hex to FILE* arg1
+__builtin func PRINT_HEX print_hex(file: file_t, src: uint64): int32;
+
+# FFLUSH, // FFLUSH arg1 | flush buffer FILE* arg1
+__builtin func FFLUSH fflush(file: file_t): int32;
+
+# OPEN, // OPEN arg1, arg2 | open file at path arg1 with mode arg2, returns a file pointer
+__builtin func OPEN open(file: const char ptr, mode: const char ptr): file_t;
+
+# CLOSE, // CLOSE arg1 | close file pointer arg1, returns 0 on success
+__builtin func CLOSE close(file: file_t): int32;
+
+# READ, // READ arg1, arg2, arg3 | read arg2 bytes from file pointer arg3 to buffer arg1
+__builtin func READ read(buffer: void ptr, n: uint64, file: file_t): uint64;
+
+# READ_LINE, // READ_LINE, arg1, arg2, arg3 | read contents from arg3 to buffer arg1 until either a newline or eof is encountered, or arg2 bytes are read
+__builtin func READ_LINE read_line(buffer: char ptr, n: uint64, file: file_t): char ptr;
+
+# READ_CHAR, // READ_CHAR arg1 | returns one character from file pointer arg1
+__builtin func READ_CHAR read_char(file: file_t): char;
+
+# WRITE, // WRITE arg1, arg2, arg3 | write arg2 bytes from arg1 to file pointer arg3, returns number of bytes written
+__builtin func WRITE write(file: file_t): uint64;
+
+# SEEK, // SEEK arg1, arg2, arg3 | seek to a position with offset arg2 from "type" arg3 in file pointer arg1. 'type' being start of file, curr position, or end of file
+__builtin func SEEK seek(file: file_t, offset: uint64 , whence: int32): int32;
+

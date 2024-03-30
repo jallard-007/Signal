@@ -15,6 +15,7 @@
   Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str); \
   Parser parser{tokenizer, memPool}; \
   Checker checker{parser.program, tokenizers, memPool}; \
+  checker.tk = &tokenizer; \
   CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
   codeGen.tk = &tokenizer
 
@@ -392,7 +393,7 @@ class TestFixture_GetStructInfo {
   void setUp(const std::string &str) {
     testBoilerPlate(str);
     REQUIRE(parser.parse());
-    REQUIRE(checker.check());
+    REQUIRE(checker.check(true));
     structInfo = codeGen.getStructInfo("StructName");
   }
 };
@@ -456,9 +457,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(cond_statement.controlFlow);
     REQUIRE(cond_statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
-    std::vector<std::string> locals;
-    checker.checkLocalVarDec(tokenizer, *statement_x.varDec, locals);
-    checker.checkLocalVarDec(tokenizer, *statement_y.varDec, locals);
+    checker.checkLocalVarDec(*statement_x.varDec);
+    checker.checkLocalVarDec(*statement_y.varDec);
     codeGen.generateStatement(statement_x);
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
@@ -538,22 +538,24 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     const std::string str = "func testFunction(): void { } ";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
-    REQUIRE(checker.check());
+    REQUIRE(checker.check(true));
     auto genDec = checker.lookUp["testFunction"];
     REQUIRE(genDec);
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
-    REQUIRE(codeGen.stackItems.size() == 1);
-    CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_ADDRESS);
-    CHECK(codeGen.stackItems[0].positionOnStack == 8);
+    REQUIRE(codeGen.stackItems.size() == 2);
+    CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
+    CHECK(codeGen.stackItems[0].positionOnStack == 0);
+    CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
+    CHECK(codeGen.stackItems[1].positionOnStack == 8);
   }
   SECTION("two") {
     const std::string str = "func testFunction(): int32 { return 10; } ";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
-    REQUIRE(checker.check());
+    REQUIRE(checker.check(true));
     auto genDec = checker.lookUp["testFunction"];
     REQUIRE(genDec);
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
@@ -570,34 +572,13 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
     const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
-    REQUIRE(checker.check());
+    REQUIRE(checker.check(true));
     auto genDec = checker.lookUp["testFunction"];
     REQUIRE(genDec);
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.addFunctionSignatureToVirtualStack(funcDec);
-    // CodeGen expected{parser.program, tokenizers, checker.lookUp};
-    // StackItem rv {
-    //   .positionOnStack = 8,
-    //   .type = StackItemType::RETURN_VALUE
-    // };
-    // expected.stack.emplace_back(rv);
-    // // VariableDec vd{Token()};
-    // // StackItem var {
-    // //   .variable = ,
-    // //   .type = StackItemType::VARIABLE
-    // // };
-    // // expected.stack.emplace_back(rv);
-
-    // StackItem ra {
-    //   .positionOnStack = 24,
-    //   .type = StackItemType::RETURN_ADDRESS
-    // };
-    // expected.stack.emplace_back(ra);
-
-    // CHECK(codeGen.stack == expected.stack);
-  
     REQUIRE(codeGen.stackItems.size() == 3);
     CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
     CHECK(codeGen.stackItems[0].positionOnStack == 8);
@@ -610,26 +591,199 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
   }
 }
 
-TEST_CASE("string literals", "[codeGen]") {
+TEST_CASE("placing literal in data section", "[codeGen]") {
   SECTION("1") {
-    const std::string str = R"(func testFunction(arg1: int64 ptr): void { str: const char ptr = "Hello World!\n"; return; } )";
+    const std::string stringLiteral = R"(Hello World!\n)";
+    const std::string str = "str: const char ptr = \"" + stringLiteral + "\";";
+    testBoilerPlate(str);
+    Statement statement;
+    REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+    checker.checkStatement(statement, Checker::voidValue, false, false);
+    REQUIRE(checker.errors.empty());
+    codeGen.generateStatement(statement);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::MOVE, 1, dataPointerIndex,
+      (bc)OpCode::NOP,
+      (bc)OpCode::ADD_I, 1, 24, 0,
+      (bc)OpCode::PUSH_Q, 1
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+    REQUIRE(codeGen.dataSectionEntries.size() == 4);
+    DataSectionEntry& entry = codeGen.dataSectionEntries[3];
+    CHECK(stringLiteral == (char *)(codeGen.dataSection.data() + entry.indexInDataSection) );
+  }
+  SECTION("2") {
+    const std::string str = "file: file_t = stdin;";
+    testBoilerPlate(str);
+    Statement statement;
+    REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+    checker.checkStatement(statement, Checker::voidValue, false, false);
+    REQUIRE(checker.errors.empty());
+    codeGen.generateStatement(statement);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::MOVE, 1, dataPointerIndex,
+      (bc)OpCode::NOP,
+      (bc)OpCode::ADD_I, 1, 8, 0,
+      (bc)OpCode::LOAD_Q, 2, 1,
+      (bc)OpCode::PUSH_Q, 2
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+    REQUIRE(codeGen.dataSectionEntries.size() == 3);
+    DataSectionEntry& entry = codeGen.dataSectionEntries[1];
+    CHECK(entry.type == DataSectionEntryType::STDIN);
+  }
+}
+
+TEST_CASE("generating return statement", "[codeGen]") {
+  SECTION("1") {
+    const std::string str = "func testFunction(): void { } ";
     testBoilerPlate(str);
     REQUIRE(parser.parse());
-    REQUIRE(checker.check());
+    REQUIRE(checker.check(true));
     auto genDec = checker.lookUp["testFunction"];
     REQUIRE(genDec);
     REQUIRE(genDec->type == GeneralDecType::FUNCTION);
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
-    CodeGen otherCodeGen{parser.program, tokenizers, checker.lookUp};
-    otherCodeGen.tk = &tokenizer;
-    otherCodeGen.generateFunctionDeclaration(funcDec);
-    codeGen.startFunctionScope(funcDec);
-    codeGen.generateStatementList(&funcDec.body.scopeStatements);
+    codeGen.generateFunctionDeclaration(funcDec);
     CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0
+    }});
     CHECK(codeGen.byteCode == expected.byteCode);
-    CHECK(otherCodeGen.byteCode == expected.byteCode);
-    std::cout << codeGen.stackItems << '\n';
-    std::cout << codeGen.dataSection.data() << '\n';
+  }
+  SECTION("2") {
+    const std::string str = "func testFunction(arg1: int64 ptr): void { } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::ADD_I, 30, 8, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+  SECTION("3") {
+    const std::string str = "func testFunction(arg1: int64 ptr, c1: char, c2: char): void { } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::ADD_I, 30, 16, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+}
+
+TEST_CASE("generating function call", "[codeGen]") {
+  SECTION("1") {
+    const std::string str = 
+R"(
+  func testFunction(): void {
+    otherTestFunction();
+  }
+  func otherTestFunction(): void {}
+)";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::NOP,
+      (bc)OpCode::NOP,
+      (bc)OpCode::NOP,
+      (bc)OpCode::CALL, 0, 0, 0, 0,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+    SECTION("2") {
+    const std::string str = 
+R"(
+  func testFunction(): void {
+    otherTestFunction();
+  }
+  func otherTestFunction(): int32 { return 1; }
+)";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
+      (bc)OpCode::NOP,
+      (bc)OpCode::NOP,
+      (bc)OpCode::NOP,
+      (bc)OpCode::CALL, 0, 0, 0, 0,
+      (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+  SECTION("3") {
+    const std::string str = 
+R"(
+  func testFunction(): void {
+    otherTestFunction(1);
+  }
+  func otherTestFunction(x: int32): int32 { return 1; }
+)";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    expected.addBytes({{
+      (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
+      (bc)OpCode::MOVE_SI, 1, 1,
+      (bc)OpCode::PUSH_D, 1,
+      (bc)OpCode::NOP,
+      (bc)OpCode::SUB_I, stackPointerIndex, 4, 0,
+      (bc)OpCode::NOP,
+      (bc)OpCode::CALL, 0, 0, 0, 0,
+      (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
   }
 }

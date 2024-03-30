@@ -14,6 +14,7 @@ bool openAndReadFile(const std::string& file, std::vector<unsigned char>& buffer
   buffer.resize(size);
   t.seekg(0);
   t.read((char *)&buffer[0], size);
+  buffer[size - 1] = 0;
   return true;
 }
 

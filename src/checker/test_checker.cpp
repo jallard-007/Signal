@@ -38,22 +38,23 @@ TEST_CASE("checkType", "[checker]") {
     tokenList.token.length = 5;
     tokenList.token.position = 7;
     tokenList.token.type = TokenType::IDENTIFIER;
-    CHECK(tc.checkType(tks.back(),tokenList));
+    tc.tk = &tks.back();
+    CHECK(tc.checkType(tokenList));
     tokenList.next = nullptr;
     TokenList nextType = tokenList;
     tokenList.next = &nextType;
     tokenList.token.type = TokenType::POINTER;
-    CHECK(tc.checkType(tks.back(),tokenList));
+    CHECK(tc.checkType(tokenList));
     nextType.next = nullptr;
     TokenList nextNextType = tokenList;
     tokenList.next = &nextNextType;
     tokenList.token.type = TokenType::REFERENCE;
-    CHECK(tc.checkType(tks.back(),tokenList));
+    CHECK(tc.checkType(tokenList));
     nextType.next = nullptr;
     TokenList nextNextNextType = tokenList;
     tokenList.next = &nextNextNextType;
     tokenList.token.type = TokenType::POINTER;
-    CHECK_FALSE(tc.checkType(tks.back(),tokenList));
+    CHECK_FALSE(tc.checkType(tokenList));
   }
 
   {
@@ -61,7 +62,7 @@ TEST_CASE("checkType", "[checker]") {
     notAType.token.length = 7;
     notAType.token.position = 38;
     notAType.token.type = TokenType::IDENTIFIER;
-    CHECK_FALSE(tc.checkType(tks.back(), notAType));
+    CHECK_FALSE(tc.checkType(notAType));
   }
 }
 
@@ -100,7 +101,7 @@ struct customType {
   REQUIRE(pr.unexpected.empty());
   Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
-  tc.secondTopLevelScan();
+  tc.secondTopLevelScan(true);
   CHECK(tc.errors.empty());
 }
 
@@ -140,7 +141,7 @@ struct customType {
   REQUIRE(pr.unexpected.empty());
   Checker tc{pr.program, tks, memPool};
   tc.firstTopLevelScan();
-  tc.secondTopLevelScan();
+  tc.secondTopLevelScan(true);
   tc.fullScan();
   CHECK(tc.errors.empty());
 }

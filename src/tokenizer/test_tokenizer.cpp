@@ -16,6 +16,7 @@ TokenType tokenAtN(const std::string& str, uint32_t n) {
 
 TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {
    CHECK(firstToken("") == TokenType::END_OF_FILE);
+   CHECK(firstToken("__builtin") == TokenType::BUILTIN);
 }
 
 TEST_CASE("Unit Test - Literals", "[tokenizer][tokenType]") {
@@ -38,6 +39,7 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("const") == TokenType::CONST);
    CHECK(firstToken("create") == TokenType::CREATE);
    CHECK(firstToken("default") == TokenType::DEFAULT);
+   CHECK(firstToken("define") == TokenType::DEFINE);
    CHECK(firstToken("elif") == TokenType::ELIF);
    CHECK(firstToken("else") == TokenType::ELSE);
    CHECK(firstToken("enum") == TokenType::ENUM);
@@ -52,6 +54,9 @@ TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
    CHECK(firstToken("return") == TokenType::RETURN);
    CHECK(firstToken("returns") == TokenType::IDENTIFIER);
    CHECK(firstToken("struct") == TokenType::STRUCT);
+   CHECK(firstToken("stdin") == TokenType::STDIN);
+   CHECK(firstToken("stderr") == TokenType::STDERR);
+   CHECK(firstToken("stdout") == TokenType::STDOUT);
    CHECK(firstToken("switch") == TokenType::SWITCH);
    CHECK(firstToken("ptr") == TokenType::POINTER);
    CHECK(firstToken("template") == TokenType::TEMPLATE);
@@ -137,6 +142,7 @@ TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
    CHECK(firstToken("char") == TokenType::CHAR_TYPE);
    CHECK(firstToken("uint32") == TokenType::UINT32_TYPE);
    CHECK(firstToken("double") == TokenType::DOUBLE_TYPE);
+   CHECK(firstToken("file_t") == TokenType::FILE_TYPE);
    CHECK(firstToken("ptr") == TokenType::POINTER);
 }
 
