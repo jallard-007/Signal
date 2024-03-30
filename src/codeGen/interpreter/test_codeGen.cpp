@@ -16,7 +16,7 @@
   Parser parser{tokenizer, memPool}; \
   Checker checker{parser.program, tokenizers, memPool}; \
   checker.tk = &tokenizer; \
-  CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
+  CodeGen codeGen{parser.program, tokenizers, checker.lookUp, checker.structLookUp}; \
   codeGen.tk = &tokenizer
 
 TEST_CASE("constant expressions", "[codeGen]") {
@@ -300,7 +300,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
     CHECK(codeGen.byteCode == expected.byteCode);
@@ -313,7 +313,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(statement.varDec);
     codeGen.generateVariableDeclaration(*statement.varDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{(bc)OpCode::MOVE_SI, 1, 10}});
     expected.addBytes({{(bc)OpCode::PUSH_D, 1}});
     CHECK(codeGen.byteCode == expected.byteCode);
@@ -331,7 +331,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
     codeGen.generateStatement(statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
     expected.alignForImm(2, 2);
@@ -360,7 +360,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
     codeGen.generateStatement(statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
     expected.addBytes({{(bc)OpCode::RS_JUMP, 0}});
@@ -377,7 +377,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     REQUIRE(statement.controlFlow);
     REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
     codeGen.generateStatement(statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 8, 0}});
     expected.alignForImm(2, 2);
@@ -387,60 +387,6 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
   }
 }
 
-class TestFixture_GetStructInfo {
-  public:
-  StructInformation structInfo;
-  void setUp(const std::string &str) {
-    testBoilerPlate(str);
-    REQUIRE(parser.parse());
-    REQUIRE(checker.check(true));
-    structInfo = codeGen.getStructInfo("StructName");
-  }
-};
-
-TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
-  SECTION("one") {
-    const std::string str = "struct StructName { x: uint32; }";
-    setUp(str);
-    CHECK(structInfo.size == 4);
-    CHECK(structInfo.alignTo == 4);
-    CHECK(structInfo.offsetMap["x"] == 0);
-  }
-  SECTION("two") {
-    const std::string str = "struct StructName { y:bool; x: uint32; }";
-    setUp(str);
-    CHECK(structInfo.size == 8);
-    CHECK(structInfo.alignTo == 4);
-    CHECK(structInfo.offsetMap["y"] == 0);
-    CHECK(structInfo.offsetMap["x"] == 4);
-  }
-  SECTION("three") {
-    const std::string str = "struct StructName { x: uint32; y:bool; }";
-    setUp(str);
-    CHECK(structInfo.size == 8);
-    CHECK(structInfo.alignTo == 4);
-    CHECK(structInfo.offsetMap["y"] == 4);
-    CHECK(structInfo.offsetMap["x"] == 0);
-  }
-  SECTION("four") {
-    const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
-    setUp(str);
-    CHECK(structInfo.size == 12);
-    CHECK(structInfo.alignTo == 4);
-    CHECK(structInfo.offsetMap["y"] == 0);
-    CHECK(structInfo.offsetMap["x"] == 4);
-    CHECK(structInfo.offsetMap["j"] == 8);
-  }
-  SECTION("five") {
-    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
-    setUp(str);
-    CHECK(structInfo.size == 24);
-    CHECK(structInfo.alignTo == 8);
-    CHECK(structInfo.offsetMap["y"] == 0);
-    CHECK(structInfo.offsetMap["x"] == 12);
-    CHECK(structInfo.offsetMap["j"] == 16);
-  }
-}
 
 TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
   {
@@ -463,7 +409,7 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
@@ -502,7 +448,7 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     codeGen.generateStatement(statement_y);
     codeGen.byteCode.clear();
     codeGen.generateStatement(cond_statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
     expected.alignForImm(2, 2);
     expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
@@ -601,7 +547,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
     checker.checkStatement(statement, Checker::voidValue, false, false);
     REQUIRE(checker.errors.empty());
     codeGen.generateStatement(statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::MOVE, 1, dataPointerIndex,
       (bc)OpCode::NOP,
@@ -621,7 +567,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
     checker.checkStatement(statement, Checker::voidValue, false, false);
     REQUIRE(checker.errors.empty());
     codeGen.generateStatement(statement);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::MOVE, 1, dataPointerIndex,
       (bc)OpCode::NOP,
@@ -648,7 +594,7 @@ TEST_CASE("generating return statement", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::POP_Q, 0,
       (bc)OpCode::JUMP, 0
@@ -666,7 +612,7 @@ TEST_CASE("generating return statement", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::POP_Q, 0,
       (bc)OpCode::ADD_I, 30, 8, 0,
@@ -685,7 +631,7 @@ TEST_CASE("generating return statement", "[codeGen]") {
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::POP_Q, 0,
       (bc)OpCode::ADD_I, 30, 16, 0,
@@ -713,7 +659,7 @@ R"(
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::NOP,
       (bc)OpCode::NOP,
@@ -741,7 +687,7 @@ R"(
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
       (bc)OpCode::NOP,
@@ -771,7 +717,7 @@ R"(
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
-    CodeGen expected{parser.program, tokenizers, checker.lookUp};
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     expected.addBytes({{
       (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
       (bc)OpCode::MOVE_SI, 1, 1,

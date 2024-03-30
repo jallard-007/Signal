@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
   if (!checker.errors.empty()) {
     return 1;
   }
-  CodeGen codeGen{parser.program, tokenizers, checker.lookUp};
+  CodeGen codeGen{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
   if (parser.program.decs.curr.type == GeneralDecType::NONE) {
     return 1;
   }

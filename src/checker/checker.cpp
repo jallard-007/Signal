@@ -111,7 +111,7 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) co
 ResultingType::ResultingType(TokenList* type, bool isLValue): type{type}, isLValue{isLValue} {}
 
 Checker::Checker(Program& prog, std::vector<Tokenizer>& tks, NodeMemPool& mem):
-structsLookUp{}, lookUp{}, program{prog}, tokenizers{tks}, memPool{mem} {}
+  lookUp{}, structLookUp{}, program{prog}, tokenizers{tks}, memPool{mem} {}
 
 bool Checker::check(bool testing) {
   firstTopLevelScan();
@@ -169,37 +169,42 @@ void Checker::firstTopLevelScan() {
         GeneralDec* &decPtr = lookUp[structName];
         if (decPtr) {
           addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, list->curr.structDec->name, decPtr});
-        } else {
-          decPtr = &list->curr;
-          auto& structDecLookUp = structsLookUp[structName];
-          if (list->curr.structDec->decs.type == StructDecType::NONE) {
-            addError({CheckerErrorType::EMPTY_STRUCT, tk->tokenizerIndex, list->curr.structDec->name});
-            break;
+          break;
+        }
+        decPtr = &list->curr;
+        auto& structInfo = structLookUp[decPtr->structDec];
+        if (list->curr.structDec->decs.type == StructDecType::NONE) {
+          addError({CheckerErrorType::EMPTY_STRUCT, tk->tokenizerIndex, list->curr.structDec->name});
+          break;
+        }
+        bool memberVariableFound = false;
+        for (StructDecList* inner = &list->curr.structDec->decs; inner; inner = inner->next) {
+          StructMemberInformation* memberInfo;
+          Token token;
+          if (inner->type == StructDecType::VAR) {
+            token = inner->varDec->name;
+            memberVariableFound = true;
+            memberInfo = &structInfo.memberLookup[tk->extractToken(inner->varDec->name)];
+          } else {
+            token = inner->funcDec->name;
+            memberInfo = &structInfo.memberLookup[tk->extractToken(inner->funcDec->name)];
           }
-          for (StructDecList* inner = &list->curr.structDec->decs; inner; inner = inner->next) {
-            StructDecList** innerStructDecPtr;
-            Token token;
-            if (inner->type == StructDecType::VAR) {
-              token = inner->varDec->name;
-              innerStructDecPtr = &structDecLookUp[tk->extractToken(inner->varDec->name)];
+          if (memberInfo->memberDec) {
+            GeneralDec *errorDec = memPool.makeGeneralDec();
+            if (memberInfo->memberDec->type == StructDecType::FUNC) {
+              errorDec->type = GeneralDecType::FUNCTION;
+              errorDec->funcDec = memberInfo->memberDec->funcDec;
             } else {
-              token = inner->funcDec->name;
-              innerStructDecPtr = &structDecLookUp[tk->extractToken(inner->funcDec->name)];
+              errorDec->type = GeneralDecType::VARIABLE;
+              errorDec->varDec = memberInfo->memberDec->varDec;
             }
-            if (*innerStructDecPtr) {
-              GeneralDec *errorDec = memPool.makeGeneralDec();
-              if ((*innerStructDecPtr)->type == StructDecType::FUNC) {
-                errorDec->type = GeneralDecType::FUNCTION;
-                errorDec->funcDec = (*innerStructDecPtr)->funcDec;
-              } else {
-                errorDec->type = GeneralDecType::VARIABLE;
-                errorDec->varDec = (*innerStructDecPtr)->varDec;
-              }
-              addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, token, errorDec});
-            } else {
-              *innerStructDecPtr = inner;
-            }
+            addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, token, errorDec});
+          } else {
+            memberInfo->memberDec = inner;
           }
+        }
+        if (!memberVariableFound) {
+          addError({CheckerErrorType::EMPTY_STRUCT, tk->tokenizerIndex, list->curr.structDec->name});
         }
         break;
       }
@@ -234,41 +239,6 @@ void Checker::firstTopLevelScan() {
           addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, list->curr.builtinFunc->funcDec.name, decPtr});
         } else {
           decPtr = &list->curr;
-        }
-        break;
-      }
-      case GeneralDecType::BUILTIN_TYPE: {
-        const std::string structName = tk->extractToken(list->curr.builtinType->structDec.name);
-        GeneralDec* &decPtr = lookUp[structName];
-        if (decPtr) {
-          addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, list->curr.builtinType->structDec.name, decPtr});
-        } else {
-          decPtr = &list->curr;
-          auto& structDecLookUp = structsLookUp[structName];
-          if (list->curr.structDec->decs.type == StructDecType::NONE) {
-            addError({CheckerErrorType::EMPTY_STRUCT, tk->tokenizerIndex, list->curr.builtinType->structDec.name});
-            break;
-          }
-          for (StructDecList* inner = &list->curr.builtinType->structDec.decs; inner; inner = inner->next) {
-            StructDecList** innerStructDecPtr;
-            Token token;
-            if (inner->type == StructDecType::VAR) {
-              token = inner->varDec->name;
-              innerStructDecPtr = &structDecLookUp[tk->extractToken(inner->varDec->name)];
-            } else {
-              exit(1);
-            }
-            if (*innerStructDecPtr) {
-              GeneralDec *errorDec = memPool.makeGeneralDec();
-              if ((*innerStructDecPtr)->type == StructDecType::VAR) {
-                errorDec->type = GeneralDecType::VARIABLE;
-                errorDec->varDec = (*innerStructDecPtr)->varDec;
-              }
-              addError({CheckerErrorType::NAME_ALREADY_IN_USE, tk->tokenizerIndex, token, errorDec});
-            } else {
-              *innerStructDecPtr = inner;
-            }
-          }
         }
         break;
       }
@@ -371,10 +341,6 @@ void Checker::secondTopLevelScan(bool testing) {
       }
       case GeneralDecType::BUILTIN_FUNCTION: {
         validateFunctionHeader(list->curr.builtinFunc->funcDec);
-        break;
-      }
-      case GeneralDecType::BUILTIN_TYPE: {
-        validateStructTopLevel(list->curr.builtinType->structDec);
         break;
       }
       default: break;
@@ -725,7 +691,7 @@ bool Checker::checkLocalVarDec(VariableDec& varDec) {
  * the ResultingType always contains a valid pointer
  * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
 */
-ResultingType Checker::checkExpression(Expression& expression, std::map<std::string, StructDecList *>* structMap) {
+ResultingType Checker::checkExpression(Expression& expression, std::unordered_map<std::string, StructMemberInformation>* structMap) {
   switch(expression.getType()) {
     case ExpressionType::BINARY_OP: {
       ResultingType leftSide = checkExpression(expression.getBinOp()->leftSide);
@@ -879,18 +845,19 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
       if (expression.getToken().type == TokenType::IDENTIFIER) {
         GeneralDec *decPtr;
         if (structMap) {
-          StructDecList *structDec = (*structMap)[tk->extractToken(expression.getToken())];
-          if (!structDec) {
+          const auto& structMapIter = (*structMap).find(tk->extractToken(expression.getToken()));
+          if (structMapIter == structMap->end()) {
             addError({CheckerErrorType::NO_SUCH_MEMBER_VARIABLE, tk->tokenizerIndex, expression.getToken()});
             return {&badValue, false};
           }
-          if (structDec->type != StructDecType::VAR) {
+          const StructMemberInformation& structMemberInfo = (*structMapIter).second;
+          if (structMemberInfo.memberDec->type != StructDecType::VAR) {
             addError({CheckerErrorType::NOT_A_VARIABLE, tk->tokenizerIndex, expression.getToken()});
             return {&badValue, false};
           }
           decPtr = memPool.makeGeneralDec();
           decPtr->type = GeneralDecType::VARIABLE;
-          decPtr->varDec = structDec->varDec;
+          decPtr->varDec = structMemberInfo.memberDec->varDec;
         } else {
           decPtr = lookUp[tk->extractToken(expression.getToken())];
           if (!decPtr) {
@@ -936,18 +903,19 @@ ResultingType Checker::checkExpression(Expression& expression, std::map<std::str
       TokenList *returnType;
       // member function
       if (structMap) {
-        StructDecList *structDec = (*structMap)[tk->extractToken(expression.getFunctionCall()->name)];
-        if (!structDec) {
+        const auto& structMapIter = (*structMap).find(tk->extractToken(expression.getToken()));
+        if (structMapIter == structMap->end()) {
           addError({CheckerErrorType::NO_SUCH_MEMBER_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name});
           return {&badValue, false};
         }
-        if (structDec->type != StructDecType::FUNC) {
+        const StructMemberInformation& structMemberInfo = (*structMapIter).second;
+        if (structMemberInfo.memberDec->type != StructDecType::FUNC) {
           addError({CheckerErrorType::NOT_A_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name});
           return {&badValue, false};
         }
         decPtr = memPool.makeGeneralDec();
         decPtr->type = GeneralDecType::FUNCTION;
-        decPtr->funcDec = structDec->funcDec;
+        decPtr->funcDec = structMemberInfo.memberDec->funcDec;
         paramList = &decPtr->funcDec->params;
         returnType = &decPtr->funcDec->returnType;
       }
@@ -1154,8 +1122,8 @@ ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& ex
     addError({CheckerErrorType::NOT_A_STRUCT, tk->tokenizerIndex, &expression.getBinOp()->leftSide});
     return {&badValue, false};
   }
-  auto& structMap = structsLookUp.at(tk->extractToken(leftSide.type->token));
-  return checkExpression(expression.getBinOp()->rightSide, &structMap);
+  auto& structMap = structLookUp[dec->structDec];
+  return checkExpression(expression.getBinOp()->rightSide, &structMap.memberLookup);
 }
 
 void Checker::addError(const CheckerError& error) {
@@ -1231,4 +1199,140 @@ TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {
     return typeA;
   }
   return typeB;
+}
+
+StructInformation& Checker::getStructInfo(const GeneralDec& generalDec) {
+  StructInformation &info = structLookUp[generalDec.structDec];
+  if (info.size != -1) {
+    return info;
+  }
+  info.size = 0;
+  Tokenizer *oldTk = tk;
+  tk = &tokenizers[generalDec.tokenizerIndex];
+  const StructDecList *structDecList = &generalDec.structDec->decs;
+  while (structDecList) {
+    if (structDecList->type != StructDecType::VAR) {
+      continue;
+    }
+    auto& memberInfo = info.memberLookup[tk->extractToken(structDecList->varDec->name)];
+    memberInfo.memberDec = structDecList;
+    Token typeToken = getTypeFromTokenList(structDecList->varDec->type);
+    
+    // get size and alignment
+    uint32_t size, alignTo;
+    if (typeToken.type == TokenType::IDENTIFIER) {
+      GeneralDec* subStruct = lookUp[tk->extractToken(typeToken)];
+      StructInformation& subStructInfo = getStructInfo(*subStruct);
+      size = subStructInfo.size;
+      alignTo = subStructInfo.alignTo;
+    }
+    else if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
+      size = getSizeOfBuiltinType(typeToken.getType());
+      alignTo = size;
+    }
+    else {
+      std::cerr << "Invalid token type in Checker::getStructInfo: " << typeToken.type << '\n';
+      exit(1);
+    }
+
+    uint32_t paddingRequired = size - ((info.size) % size);
+    if (paddingRequired == size) {
+      paddingRequired = 0;
+    }
+    info.size += paddingRequired;
+    memberInfo.position = info.size;
+    info.size += size;
+    if (alignTo > info.alignTo) {
+      info.alignTo = alignTo;
+    }
+    structDecList = structDecList->next;
+  }
+  uint32_t paddingRequired = info.alignTo - ((info.size) % info.alignTo);
+  if (paddingRequired != info.alignTo) {
+    info.size += paddingRequired;
+  }
+  tk = oldTk;
+  return info;
+}
+
+
+/**
+ * Returns the size of a type
+ * \param token the token of the type
+ * \returns the size of the type
+*/
+uint32_t getSizeOfBuiltinType(const TokenType type) {
+  switch (type) {
+    case TokenType::BOOL: {
+      return sizeof (bool);
+    }
+    case TokenType::CHAR_TYPE: {
+      return sizeof (char);
+    }
+    case TokenType::STRING_TYPE: {
+      return sizeof (char *);
+    }
+    case TokenType::INT8_TYPE:
+    case TokenType::UINT8_TYPE: {
+      return sizeof (uint8_t);
+    }
+    case TokenType::INT16_TYPE:
+    case TokenType::UINT16_TYPE: {
+      return sizeof (uint16_t);
+    }
+    case TokenType::INT32_TYPE:
+    case TokenType::UINT32_TYPE: {
+      return sizeof (uint32_t);
+    }
+    case TokenType::INT64_TYPE:
+    case TokenType::UINT64_TYPE: {
+      return sizeof (uint64_t);
+    }
+    case TokenType::POINTER: {
+      return sizeof (void *);
+    }
+    case TokenType::DOUBLE_TYPE: {
+      return sizeof (double);
+    }
+    case TokenType::FILE_TYPE: {
+      return sizeof(stdin);
+    }
+    case TokenType::VOID: {
+      return 0;
+    }
+    case TokenType::REFERENCE: {
+      return sizeof (void *);
+    }
+    default: {
+      std::cerr << "Invalid TokenType "<< type << " in getSizeOfBuiltinType\n";
+      exit(1);
+    }
+  }
+}
+
+/**
+ * Returns the amount of padding needed to align an item in memory
+ * \param currOffset is the current offset within the container, 0 is assumed to be 8 byte aligned
+ * \param size the size of the item in bytes
+ * \param alignTo the alignment needed in bytes
+ * \returns the number of bytes of padding needed to align 
+*/
+uint32_t getPaddingNeeded(const uint32_t currOffset, const uint32_t size, const uint32_t alignTo) {
+  const uint32_t mod = (currOffset + size) % alignTo;
+  return mod != 0 ? alignTo - mod : 0;
+}
+
+/**
+ * Returns the actual type from a token list
+*/
+Token getTypeFromTokenList(const TokenList& tokenList) {
+  return tokenList.token;
+}
+
+const TokenList* getNextFromTokenList(const TokenList& tokenList) {
+  const TokenList* next = tokenList.next;
+  while (next && isTypeQualifier(next->token.getType())) {
+    next = next->next;
+  }
+  return next;
 }

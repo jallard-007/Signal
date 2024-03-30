@@ -3,6 +3,7 @@
 #include "nodes.hpp"
 #include "nodeMemPool.hpp"
 #include <map>
+#include <unordered_map>
 
 enum class CheckerErrorType: uint8_t {
   NONE,
@@ -57,6 +58,18 @@ enum class CheckerErrorType: uint8_t {
   OPERATION_ON_VOID,
 };
 
+struct StructMemberInformation {
+  const StructDecList *memberDec{};
+  uint32_t position{};
+};
+
+struct StructInformation {
+  std::unordered_map<std::string, StructMemberInformation> memberLookup;
+  int32_t size = -1; // do we want to allow structs without any member variables? if not, change this to unsigned, make checker show error
+  uint32_t alignTo = 0;
+  StructInformation() = default;
+};
+
 struct CheckerError {
   Token token;
   GeneralDec *dec{nullptr};
@@ -80,8 +93,8 @@ struct ResultingType {
 #define MAX_ERRORS 20
 
 struct Checker {
-  std::map<std::string, std::map<std::string, StructDecList *>> structsLookUp;
-  std::map<std::string, GeneralDec *> lookUp;
+  std::unordered_map<std::string, GeneralDec *> lookUp;
+  std::unordered_map<StructDec *, StructInformation> structLookUp;
   std::vector<CheckerError> errors;
   std::vector<std::string> locals;
   Program& program;
@@ -113,11 +126,12 @@ struct Checker {
   void checkFunction(FunctionDec&);
   bool validateFunctionHeader(FunctionDec&);
   void validateStructTopLevel(StructDec&);
+  StructInformation& getStructInfo(const GeneralDec&);
   void checkForStructCycles(GeneralDec&, std::vector<StructDec *>&);
   bool checkStatement(Statement&, const TokenList&, bool, bool);
   bool checkScope(Scope&, const TokenList&, bool, bool);
   bool checkLocalVarDec(VariableDec&);
-  ResultingType checkExpression(Expression&, std::map<std::string, StructDecList *> *structMap = nullptr);
+  ResultingType checkExpression(Expression&, std::unordered_map<std::string, StructMemberInformation> *structMap = nullptr);
   ResultingType checkMemberAccess(ResultingType&, Expression&);
   bool checkType(TokenList&);
   bool checkAssignment(const TokenList&, const TokenList&);
@@ -128,3 +142,7 @@ struct Checker {
 };
 
 bool canBeConvertedToBool(const TokenList*);
+Token getTypeFromTokenList(const TokenList&);
+const TokenList* getNextFromTokenList(const TokenList&);
+uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
+uint32_t getSizeOfBuiltinType(TokenType);

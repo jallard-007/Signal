@@ -1,6 +1,6 @@
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <array>
 #include <span>
 #include <cstdint>
@@ -41,13 +41,6 @@ struct ExpressionResult {
 
   inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true; }
   inline bytecode_t getReg() const { assert(isReg); return data[0]; }
-};
-
-struct StructInformation {
-  std::map<std::string, uint32_t> offsetMap;
-  int32_t size = -1; // do we want to allow structs without any member variables? if not, change this to unsigned, make checker show error
-  uint32_t alignTo = 0;
-  StructInformation() = default;
 };
 
 enum class JumpMarkerType: uint8_t {
@@ -137,7 +130,6 @@ struct DataSectionEntry {
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
-  std::map<std::string, StructInformation> structNameToInfoMap;
   std::map<std::string, uint32_t> nameToStackItemIndex;
   std::vector<unsigned char> byteCode;
   std::vector<unsigned char> dataSection;
@@ -146,10 +138,16 @@ struct CodeGen {
   std::vector<StackItem> stackItems;
   Tokenizer *tk{nullptr};
   Program &program;
-  std::map<std::string, GeneralDec *>& lookUp;
   std::vector<Tokenizer> &tokenizers;
+  std::unordered_map<std::string, GeneralDec *>& lookUp;
+  std::unordered_map<StructDec *, StructInformation>& structLookUp;
 
-  CodeGen(Program&, std::vector<Tokenizer>&, std::map<std::string, GeneralDec *>&);
+  CodeGen(
+    Program&,
+    std::vector<Tokenizer>&,
+    std::unordered_map<std::string, GeneralDec *>&,
+    std::unordered_map<StructDec *, StructInformation>&
+  );
 
   // main driver
   void generate();
@@ -196,7 +194,6 @@ struct CodeGen {
   ExpressionResult generateExpressionUnOp(const UnOp&);
 
 // STRUCTS
-  StructInformation& getStructInfo(const std::string&);
 
 // SCOPES
   void generateScope(const Scope&);
@@ -218,7 +215,6 @@ struct CodeGen {
   uint32_t getPositionPushingStuctToStack(const StructInformation&);
   uint32_t getPositionOnStack(uint32_t);
   uint32_t getPositionPushingToStack(uint32_t, uint32_t);
-  uint32_t getPaddingNeededPushingToStack(uint32_t, uint32_t, uint32_t);
   void addSpaceToStack(uint32_t);
   StackVariable& addVarDecToVirtualStack(const VariableDec&);
   uint32_t getCurrStackPointerPosition();
@@ -235,11 +231,8 @@ struct CodeGen {
   bytecode_t allocateRegister();
   void freeRegister(bytecode_t);
   uint32_t getSizeOfType(Token);
-
 };
 
-Token getTypeFromTokenList(const TokenList&);
-const TokenList* getNextFromTokenList(const TokenList&);
 constexpr OpCode getLoadOpForSize(uint32_t);
 constexpr OpCode getStoreOpForSize(uint32_t);
 constexpr OpCode getPopOpForSize(uint32_t);

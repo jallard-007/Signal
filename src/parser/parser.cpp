@@ -252,14 +252,6 @@ bool Parser::parseBuiltin(GeneralDec&) {
       expected.emplace_back(ExpectedType::TOKEN, token, TokenType::SEMICOLON, tokenizer->tokenizerIndex);
       return false;
     }
-
-  }
-  else if (token.getType() == TokenType::STRUCT) {
-    globalList->curr.type = GeneralDecType::BUILTIN_TYPE;
-    globalList->curr.builtinType = memPool.makeBuiltinType(token);
-    if (!parseStruct(globalList->curr.builtinType->structDec)) {
-      return false;
-    }
   }
   else {
     unexpected.emplace_back(token, tokenizer->tokenizerIndex);

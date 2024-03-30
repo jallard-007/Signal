@@ -17,10 +17,12 @@ TEST_CASE("scanTopLevel", "[checker]") {
   CHECK(tc.lookUp["funcName"]);
   CHECK(tc.lookUp["var"]);
   CHECK(tc.lookUp["thing"]);
-  auto &r = tc.structsLookUp["thing"];
-  CHECK(r.size() == 1);
-  CHECK(r["var"]);
-  CHECK_FALSE(tc.lookUp["other"]);
+  const GeneralDec* genDec = tc.lookUp["thing"];
+  REQUIRE(genDec);
+  StructInformation& structInfo = tc.structLookUp[genDec->structDec];
+  CHECK(structInfo.memberLookup.size() == 1);
+  CHECK(structInfo.memberLookup["var"].memberDec);
+  CHECK_FALSE(structInfo.memberLookup["other"].memberDec);
 }
 
 TEST_CASE("checkType", "[checker]") {
@@ -144,4 +146,64 @@ struct customType {
   tc.secondTopLevelScan(true);
   tc.fullScan();
   CHECK(tc.errors.empty());
+}
+
+
+class TestFixture_GetStructInfo {
+  public:
+  StructInformation structInfo;
+  void setUp(const std::string &str) {
+    std::vector<Tokenizer> tokenizers;
+    Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str);
+    Parser parser{tokenizer, memPool};
+    Checker checker{parser.program, tokenizers, memPool};
+    checker.tk = &tokenizer;
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    structInfo = checker.getStructInfo(*checker.lookUp["StructName"]);
+  }
+};
+
+TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
+  SECTION("one") {
+    const std::string str = "struct StructName { x: uint32; }";
+    setUp(str);
+    CHECK(structInfo.size == 4);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.memberLookup["x"].position == 0);
+  }
+  SECTION("two") {
+    const std::string str = "struct StructName { y:bool; x: uint32; }";
+    setUp(str);
+    CHECK(structInfo.size == 8);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.memberLookup["y"].position == 0);
+    CHECK(structInfo.memberLookup["x"].position == 4);
+  }
+  SECTION("three") {
+    const std::string str = "struct StructName { x: uint32; y:bool; }";
+    setUp(str);
+    CHECK(structInfo.size == 8);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.memberLookup["y"].position == 4);
+    CHECK(structInfo.memberLookup["x"].position == 0);
+  }
+  SECTION("four") {
+    const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
+    setUp(str);
+    CHECK(structInfo.size == 12);
+    CHECK(structInfo.alignTo == 4);
+    CHECK(structInfo.memberLookup["y"].position == 0);
+    CHECK(structInfo.memberLookup["x"].position == 4);
+    CHECK(structInfo.memberLookup["j"].position == 8);
+  }
+  SECTION("five") {
+    const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
+    setUp(str);
+    CHECK(structInfo.size == 24);
+    CHECK(structInfo.alignTo == 8);
+    CHECK(structInfo.memberLookup["y"].position == 0);
+    CHECK(structInfo.memberLookup["x"].position == 12);
+    CHECK(structInfo.memberLookup["j"].position == 16);
+  }
 }

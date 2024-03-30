@@ -261,7 +261,7 @@ int Interpreter::runProgram() {
     case OpCode::CALL: {
       sp -= 8;
       *(uint64_t *)sp = ip + 4;
-      ip = ip + *(uint32_t*)ip - 1;
+      ip = ip + *(int32_t*)ip - 1;
       break;
     }
     case OpCode::CMP: {

@@ -8,9 +8,9 @@ void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
   }
   std::vector<TokenList *> r;
   for (TokenList *iter = this; iter; iter = iter->next) {
-    // if (iter->token.type == TokenType::DEC_PTR) {
-    //   break;
-    // }
+    if (iter->token.type == TokenType::DEC_PTR) {
+      break;
+    }
     r.emplace_back(iter);
   }
   if (!r.empty()) {

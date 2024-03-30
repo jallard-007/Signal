@@ -60,8 +60,9 @@ JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
 CodeGen::CodeGen(
   Program& program,
   std::vector<Tokenizer>& tokenizers,
-  std::map<std::string, GeneralDec *>& lookUp
-): program{program}, lookUp{lookUp}, tokenizers{tokenizers} {
+  std::unordered_map<std::string, GeneralDec *>& lookUp,
+  std::unordered_map<StructDec *, StructInformation>& structLookup
+): program{program}, tokenizers{tokenizers}, lookUp{lookUp}, structLookUp{structLookup} {
   sp.inUse = true;
   ip.inUse = true;
   dp.inUse = true;
@@ -300,8 +301,7 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
       exit(1);
     }
     case GeneralDecType::INCLUDE_DEC:
-    case GeneralDecType::BUILTIN_FUNCTION:
-    case GeneralDecType::BUILTIN_TYPE: {
+    case GeneralDecType::BUILTIN_FUNCTION: {
       // don't do anything, handled by parser
       break;
     }
@@ -318,9 +318,6 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   StackVariable& stackVar = addVarDecToVirtualStack(varDec);
   const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
   const Token typeToken = getTypeFromTokenList(varDec.type);
-  const uint32_t size = getSizeOfType(typeToken);
-  const uint32_t padding = diff - size;
-  assert(padding < size);
   if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
     if (initialize && varDec.initialAssignment) {
       ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
@@ -332,6 +329,9 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
       }
       stackVar.reg = reg;
     }
+    const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
+    const uint32_t padding = diff - size;
+    assert(padding < size);
     assert(size >= 1 && size <= 8);
     if (!reg) {
       uint32_t spaceToAdd = size + padding;
@@ -388,6 +388,11 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     }
   }
   else if (typeToken.type == TokenType::IDENTIFIER) {
+    const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
+    const StructInformation& structInfo = structLookUp[genDec->structDec];
+    const uint32_t size = structInfo.size;
+    const uint32_t padding = diff - size;
+    assert(padding < size);
     uint32_t spaceToAdd = size + padding;
     ExpressionResult spaceToAddExp;
     spaceToAddExp.set(spaceToAdd);
@@ -918,7 +923,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     Token returnType = getTypeFromTokenList(p_funcDec->returnType);
     uint32_t size = getSizeOfType(returnType);
     // 8 byte align return type since function assumes it is
-    const uint32_t padding = getPaddingNeededPushingToStack(getCurrStackPointerPosition(), size, 8);
+    const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, 8);
     addSpaceToStack(padding + size);
     StackItem returnValue {
       .tempValue {
@@ -947,7 +952,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
       expressionList = expressionList->next;
     } while (expressionList);
   }
-  addSpaceToStack(getPaddingNeededPushingToStack(getCurrStackPointerPosition(), 8, 8));
+  addSpaceToStack(getPaddingNeeded(getCurrStackPointerPosition(), 8, 8));
   alignForImm(1, 4);
   // register this position to be updated
   addByteOp(OpCode::CALL);
@@ -1039,6 +1044,7 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
 */
 ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
   ExpressionResult expRes;
+  expRes.isPointerToValue = true;
   switch (expression.getType()) {
     case ExpressionType::BINARY_OP: {
       // if binary op is not a member access, cannot get address of the result of a binary op
@@ -1061,13 +1067,19 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
 
       */
 
+      Token type;
       if (op == TokenType::PTR_MEMBER_ACCESS) {
-        expRes.type = expRes.type->next;
+        // pointer to type, get type after the pointer
+        type = getTypeFromTokenList(*getNextFromTokenList(*expRes.type));
+      } else {
+        type = getTypeFromTokenList(*expRes.type);
       }
-      const StructInformation& structInfo = structNameToInfoMap[tk->extractToken(expRes.type->token)];
+      const std::string& structName = tk->extractToken(type);
+      const GeneralDec* genDec = lookUp[structName];
+      const StructInformation& structInfo = structLookUp[genDec->structDec];
       assert(binOp->rightSide.getType() == ExpressionType::VALUE);
       const std::string& memberName = tk->extractToken(binOp->rightSide.getToken());
-      const uint32_t offsetInStruct = structInfo.offsetMap.at(memberName);
+      const uint32_t offsetInStruct = structInfo.memberLookup.at(memberName).position;
       if (offsetInStruct) {
         ExpressionResult offsetExpression;
         offsetExpression.set(offsetInStruct);
@@ -1120,7 +1132,6 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       return expRes;
     }
   }
-
 }
 
 
@@ -1770,55 +1781,6 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
 // STRUCTS
 // ========================================
 
-StructInformation& CodeGen::getStructInfo(const std::string& structName) {
-  StructInformation &info = structNameToInfoMap[structName];
-  if (info.size != -1) {
-    return info;
-  }
-  info.size = 0;
-  GeneralDec const * const &generalDec = lookUp[structName];
-  Tokenizer *oldTk = tk;
-  tk = &tokenizers[generalDec->tokenizerIndex];
-  StructDecList *structDecList = &generalDec->structDec->decs;
-  while (structDecList) {
-    if (structDecList->type != StructDecType::VAR) {
-      continue;
-    }
-    Token typeToken = getTypeFromTokenList(structDecList->varDec->type);
-    uint32_t& offset = info.offsetMap[tk->extractToken(structDecList->varDec->name)];
-    uint32_t size, alignTo;
-    if (typeToken.type == TokenType::IDENTIFIER) {
-      StructInformation& subStructInfo = getStructInfo(tk->extractToken(typeToken));
-      size = subStructInfo.size;
-      alignTo = subStructInfo.alignTo;
-    }
-    else if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
-      size = getSizeOfType(typeToken);
-      alignTo = size;
-    } else {
-      std::cerr << "Invalid token type with enum value: " << (uint32_t)typeToken.type << '\n';
-      exit(1);
-    }
-    uint32_t paddingRequired = size - ((info.size) % size);
-    if (paddingRequired == size) {
-      paddingRequired = 0;
-    }
-    info.size += paddingRequired;
-    offset = info.size;
-    info.size += size;
-    if (alignTo > info.alignTo) {
-      info.alignTo = alignTo;
-    }
-    structDecList = structDecList->next;
-  }
-  uint32_t paddingRequired = info.alignTo - ((info.size) % info.alignTo);
-  if (paddingRequired != info.alignTo) {
-    info.size += paddingRequired;
-  }
-  tk = oldTk;
-  return info;
-}
-
 
 // ========================================
 // SCOPES
@@ -2089,13 +2051,14 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
 */
 uint32_t CodeGen::getPositionPushingTypeToStack(Token typeToken, uint32_t alignTo) {
   if (typeToken.type == TokenType::IDENTIFIER) {
-    const StructInformation &structInfo = getStructInfo(tk->extractToken(typeToken));
+    const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
+    const StructInformation &structInfo = structLookUp[genDec->structDec];
     if (!alignTo) {
       alignTo = structInfo.alignTo;
     }
     return getPositionPushingToStack(structInfo.size, alignTo);
   }
-  uint32_t sizeOfParameter = getSizeOfType(typeToken);
+  uint32_t sizeOfParameter = getSizeOfBuiltinType(typeToken.getType());
   if (!alignTo) {
     alignTo = sizeOfParameter;
   }
@@ -2111,12 +2074,7 @@ uint32_t CodeGen::getPositionPushingStuctToStack(const StructInformation &struct
 
 uint32_t CodeGen::getPositionPushingToStack(const uint32_t sizeOfType, const uint32_t alignTo) {
   const uint32_t curr_sp_position = getCurrStackPointerPosition();
-  return curr_sp_position + getPaddingNeededPushingToStack(curr_sp_position, sizeOfType, alignTo) + sizeOfType;
-}
-
-uint32_t CodeGen::getPaddingNeededPushingToStack(const uint32_t spPosition, const uint32_t size, const uint32_t alignTo) {
-  const uint32_t mod = (spPosition + size) % alignTo;
-  return mod != 0 ? alignTo - mod : 0;
+  return curr_sp_position + getPaddingNeeded(curr_sp_position, sizeOfType, alignTo) + sizeOfType;
 }
 
 void CodeGen::addSpaceToStack(uint32_t space) {
@@ -2176,8 +2134,8 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
   const Token typeToken = getTypeFromTokenList(*type);
   const uint32_t spPosition = getCurrStackPointerPosition();
   if (typeToken.getType() != TokenType::IDENTIFIER) {
-    const uint32_t size = getSizeOfType(typeToken);
-    const uint32_t padding = getPaddingNeededPushingToStack(spPosition, size, size);
+    const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
+    const uint32_t padding = getPaddingNeeded(spPosition, size, size);
     addSpaceToStack(padding);
     if (!expRes.isPointerToValue) {
       addBytes({{(bc)getPushOpForSize(size), expRes.getReg()}});
@@ -2188,9 +2146,10 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
     }
     return padding + size;
   } else {
-    const StructInformation& structInfo = getStructInfo(tk->extractToken(typeToken));
+    const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
+    const StructInformation& structInfo = structLookUp[genDec->structDec];
     uint32_t size = structInfo.size;
-    const uint32_t padding = getPaddingNeededPushingToStack(spPosition, size, structInfo.alignTo);
+    const uint32_t padding = getPaddingNeeded(spPosition, size, structInfo.alignTo);
     if (!expRes.isPointerToValue) {
       addSpaceToStack(padding);
       addBytes({{(bc)getPushOpForSize(size), expRes.getReg()}});
@@ -2333,77 +2292,16 @@ void CodeGen::freeRegister(bytecode_t regNum) {
   regInfo.inUse = false;
 }
 
-/**
- * Returns the size of a type
- * \param token the token of the type
- * \returns the size of the type
-*/
-uint32_t CodeGen::getSizeOfType(const Token token) {
-  switch (token.type) {
-    case TokenType::BOOL: {
-      return sizeof (bool);
-    }
-    case TokenType::CHAR_TYPE: {
-      return sizeof (char);
-    }
-    case TokenType::STRING_TYPE: {
-      return sizeof (char *);
-    }
-    case TokenType::INT8_TYPE:
-    case TokenType::UINT8_TYPE: {
-      return sizeof (uint8_t);
-    }
-    case TokenType::INT16_TYPE:
-    case TokenType::UINT16_TYPE: {
-      return sizeof (uint16_t);
-    }
-    case TokenType::INT32_TYPE:
-    case TokenType::UINT32_TYPE: {
-      return sizeof (uint32_t);
-    }
-    case TokenType::INT64_TYPE:
-    case TokenType::UINT64_TYPE: {
-      return sizeof (uint64_t);
-    }
-    case TokenType::POINTER: {
-      return sizeof (void *);
-    }
-    case TokenType::DOUBLE_TYPE: {
-      return sizeof (double);
-    }
-    case TokenType::FILE_TYPE: {
-      return sizeof(stdin);
-    }
-    case TokenType::VOID: {
-      return 0;
-    }
-    case TokenType::REFERENCE: {
-      return sizeof (void *);
-    }
-    case TokenType::IDENTIFIER: {
-      return getStructInfo(tk->extractToken(token)).size;
-    }
-    default: {
-      std::cerr << "Invalid TokenType ["<< (uint32_t)token.type << "] in CodeGen::sizeOfType\n";
-      exit(1);
-    }
+uint32_t CodeGen::getSizeOfType(Token typeToken) {
+  if (typeToken.getType() == TokenType::IDENTIFIER) {
+    const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
+    const StructInformation& structInfo = structLookUp[genDec->structDec];
+    return structInfo.size;
+    // struct
   }
+  return getSizeOfBuiltinType(typeToken.getType());
 }
 
-/**
- * Returns the actual type from a token list
-*/
-Token getTypeFromTokenList(const TokenList& tokenList) {
-  return tokenList.token;
-}
-
-const TokenList* getNextFromTokenList(const TokenList& tokenList) {
-  const TokenList* next = tokenList.next;
-  while (next && isTypeQualifier(next->token.getType())) {
-    next = next->next;
-  }
-  return next;
-}
 
 constexpr OpCode getLoadOpForSize(const uint32_t size) {
   switch(size) {

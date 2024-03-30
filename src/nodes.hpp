@@ -434,8 +434,8 @@ struct BuiltinType {
 };
 
 struct BuiltinFunc {
-  const Token name;
   FunctionDec funcDec;
+  const Token name;
   BuiltinFunc() = delete;
   BuiltinFunc(const Token& name): name{name} {}
 };
@@ -450,7 +450,6 @@ enum class GeneralDecType: uint8_t {
   TEMPLATE_CREATE,
   INCLUDE_DEC,
   BUILTIN_FUNCTION,
-  BUILTIN_TYPE,
 };
 
 // globalDec:= structDec | varDec ; | functionDec | enumDec | templateDec | templateCreation
