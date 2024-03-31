@@ -104,7 +104,7 @@ enum class OpCode: bytecode_t {
   LOAD_D, // LOAD dest, src
   LOAD_Q, // LOAD dest, src
 
-  // STORE dest, src| stores data from src into memory at the address dest
+  // STORE dest, src | stores data from src into memory at the address dest
   STORE_B, // STORE dest, src
   STORE_W, // STORE dest, src
   STORE_D, // STORE dest, src

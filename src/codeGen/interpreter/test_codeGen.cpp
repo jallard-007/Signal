@@ -395,10 +395,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     Statement statement_x, statement_y, cond_statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement_x);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
-    assert(statement_x.type == StatementType::VARIABLE_DEC);
+    REQUIRE(statement_x.type == StatementType::VARIABLE_DEC);
     errorType = parser.parseStatement(statement_y);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
-    assert(statement_y.type == StatementType::VARIABLE_DEC);
+    REQUIRE(statement_y.type == StatementType::VARIABLE_DEC);
     errorType = parser.parseStatement(cond_statement);
     REQUIRE(errorType == ParseStatementErrorType::NONE);
     REQUIRE(cond_statement.controlFlow);
@@ -829,7 +829,7 @@ R"(
     expected.addBytes({{
       (bc)OpCode::LOAD_D, 1, 30,
       (bc)OpCode::INC, 1,
-      (bc)OpCode::STORE_D, 1, 30,
+      (bc)OpCode::STORE_D, 30, 1,
       (bc)OpCode::RS_JUMP
     }});
     expected.addByte(jumpIndex - (expected.byteCode.size() - 1));
@@ -882,7 +882,7 @@ R"(
     expected.addBytes({{
       (bc)OpCode::LOAD_D, 1, 30,
       (bc)OpCode::INC, 1,
-      (bc)OpCode::STORE_D, 1, 30,
+      (bc)OpCode::STORE_D, 30, 1,
       (bc)OpCode::RS_JUMP
     }});
     expected.addByte(jumpIndex - (expected.byteCode.size() - 1));
@@ -894,5 +894,48 @@ R"(
       (bc)OpCode::JUMP, 0,
     }});
     CHECK(codeGen.byteCode == expected.byteCode);
+  }
+}
+
+TEST_CASE("get address of expression", "[codeGen]") {
+  SECTION("1") {
+    const std::string str = "x:uint32; y:int32; x; y; ";
+    testBoilerPlate(str);
+    Statement statement_x, statement_y, load_statement_x, load_statement_y;
+    ParseStatementErrorType errorType = parser.parseStatement(statement_x);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement_x.type == StatementType::VARIABLE_DEC);
+    errorType = parser.parseStatement(statement_y);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(statement_y.type == StatementType::VARIABLE_DEC);
+    errorType = parser.parseStatement(load_statement_x);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(load_statement_x.type == StatementType::EXPRESSION);
+    REQUIRE(load_statement_x.expression->getType() == ExpressionType::VALUE);
+    errorType = parser.parseStatement(load_statement_y);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(load_statement_y.type == StatementType::EXPRESSION);
+    REQUIRE(load_statement_y.expression->getType() == ExpressionType::VALUE);
+    codeGen.generateStatement(statement_x);
+    codeGen.generateStatement(statement_y);
+    codeGen.byteCode.clear();
+    ExpressionResult res_x = codeGen.getAddressOfExpression(*load_statement_x.expression);
+    ExpressionResult res_y = codeGen.getAddressOfExpression(*load_statement_y.expression);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    expected.addBytes({{
+      (bc)OpCode::MOVE, 1, 30,
+      (bc)OpCode::NOP,
+      (bc)OpCode::ADD_I, 1, 4, 0,
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+    CHECK(res_x.isPointerToValue);
+    CHECK(res_x.isReg);
+    CHECK(res_x.getReg() == 1);
+    CHECK(res_x.type->token.getType() == TokenType::UINT32_TYPE);
+    CHECK(res_y.isPointerToValue);
+    CHECK(res_y.isReg);
+    CHECK(res_y.getReg() == 30);
+    CHECK_FALSE(res_y.isTemp);
+    CHECK(res_y.type->token.getType() == TokenType::INT32_TYPE);
   }
 }

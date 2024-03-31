@@ -1054,21 +1054,25 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
     case ExpressionType::VALUE: {
       // a plain identifier, just need to look up if it's a reference and then use original
       // otherwise it's a stack variable so get offset from stack pointer
-      expRes.setReg(allocateRegister());
-      addBytes({{(bc)OpCode::MOVE, expRes.getReg(), stackPointerIndex}});
       const std::string& ident = tk->extractToken(expression.getToken());
       uint32_t stackItemIndex = nameToStackItemIndex[ident];
       StackVariable& stackVar = stackItems[stackItemIndex].variable;
       uint32_t offset = getVarOffsetFromSP(stackVar);
-      ExpressionResult varOffsetExp;
-      varOffsetExp.set(offset);
-      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, varOffsetExp);
+      if (offset) {
+        expRes.setReg(allocateRegister());
+        addBytes({{(bc)OpCode::MOVE, expRes.getReg(), stackPointerIndex}});
+        ExpressionResult varOffsetExp;
+        varOffsetExp.set(offset);
+        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, varOffsetExp);
+      } else {
+        expRes.setReg(stackPointerIndex);
+        expRes.isTemp = false;
+      }
       expRes.type = &stackVar.varDec.type;
       if (expRes.type->token.getType() == TokenType::REFERENCE) {
         // always move past references
         expRes.type = expRes.type->next;
       }
-      expRes.isTemp = true;
       return expRes;
     }
     case ExpressionType::ARRAY_ACCESS: {
@@ -1294,6 +1298,73 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
   }
 }
 
+/**
+ * Loads the data pointed at by expRes into a register
+*/
+ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp) {
+  assert(pointerExp.isReg);
+  const TokenList* type;
+  if (pointerExp.isPointerToValue) {
+    type = pointerExp.type;
+  } else {
+    assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
+    type = getNextFromTokenList(*pointerExp.type);
+  }
+  const Token typeToken = getTypeFromTokenList(*type);
+  const uint32_t sizeOfType = getSizeOfType(typeToken);
+  const OpCode loadOp = getLoadOpForSize(sizeOfType);
+  assert(loadOp != OpCode::NOP);
+  ExpressionResult expRes;
+  expRes.setReg(allocateRegister());
+  expRes.type = type;
+  addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
+  return expRes;
+}
+
+/**
+ * Stores data
+*/
+void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, ExpressionResult &valueExp) {
+  assert(pointerExp.isReg);
+  if (!valueExp.isReg) {
+    moveImmToReg(allocateRegister(), valueExp);
+  }
+  const TokenList* type;
+  if (pointerExp.isPointerToValue) {
+    type = pointerExp.type;
+  } else {
+    assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
+    type = getNextFromTokenList(*pointerExp.type);
+  }
+  const Token typeToken = getTypeFromTokenList(*type);
+  const uint32_t sizeOfType = getSizeOfType(typeToken);
+  const OpCode storeOp = getStoreOpForSize(sizeOfType);
+  assert(storeOp != OpCode::NOP);
+  addBytes({{(bc)storeOp, pointerExp.getReg(), valueExp.getReg()}});
+}
+
+/**
+ * Adds to a pointer based on type size
+ * \param pointerExp the pointer expression to add to. Must be a pointer type
+ * \param indexExp the index expression, can be any integral value
+*/
+void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResult &indexExp) {
+  assert(isSigned(getTypeFromTokenList(*indexExp.type).getType()) || isUnsigned(getTypeFromTokenList(*indexExp.type).getType()));
+  assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
+  const Token nextType = getTypeFromTokenList(*getNextFromTokenList(*pointerExp.type));
+  uint32_t sizeOfType = getSizeOfType(nextType);
+  if (sizeOfType > 1) {
+    ExpressionResult sizeExp;
+    sizeExp.set(sizeOfType);
+    if (!indexExp.isReg) {
+      indexExp = evaluateBinOpImmExpression(TokenType::MULTIPLICATION, indexExp, sizeExp);
+    } else {
+      expressionResWithOp(OpCode::MUL, OpCode::MUL_I, indexExp, sizeExp);
+    }
+  }
+  expressionResWithOp(OpCode::ADD, OpCode::ADD_I, pointerExp, indexExp);
+}
+
 
 // ========================================
 // BINARY EXPRESSIONS
@@ -1406,14 +1477,19 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
 */
 ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
   // checkers job to insure the assignment is valid
-  ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
   ExpressionResult rightResult = generateExpression(binOp.rightSide);
-  assert(!leftResult.isTemp);
+  ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
   assert(leftResult.isReg);
-  registers[leftResult.getReg()].changed = true;
-  expressionResWithOp(op, opImm, leftResult, rightResult);
+  assert(leftResult.isPointerToValue);
+  ExpressionResult leftValue = loadValueFromPointer(leftResult);
+  // registers[leftResult.getReg()].changed = true;
+  expressionResWithOp(op, opImm, leftValue, rightResult);
   if (rightResult.isTemp){
     freeRegister(rightResult.getReg());
+  }
+  storeValueToPointer(leftResult, leftValue);
+  if (leftValue.isTemp){
+    freeRegister(leftValue.getReg());
   }
   // write new value to stack
   // have to know where leftResult is. it could be on the stack or heap
@@ -1703,60 +1779,86 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 // UNARY EXPRESSIONS
 // ========================================
 
-ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
+ExpressionResult CodeGen::defaultUnOp(const UnOp& unOp, OpCode op) {
   ExpressionResult expRes = generateExpression(unOp.operand);
-  // TokenType expType = expRes.type->token.getType();
-  switch (unOp.op.type) {
+  if (!expRes.isReg) {
+    // evaluate imm
+    return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
+  }
+  if (!expRes.isTemp) {
+    const bc reg = allocateRegister();
+    addBytes({{(bc)OpCode::MOVE, reg, expRes.getReg()}});
+    expRes.setReg(reg);
+    expRes.isTemp = true;
+  }
+  addBytes({{(bc)op, expRes.getReg()}});
+  return expRes;
+}
+
+ExpressionResult CodeGen::incrementOrDecrement(const UnOp& unOp, TokenType op) {
+  assert(op == TokenType::DECREMENT_PREFIX || op == TokenType::INCREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX);
+  ExpressionResult addressExp = getAddressOfExpression(unOp.operand);
+  ExpressionResult dataExp = loadValueFromPointer(addressExp);
+  ExpressionResult incrementExp;
+  OpCode opCode;
+  if (op == TokenType::DECREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX) {
+    opCode = OpCode::DEC;
+    incrementExp.set(-1);
+  } else {
+    opCode = OpCode::INC;
+    incrementExp.set(1);
+  }
+  const Token typeToken = getTypeFromTokenList(*dataExp.type);
+  if (op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX) {
+    bytecode_t currReg = dataExp.getReg();
+    dataExp.setReg(allocateRegister());
+    addBytes({{(bc)OpCode::MOVE, dataExp.getReg(), currReg}});
+    if (typeToken.getType() == TokenType::POINTER) {
+      doPointerIndex(dataExp, incrementExp);
+    } else {
+      addBytes({{(bc)opCode, dataExp.getReg()}});
+    }
+    storeValueToPointer(addressExp, dataExp);
+    freeRegister(dataExp.getReg());
+    dataExp.setReg(currReg);
+  } else {
+    if (typeToken.getType() == TokenType::POINTER) {
+      doPointerIndex(dataExp, incrementExp);
+    } else {
+      addBytes({{(bc)opCode, dataExp.getReg()}});
+    }
+    storeValueToPointer(addressExp, dataExp);
+  }
+  return dataExp;
+}
+
+ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
+  switch (unOp.op.getType()) {
     case TokenType::NOT: {
-      if (!expRes.isReg) {
-        // evaluate imm
-        return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
-      }
-      if (!expRes.isTemp) {
-        const bc reg = allocateRegister();
-        addBytes({{(bc)OpCode::MOVE, reg, expRes.getReg()}});
-        expRes.setReg(reg);
-        expRes.isReg = true;
-        expRes.isTemp = true;
-      }
-      addBytes({{(bc)OpCode::NOT, expRes.getReg()}});
-      return expRes;
+      return defaultUnOp(unOp, OpCode::NOT);
     }
     case TokenType::ADDRESS_OF: {
-      return expRes;
+      return getAddressOfExpression(unOp.operand);
     }
     case TokenType::DEREFERENCE: {
+      ExpressionResult expRes = generateExpression(unOp.operand);
+      const Token type = getTypeFromTokenList(*expRes.type);
+      assert(type.getType() == TokenType::POINTER);
+      expRes.type = getNextFromTokenList(*expRes.type);
+      expRes.isPointerToValue = true;
       return expRes;
     }
-    case TokenType::INCREMENT_POSTFIX: {
-      return expRes;
-    }
-    case TokenType::INCREMENT_PREFIX: {
-      return expRes;
-    }
-    case TokenType::DECREMENT_POSTFIX: {
-      return expRes;
-    }
+    case TokenType::INCREMENT_POSTFIX:
+    case TokenType::INCREMENT_PREFIX:
+    case TokenType::DECREMENT_POSTFIX:
     case TokenType::DECREMENT_PREFIX: {
-      return expRes;
+      return incrementOrDecrement(unOp, unOp.op.getType());
     }
     case TokenType::NEGATIVE: {
-      if (!expRes.isReg) {
-        // evaluate imm
-        return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
-      }
-      if (!expRes.isTemp) {
-        const bc reg = allocateRegister();
-        addBytes({{(bc)OpCode::MOVE, reg, expRes.getReg()}});
-        expRes.setReg(reg);
-        expRes.isReg = true;
-        expRes.isTemp = true;
-      }
-      addBytes({{(bc)OpCode::NEGATE, expRes.getReg()}});
-      return expRes;
+      return defaultUnOp(unOp, OpCode::NEGATE);
     }
     default: {
-      std::cerr << "Invalid\n";
+      std::cerr << "Invalid token type in CodeGen::generateExpressionUnOp " << unOp.op.getType() << '\n';
       exit(1);
     }
   }
@@ -2275,11 +2377,13 @@ bytecode_t CodeGen::allocateRegister() {
 }
 
 void CodeGen::freeRegister(bytecode_t regNum) {
+  assert(
+    regNum != stackPointerIndex &&
+    regNum != instructionPointerIndex && 
+    regNum != miscRegisterIndex &&
+    regNum != dataPointerIndex
+  );
   RegisterInfo& regInfo = registers[regNum];
-  if (regInfo.changed) {
-    // SUB_I misc, bp, regInfo.stackOffset
-    // STORE misc, currReg
-  }
   regInfo.changed = false;
   regInfo.inUse = false;
 }

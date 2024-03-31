@@ -183,6 +183,9 @@ struct CodeGen {
   void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
   ExpressionResult getAddressOfExpression(const Expression&);
   ExpressionResult loadValue(const Expression&);
+  ExpressionResult loadValueFromPointer(const ExpressionResult &);
+  void storeValueToPointer(const ExpressionResult &, ExpressionResult &);
+  void doPointerIndex(const ExpressionResult &, ExpressionResult&);
 
 // BINARY EXPRESSIONS
   ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
@@ -192,6 +195,8 @@ struct CodeGen {
 
 // UNARY EXPRESSIONS
   ExpressionResult generateExpressionUnOp(const UnOp&);
+  ExpressionResult defaultUnOp(const UnOp&, OpCode);
+  ExpressionResult incrementOrDecrement(const UnOp&, TokenType);
 
 // STRUCTS
 
