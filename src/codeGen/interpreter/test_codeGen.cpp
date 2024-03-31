@@ -524,8 +524,7 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
     expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
     expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-    expected.alignForImm(2, 2);
-    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 1, 0}});
+    expected.addBytes({{(bc)OpCode::INC, miscRegisterIndex}});
     expected.addBytes({{(bc)OpCode::LOAD_B, 3, 0}});
 
     expected.addBytes({{(bc)OpCode::LOGICAL_AND, 2, 3}});
@@ -619,7 +618,6 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
     CHECK(stringLiteral == (char *)(codeGen.dataSection.data() + entry.indexInDataSection) );
   }
   SECTION("2") {
-    SKIP();
     const std::string str = "file: file_t = stdin;";
     testBoilerPlate(str);
     Statement statement;
@@ -800,6 +798,7 @@ TEST_CASE("for loop", "[codeGen]") {
 R"(
   func testFunction(): void {
     for (i: uint32 = 0; i < 10; ++i) {}
+    c: char;
   }
 )";
     testBoilerPlate(str);
@@ -811,8 +810,8 @@ R"(
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
+    codeGen.writeLocalJumpOffsets();
     CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-    // output should be exactly the same as the for loop code
     expected.addBytes({{
       (bc)OpCode::MOVE_SI, 1, 0,
       (bc)OpCode::PUSH_D, 1,
@@ -837,6 +836,8 @@ R"(
     expected.alignForImm(2, 2);
     expected.addBytes({{
       (bc)OpCode::ADD_I, 30, 4, 0,
+      (bc)OpCode::DEC, 30,
+      (bc)OpCode::INC, 30,
       (bc)OpCode::POP_Q, 0,
       (bc)OpCode::JUMP, 0,
     }});
@@ -853,6 +854,7 @@ R"(
     while i < 10 {
       ++i;
     }
+    c: char;
   }
 )";
     testBoilerPlate(str);
@@ -864,6 +866,7 @@ R"(
     REQUIRE(genDec->funcDec);
     FunctionDec& funcDec = *genDec->funcDec;
     codeGen.generateFunctionDeclaration(funcDec);
+    codeGen.writeLocalJumpOffsets();
     CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
     // output should be exactly the same as the for loop code
     expected.addBytes({{
@@ -889,7 +892,8 @@ R"(
     expected.byteCode[conditionJump] = expected.byteCode.size() - (conditionJump - 1);
     expected.alignForImm(2, 2);
     expected.addBytes({{
-      (bc)OpCode::ADD_I, 30, 4, 0,
+      (bc)OpCode::DEC, 30,
+      (bc)OpCode::ADD_I, 30, 5, 0,
       (bc)OpCode::POP_Q, 0,
       (bc)OpCode::JUMP, 0,
     }});

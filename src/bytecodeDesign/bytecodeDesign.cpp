@@ -1,3 +1,4 @@
+#include <cassert>
 #include "bytecodeDesign.hpp"
 
 
@@ -266,13 +267,6 @@ const char * bytecode_t_to_op [] = {
   "JUMP_GE",
   "JUMP_L",
   "JUMP_LE",
-  "R_JUMP",
-  "R_JUMP_E",
-  "R_JUMP_NE",
-  "R_JUMP_G",
-  "R_JUMP_GE",
-  "R_JUMP_L",
-  "R_JUMP_LE",
   "RS_JUMP",
   "RS_JUMP_E",
   "RS_JUMP_NE",
@@ -280,6 +274,13 @@ const char * bytecode_t_to_op [] = {
   "RS_JUMP_GE",
   "RS_JUMP_L",
   "RS_JUMP_LE",
+  "R_JUMP",
+  "R_JUMP_E",
+  "R_JUMP_NE",
+  "R_JUMP_G",
+  "R_JUMP_GE",
+  "R_JUMP_L",
+  "R_JUMP_LE",
   "MOVE",
   "MOVE_SI",
   "MOVE_I",

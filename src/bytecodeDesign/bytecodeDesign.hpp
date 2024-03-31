@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include <cassert>
 
 #define stdoutDataIndex 0
 #define stdinDataIndex (stdoutDataIndex + sizeof (FILE *))
@@ -120,15 +121,6 @@ enum class OpCode: bytecode_t {
   JUMP_LE, // jump if not less (zero or not positive) | JUMP_LE reg
 
   // relative jumps are relative to the jump instruction
-  // relative jump by int16
-  R_JUMP, // RB_JUMP 2 byte imm
-  R_JUMP_E, // jump if equal (zero) | R_JUMP_E 2 byte imm
-  R_JUMP_NE, // jump if not equal (not zero) | R_JUMP_NE 2 byte imm
-  R_JUMP_G, // jump if greater (positive) | R_JUMP_G 2 byte imm
-  R_JUMP_GE, // jump if greater or equal (zero or positive) | R_JUMP_GE 2 byte imm
-  R_JUMP_L, // jump if less (not zero and not positive) | R_JUMP_L 2 byte imm
-  R_JUMP_LE, // jump if not less (zero or not positive) | R_JUMP_LE 2 byte imm
-
   // relative short jump by int8
   RS_JUMP, // RS_JUMP 1 byte imm
   RS_JUMP_E, // jump if equal (zero) | RS_JUMP_E 1 byte imm
@@ -137,6 +129,15 @@ enum class OpCode: bytecode_t {
   RS_JUMP_GE, // jump if greater or equal (zero or positive) | RS_JUMP_GE 1 byte imm
   RS_JUMP_L, // jump if less (not zero and not positive) | RS_JUMP_L 1 byte imm
   RS_JUMP_LE, // jump if not less (zero or not positive) | RS_JUMP_LE 1 byte imm
+
+  // relative jump by int32
+  R_JUMP, // RB_JUMP 4 byte imm
+  R_JUMP_E, // jump if equal (zero) | R_JUMP_E 4 byte imm
+  R_JUMP_NE, // jump if not equal (not zero) | R_JUMP_NE 4 byte imm
+  R_JUMP_G, // jump if greater (positive) | R_JUMP_G 4 byte imm
+  R_JUMP_GE, // jump if greater or equal (zero or positive) | R_JUMP_GE 4 byte imm
+  R_JUMP_L, // jump if less (not zero and not positive) | R_JUMP_L 4 byte imm
+  R_JUMP_LE, // jump if not less (zero or not positive) | R_JUMP_LE 4 byte imm
 
   // move data between registers
   MOVE, // MOVE dest, src
@@ -200,6 +201,31 @@ enum class OpCode: bytecode_t {
 };
 
 std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& obj);
+
+constexpr uint8_t smallestImmediateSizeForOffset(int64_t res) {
+  if (res <= INT8_MAX && res >= INT8_MIN) {
+    return 1;
+  } else if (res <= INT32_MAX && res >= INT32_MIN) {
+    return 4;
+  }
+  assert(false);
+  return 0;
+}
+
+constexpr uint8_t immediateSizeForRelativeJumpOp(OpCode jumpOp) {
+  if (jumpOp >= OpCode::RS_JUMP && jumpOp <= OpCode::RS_JUMP_LE) {
+    return smallestImmediateSizeForOffset(INT8_MAX);
+  } else if (jumpOp >= OpCode::R_JUMP && jumpOp <= OpCode::R_JUMP_LE) {
+    return smallestImmediateSizeForOffset(INT32_MAX);
+  }
+  return smallestImmediateSizeForOffset(INT64_MAX);
+}
+
+constexpr OpCode upgradeRelativeJumpOp(const OpCode jumpOp) {
+  assert(OpCode::RS_JUMP < OpCode::R_JUMP);
+  assert(immediateSizeForRelativeJumpOp(jumpOp) == 1);
+  return (OpCode)((uint8_t)jumpOp + (uint8_t)OpCode::R_JUMP - (uint8_t)OpCode::RS_JUMP);
+}
 
 extern const char * bytecode_t_to_op [];
 extern const char * bytecode_t_to_builtin_function [];

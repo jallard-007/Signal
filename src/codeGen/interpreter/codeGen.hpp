@@ -46,20 +46,20 @@ struct ExpressionResult {
 enum class JumpMarkerType: uint8_t {
   NONE,
   
-  // if/elif/else statements
-  BRANCH_START, // marks start of branching statement
+  // marks actual jump statements, a jump op is at the paired index 
   TO_BRANCH_END, // go to end of branching statement (condition was false)
-  IF_CHAIN_START, // marks start of if/elif/else chain
   TO_IF_CHAIN_END, // to go end if if/elif/else chain
-
-  // loops
-  LOOP_START,
   TO_LOOP_START,
   TO_LOOP_END,
-
-  // short circuit logical binary ops
   TO_LOGICAL_BIN_OP_END,
+
+  // other
+  FUNCTION_CALL,
+
+  SET, // the jump marker has been set
 };
+
+bool jumpMarkerTypeHasJump(JumpMarkerType);
 
 struct JumpMarker {
   uint64_t start;
@@ -168,8 +168,9 @@ struct CodeGen {
   void moveImmToReg(uint8_t, ExpressionResult&);
 
 // JUMP MARKERS
-  uint64_t addJumpMarker(JumpMarkerType);
-  void updateJumpMarkersTo(uint64_t, JumpMarkerType, JumpMarkerType = JumpMarkerType::NONE, bool = false);
+  void addJumpMarker(JumpMarkerType);
+  void updateJumpMarkersTo(uint64_t, JumpMarkerType, uint32_t);
+  void writeLocalJumpOffsets();
 
 // DECLARATIONS
   void generateGeneralDeclaration(const GeneralDec&);
@@ -228,6 +229,7 @@ struct CodeGen {
   void addFunctionSignatureToVirtualStack(const FunctionDec&);
 
   void fakeClearStackFromTo(uint32_t, uint32_t);
+  void clearStackFromTo(uint32_t, uint32_t);
   uint32_t getVarOffsetFromSP(const StackVariable &);
   uint32_t getOffsetFromSP(uint32_t);
 
@@ -236,6 +238,7 @@ struct CodeGen {
   bytecode_t allocateRegister();
   void freeRegister(bytecode_t);
   uint32_t getSizeOfType(Token);
+  void efficientImmAddOrSub(bytecode_t, uint64_t, OpCode);
 };
 
 constexpr OpCode getLoadOpForSize(uint32_t);

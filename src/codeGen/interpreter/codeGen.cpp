@@ -226,9 +226,15 @@ void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
 // JUMP MARKERS
 // ========================================
 
-uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
+bool jumpMarkerTypeHasJump(JumpMarkerType markerType) {
+  return markerType >= JumpMarkerType::TO_BRANCH_END && markerType <= JumpMarkerType::TO_LOGICAL_BIN_OP_END;
+}
+
+/**
+ * \returns the index of the jump marker within the jump markers array
+*/
+void CodeGen::addJumpMarker(JumpMarkerType type) {
   jumpMarkers.emplace_back(byteCode.size(), type);
-  return byteCode.size();
 }
 
 /**
@@ -238,26 +244,90 @@ uint64_t CodeGen::addJumpMarker(JumpMarkerType type) {
  * \param until keep updating markers till this type is reached. if none, updates the first marker and stops
  * \param clear set the 'until' marker to type none if reached
 */
-void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, JumpMarkerType until, bool clear) {
-  for (auto jumpMarker = jumpMarkers.rbegin(); jumpMarker != jumpMarkers.rend(); ++jumpMarker) {
-    if (until != JumpMarkerType::NONE && jumpMarker->type == until) {
-      if (clear) {
-        jumpMarker->type = JumpMarkerType::NONE;
-      }
-      break;
-    }
-    if (jumpMarker->type == type) {
-      jumpMarker->destination = destination;
-      jumpMarker->type = JumpMarkerType::NONE;
-      if (until == JumpMarkerType::NONE) {
-        break;
-      }
+void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, uint32_t from) {
+  for (; from < jumpMarkers.size(); ++from) {
+    JumpMarker& jumpMarker = jumpMarkers[from];
+    if (jumpMarker.type == type) {
+      jumpMarker.type = JumpMarkerType::SET;
+      jumpMarker.destination = destination;
     }
   }
-  // clean up
-  // while (!jumpMarkers.empty() && jumpMarkers.back().type == JumpMarkerType::NONE) {
-  //   jumpMarkers.pop_back();
-  // }
+}
+
+void CodeGen::writeLocalJumpOffsets() {
+  // first pass is to shift and update jump markers as needed depending on offset distance
+  while (true) {
+    bool updated = false;
+    for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
+      // only jumps within a function, no function calls
+      JumpMarker& jumpMarker = jumpMarkers[i];
+      if (jumpMarker.type != JumpMarkerType::SET) {
+        continue;
+      }
+      if (jumpMarker.start > UINT32_MAX || jumpMarker.destination > UINT32_MAX) {
+        std::cerr << "Compiler error, bytecode too large\n";
+        exit(1);
+      }
+      int64_t res = jumpMarker.start - jumpMarker.destination;
+      const OpCode jumpOp = (OpCode)byteCode[jumpMarker.start];
+      const uint8_t jumpOpImmSize = immediateSizeForRelativeJumpOp(jumpOp);
+      const uint8_t minImmSize = smallestImmediateSizeForOffset(res);
+      if (jumpOpImmSize == minImmSize) {
+        continue;
+      }
+      assert(minImmSize == 4);
+      byteCode[jumpMarker.start] = (bc)OpCode::NOP;
+      // currently we only have the 4 byte relative immediate, so
+      // extend by 8 bytes since moving by a multiple of 8 bytes keep everything after aligned
+      const uint32_t shiftAmount = 8;
+      byteCode.insert(byteCode.begin() + jumpMarker.start, shiftAmount, (bc)OpCode::NOP);
+      // find where we would be 4 byte aligned
+      while (true) {
+        if ((jumpMarker.start + 1) % minImmSize == 0) {
+          break;
+        }
+        ++jumpMarker.start;
+      }
+      byteCode[jumpMarker.start] = (bc)upgradeRelativeJumpOp(jumpOp);
+
+      for (uint32_t k = 0; k < jumpMarkers.size(); ++k) {
+        JumpMarker& otherJumpMarker = jumpMarkers[k];
+        if (otherJumpMarker.destination > jumpMarker.start) {
+          otherJumpMarker.destination += shiftAmount;
+          updated = true;
+        }
+        if (otherJumpMarker.start > jumpMarker.start) {
+          otherJumpMarker.start += shiftAmount;
+          updated = true;
+        }
+      }
+    }
+    if (!updated) {
+      break;
+    }
+  }
+
+  // second pass is to write the offset in
+  for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
+    JumpMarker& jumpMarker = jumpMarkers[i];
+    if (jumpMarker.type != JumpMarkerType::SET) {
+      continue;
+    }
+    const OpCode jumpOp = (OpCode)byteCode[jumpMarker.start];
+    const uint32_t immSize = immediateSizeForRelativeJumpOp(jumpOp);
+    int64_t res = jumpMarker.destination - jumpMarker.start;
+    assert(smallestImmediateSizeForOffset(res) == immSize);
+    assert(immSize == 1 || immSize == 4);
+    if (immSize == 1) {
+      byteCode[jumpMarker.start + 1] = (int8_t)res;
+    } else if (immSize == 4) {
+      *(int32_t *)&byteCode[jumpMarker.start + 1] = (int32_t)res;
+    } else {
+      // compiler 
+      std::cerr << "Compiler error, unsupported relative jump immediate size\n";
+      exit(1);
+    }
+  }
 }
 
 
@@ -324,13 +394,7 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     const uint32_t padding = diff - size;
     assert(padding < size);
     uint32_t spaceToAdd = size + padding;
-    ExpressionResult spaceToAddExp;
-    spaceToAddExp.set(spaceToAdd);
-    spaceToAddExp.type = &Checker::uint64Value;
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+    efficientImmAddOrSub(stackPointerIndex, spaceToAdd, OpCode::SUB);
     return;
   }
 
@@ -346,7 +410,7 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     if (!expRes.isReg) {
       moveImmToReg(allocateRegister(), expRes);
     } else if (expRes.isPointerToValue) {
-      // load value
+      expRes = loadValueFromPointer(expRes);
     }
     // stackVar.reg = reg;
   }
@@ -355,28 +419,12 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   assert(size >= 1 && size <= 8);
   if (!expRes.isReg) {
     uint32_t spaceToAdd = size + padding;
-    ExpressionResult spaceToAddExp;
-    spaceToAddExp.set(spaceToAdd);
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+    efficientImmAddOrSub(stackPointerIndex, spaceToAdd, OpCode::SUB);
     return;
   }
   const OpCode pushOp = getPushOpForSize(size);
   assert(pushOp != OpCode::NOP);
-  if (padding == 1) {
-    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
-  } else if (padding == 2) {
-    addBytes({{(bc)OpCode::DEC, stackPointerIndex, (bc)OpCode::DEC, stackPointerIndex}});
-  } else if (padding) {
-    ExpressionResult paddingToAdd;
-    paddingToAdd.set(padding);
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
-  }
+  efficientImmAddOrSub(stackPointerIndex, padding, OpCode::SUB);
   addBytes({{(bc)pushOp, expRes.getReg()}});
   if (expRes.isTemp) {
     freeRegister(expRes.getReg());
@@ -1038,11 +1086,8 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       const std::string& memberName = tk->extractToken(binOp->rightSide.getToken());
       const uint32_t offsetInStruct = structInfo.memberLookup.at(memberName).position;
       if (offsetInStruct) {
-        ExpressionResult offsetExpression;
-        offsetExpression.set(offsetInStruct);
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExpression);
+        efficientImmAddOrSub(expRes.getReg(), offsetInStruct, OpCode::ADD);
       }
-      // get offset of member and add to structVar
       return expRes;
     }
     case ExpressionType::UNARY_OP: {
@@ -1061,9 +1106,7 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
       if (offset) {
         expRes.setReg(allocateRegister());
         addBytes({{(bc)OpCode::MOVE, expRes.getReg(), stackPointerIndex}});
-        ExpressionResult varOffsetExp;
-        varOffsetExp.set(offset);
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, varOffsetExp);
+        efficientImmAddOrSub(expRes.getReg(), offset, OpCode::ADD);
       } else {
         expRes.setReg(stackPointerIndex);
         expRes.isTemp = false;
@@ -1151,9 +1194,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
           expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
           expRes.setReg(stringExp.getReg());
         }
-        ExpressionResult offsetExp;
-        offsetExp.set(dataSectionEntry.indexInDataSection);
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+        efficientImmAddOrSub(expRes.getReg(), dataSectionEntry.indexInDataSection, OpCode::ADD);
       } else {
         expRes.setReg(dataPointerIndex);
         expRes.isTemp = true;
@@ -1223,36 +1264,27 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
       expRes.isPointerToValue = true;
       expRes.setReg(allocateRegister());
       expRes.isTemp = true;
-      ExpressionResult dataPointerExp;
-      dataPointerExp.setReg(dataPointerIndex);
-      expressionResWithOp(OpCode::MOVE, OpCode::NOP, expRes, dataPointerExp);
-      ExpressionResult offsetExp;
-      offsetExp.set(stdinDataIndex);
-      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+      addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
+      efficientImmAddOrSub(expRes.getReg(), stdinDataIndex, OpCode::ADD);
+      expRes.type = &Checker::fileValue;
       return expRes;
     }
     case TokenType::STDERR: {
       expRes.isPointerToValue = true;
       expRes.setReg(allocateRegister());
       expRes.isTemp = true;
-      ExpressionResult dataPointerExp;
-      dataPointerExp.setReg(dataPointerIndex);
-      expressionResWithOp(OpCode::MOVE, OpCode::NOP, expRes, dataPointerExp);
-      ExpressionResult offsetExp;
-      offsetExp.set(stderrDataIndex);
-      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+      addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
+      efficientImmAddOrSub(expRes.getReg(), stderrDataIndex, OpCode::ADD);
+      expRes.type = &Checker::fileValue;
       return expRes;
     }
     case TokenType::STDOUT: {
       expRes.isPointerToValue = true;
       expRes.setReg(allocateRegister());
       expRes.isTemp = true;
-      ExpressionResult dataPointerExp;
-      dataPointerExp.setReg(dataPointerIndex);
-      expressionResWithOp(OpCode::MOVE, OpCode::NOP, expRes, dataPointerExp);
-      ExpressionResult offsetExp;
-      offsetExp.set(stdoutDataIndex);
-      expressionResWithOp(OpCode::ADD, OpCode::ADD_I, expRes, offsetExp);
+      addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
+      efficientImmAddOrSub(expRes.getReg(), stdoutDataIndex, OpCode::ADD);
+      expRes.type = &Checker::fileValue;
       return expRes;
     }
     case TokenType::NULL_PTR: {
@@ -1279,12 +1311,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
       const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
       if (varOffset) {
         addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-        ExpressionResult varOffsetExp;
-        varOffsetExp.set(varOffset);
-        ExpressionResult miscRegExp;
-        miscRegExp.setReg(miscRegisterIndex);
-        varOffsetExp.type = &Checker::uint64Value;
-        expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
+        efficientImmAddOrSub(miscRegisterIndex, varOffset, OpCode::ADD);
         addBytes({{(bc)loadOp, expRes.getReg(), miscRegisterIndex}});
       } else {
         addBytes({{(bc)loadOp, expRes.getReg(), stackPointerIndex}});
@@ -1520,6 +1547,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     // so if left is not a reg, we know it's value does not matter
 
     ExpressionResult leftResult = generateExpression(binOp.leftSide, controlFlow);
+    uint32_t startJumpMarkers = jumpMarkers.size();
     // if jump op is set, the flags are already set, 
     if (!leftResult.isReg && leftResult.jumpOp == OpCode::NOP) {
       // left side is immediate value
@@ -1599,7 +1627,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         addBytes({{(bc)OpCode::SET_FLAGS, rightResult.getReg()}});
       } else if (rightResult.isReg) {
         addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
-        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END, startJumpMarkers);
       } else {
         assert(rightResult.jumpOp != OpCode::NOP);
         addBytes({{(bc)OpCode::GET_NE, miscRegisterIndex}});
@@ -1910,14 +1938,7 @@ void CodeGen::endSoftScope() {
     stackItems.pop_back();
     assert(!stackItems.empty()); // paired with marker comment above
   }
-  if (stackUsage) {
-    ExpressionResult stackUsageExp;
-    stackUsageExp.set(stackUsage);
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerExp, stackUsageExp);
-  }
+  efficientImmAddOrSub(stackPointerIndex, stackUsage, OpCode::ADD);
 }
 
 
@@ -1981,39 +2002,48 @@ void CodeGen::generateStatement(const Statement& statement) {
 void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
   switch (controlFlowStatement.type) {
     case ControlFlowStatementType::FOR_LOOP: {
+      // const uint32_t currStack = stackItems.size();
       generateStatement(controlFlowStatement.forLoop->initialize);
-      const uint64_t startOfLoopIndex = addJumpMarker(JumpMarkerType::LOOP_START);
+      const uint64_t startOfLoopIndex = byteCode.size();
+      const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
       const BranchStatementResult res = generateBranchStatement(controlFlowStatement.forLoop->statement);
       generateExpression(controlFlowStatement.forLoop->iteration);
       addJumpMarker(JumpMarkerType::TO_LOOP_START);
       addJumpOp(OpCode::RS_JUMP);
       if (res == BranchStatementResult::ADDED_JUMP) {
-        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, loopJumpMarkersFrom);
       }
-      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, JumpMarkerType::LOOP_START);
-      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, JumpMarkerType::LOOP_START, true);
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, loopJumpMarkersFrom);
+      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, loopJumpMarkersFrom);
+      if (controlFlowStatement.forLoop->initialize.type == StatementType::VARIABLE_DEC) {
+        assert(nameToStackItemIndex[tk->extractToken(controlFlowStatement.forLoop->initialize.varDec->name)] == stackItems.size() - 1);
+        fakeClearStackFromTo(stackItems.size() - 1, stackItems.size() - 2);
+        stackItems.pop_back();
+      }
       break;
     }
     case ControlFlowStatementType::WHILE_LOOP: {
-      const uint64_t startOfLoopIndex = addJumpMarker(JumpMarkerType::LOOP_START);
+      const uint64_t startOfLoopIndex = byteCode.size();
+      const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
       BranchStatement& whileLoop = controlFlowStatement.whileLoop->statement;
       const BranchStatementResult res = generateBranchStatement(whileLoop);
       // place unconditional jump at the end of the while loop to go to start
       addJumpMarker(JumpMarkerType::TO_LOOP_START);
       addJumpOp(OpCode::RS_JUMP);
       if (res == BranchStatementResult::ADDED_JUMP) {
-        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, loopJumpMarkersFrom);
       }
       // update jump markers added by break / continue
-      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, JumpMarkerType::LOOP_START);
-      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, JumpMarkerType::LOOP_START, true);
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, loopJumpMarkersFrom);
+      updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, loopJumpMarkersFrom);
       break; 
     }
     case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
       const BranchStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
       const ElifStatementList *elifStatementList = controlFlowStatement.conditional->elifStatement;
       const Scope* elseStatement = controlFlowStatement.conditional->elseStatement;
-      addJumpMarker(JumpMarkerType::IF_CHAIN_START); // mark start of this if/elif/else chain
+      const uint32_t ifChainJumpMarkersFrom = jumpMarkers.size();
+      // addJumpMarker(JumpMarkerType::IF_CHAIN_START); // mark start of this if/elif/else chain
 
       // if statement
       {
@@ -2025,12 +2055,13 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         }
         if (res == BranchStatementResult::ADDED_JUMP) {
           // update if false condition jump to go to code after the branch
-          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, ifChainJumpMarkersFrom);
         }
       }
 
       // elif statements
       while (elifStatementList) {
+        const uint32_t markersStart = jumpMarkers.size();
         const BranchStatementResult res = generateBranchStatement(elifStatementList->elif);
         elifStatementList = elifStatementList->next;
         if (elifStatementList || elseStatement) {
@@ -2040,7 +2071,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         }
         if (res == BranchStatementResult::ADDED_JUMP) {
           // update elif false condition jump to go to code after the branch
-          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END);
+          updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, markersStart);
         }
       }
 
@@ -2050,7 +2081,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
       }
 
       // update all TO_IF_CHAIN_END jump ops until IF_CHAIN_START to go to current index
-      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, JumpMarkerType::IF_CHAIN_START, true);
+      updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, ifChainJumpMarkersFrom);
       break;
     }
     case ControlFlowStatementType::RETURN_STATEMENT: {
@@ -2166,16 +2197,7 @@ uint32_t CodeGen::getPositionPushingToStack(const uint32_t sizeOfType, const uin
 }
 
 void CodeGen::addSpaceToStack(uint32_t space) {
-  if (space == 1) {
-    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
-  } else if (space) {
-    ExpressionResult spaceToAdd;
-    spaceToAdd.set(space);
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAdd);
-  }
+  efficientImmAddOrSub(stackPointerIndex, space, OpCode::SUB);
 }
 
 StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
@@ -2320,21 +2342,17 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
  * \param to the index to go to
 */
 void CodeGen::fakeClearStackFromTo(const uint32_t from, const uint32_t to) {
+  // this for loop is going in the wrong order for destruction
+  // must be reverse order of placed on stack, not same order
   // for  (uint32_t i = from; i > to; --i) {
   //   if (stackItems[i].type != StackItemType::VARIABLE) {
   //     continue;
   //   }
   //   // call destructor for each variable
   // }
+  assert(from < stackItems.size() && to < stackItems.size() && from >= to);
   const uint32_t stackUsage = getPositionOnStack(from) - getPositionOnStack(to);
-  if (stackUsage) {
-    ExpressionResult stackUsageExp;
-    stackUsageExp.set(stackUsage);
-    ExpressionResult stackPointerExp;
-    stackPointerExp.setReg(stackPointerIndex);
-    stackPointerExp.type = &Checker::uint64Value;
-    expressionResWithOp(OpCode::ADD, OpCode::ADD_I, stackPointerExp, stackUsageExp);
-  }
+  efficientImmAddOrSub(stackPointerIndex, stackUsage, OpCode::ADD);
 }
 
 uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
@@ -2395,6 +2413,35 @@ uint32_t CodeGen::getSizeOfType(Token typeToken) {
     return structInfo.size;
   }
   return getSizeOfBuiltinType(typeToken.getType());
+}
+
+/**
+ * 
+*/
+void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
+  assert(op == OpCode::SUB || op == OpCode::ADD);
+  OpCode small, imm;
+  if (op == OpCode::SUB) {
+    // dec
+    small = OpCode::DEC;
+    imm = OpCode::SUB_I;
+  } else {
+    small = OpCode::INC;
+    imm = OpCode::ADD_I;
+  }
+  if (val == 1) {
+    addBytes({{(bc)small, reg}});
+  } else if (val) {
+    ExpressionResult paddingToAdd;
+    paddingToAdd.set(val);
+    ExpressionResult regExp;
+    regExp.setReg(reg);
+    regExp.type = &Checker::uint64Value;
+    expressionResWithOp(op, imm, regExp, paddingToAdd);
+    if (paddingToAdd.isTemp) {
+      freeRegister(paddingToAdd.getReg());
+    }
+  }
 }
 
 

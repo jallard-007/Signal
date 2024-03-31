@@ -416,12 +416,12 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::R_JUMP: {
-      ip += *(int16_t *)(ip) - 1;
+      ip += *(int32_t *)(ip) - 1;
       break;
     }
     case OpCode::R_JUMP_E: {
       if (z) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -429,7 +429,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_NE: {
       if (!z) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -437,7 +437,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_G: {
       if (p) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -445,7 +445,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_GE: {
       if (z || p) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -453,7 +453,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_L: {
       if (!z && !p) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
@@ -461,7 +461,7 @@ int Interpreter::runProgram() {
     }
     case OpCode::R_JUMP_LE: {
       if (z || !p) {
-        ip += *(int16_t *)(ip) - 1;
+        ip += *(int32_t *)(ip) - 1;
       } else {
         ip += 2;
       }
