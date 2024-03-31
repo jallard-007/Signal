@@ -313,81 +313,12 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * \returns the size of the type
 */
 void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
-  bc reg = 0;
   const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
   StackVariable& stackVar = addVarDecToVirtualStack(varDec);
   const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
   const Token typeToken = getTypeFromTokenList(varDec.type);
-  if (isBuiltInType(typeToken.type) || typeToken.type == TokenType::REFERENCE) {
-    if (initialize && varDec.initialAssignment) {
-      ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
-      if (!expRes.isReg) {
-        reg = allocateRegister();
-        moveImmToReg(reg, expRes);
-      } else {
-        reg = expRes.getReg();
-      }
-      stackVar.reg = reg;
-    }
-    const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
-    const uint32_t padding = diff - size;
-    assert(padding < size);
-    assert(size >= 1 && size <= 8);
-    if (!reg) {
-      uint32_t spaceToAdd = size + padding;
-      ExpressionResult spaceToAddExp;
-      spaceToAddExp.set(spaceToAdd);
-      ExpressionResult stackPointerExp;
-      stackPointerExp.setReg(stackPointerIndex);
-      stackPointerExp.type = &Checker::uint64Value;
-      expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
-    } else {
-      switch (size) {
-        case 1: {
-          addBytes({{(bc)OpCode::PUSH_B, reg}});
-          break;
-        }
-        case 2: {
-          if (padding) {
-            addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
-          }
-          addBytes({{(bc)OpCode::PUSH_W, reg}});
-          break;
-        }
-        case 4: {
-          // add padding to align
-          if (padding) {
-            ExpressionResult paddingToAdd;
-            paddingToAdd.set(padding);
-            ExpressionResult stackPointerExp;
-            stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.type = &Checker::uint64Value;
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
-          }
-          // push value to stack
-          addBytes({{(bc)OpCode::PUSH_D, reg}});
-          break;
-        }
-        case 8: {
-          if (padding) {
-            ExpressionResult paddingToAdd;
-            paddingToAdd.set(padding);
-            ExpressionResult stackPointerExp;
-            stackPointerExp.setReg(stackPointerIndex);
-            stackPointerExp.type = &Checker::uint64Value;
-            expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
-          }
-          addBytes({{(bc)OpCode::PUSH_Q, reg}});
-          break;
-        }
-        default: {
-          std::cerr << "Invalid Size [" << size << "] in generateVariableDeclaration\n";
-          exit(1);
-        }
-      }
-    }
-  }
-  else if (typeToken.type == TokenType::IDENTIFIER) {
+
+  if (typeToken.type == TokenType::IDENTIFIER) {
     const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
     const StructInformation& structInfo = structLookUp[genDec->structDec];
     const uint32_t size = structInfo.size;
@@ -401,31 +332,59 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     stackPointerExp.setReg(stackPointerIndex);
     stackPointerExp.type = &Checker::uint64Value;
     expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+    return;
   }
-  else {
+
+  if (!isBuiltInType(typeToken.type) && typeToken.type != TokenType::REFERENCE) {
     std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
     exit(1);
   }
-  // adding to stack
-  // uint32_t offset = size;
-  // for (StackItem &item : stack) {
-  //   if (item.type == StackItemType::MARKER) {
-  //     if (item.marker == StackMarkerType::HARD_SCOPE_START) {
-  //       break;
-  //     }
-  //   } else if (item.type == StackItemType::VARIABLE) {
-  //     offset = item.variable.offset + size;
-  //     break;
-  //   }
-  // }
-  // StackItem stackItem {
-  //   .variable = {
-  //     .varDec = varDec,
-  //     .offset = offset,
-  //   },
-  //   .type = StackItemType::VARIABLE,
-  // };
-  // stack.emplace_back(stackItem);
+
+  bc reg = 0;
+  const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
+  if (initialize && varDec.initialAssignment) {
+    ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
+
+    if (!expRes.isReg) {
+      reg = allocateRegister();
+      moveImmToReg(reg, expRes);
+    } else if (expRes.isPointerToValue) {
+      // load value
+    }
+    else {
+      reg = expRes.getReg();
+    }
+    // stackVar.reg = reg;
+  }
+  const uint32_t padding = diff - size;
+  assert(padding < size);
+  assert(size >= 1 && size <= 8);
+  if (!reg) {
+    uint32_t spaceToAdd = size + padding;
+    ExpressionResult spaceToAddExp;
+    spaceToAddExp.set(spaceToAdd);
+    ExpressionResult stackPointerExp;
+    stackPointerExp.setReg(stackPointerIndex);
+    stackPointerExp.type = &Checker::uint64Value;
+    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, spaceToAddExp);
+    return;
+  }
+  const OpCode pushOp = getPushOpForSize(size);
+  assert(pushOp != OpCode::NOP);
+  if (padding == 1) {
+    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
+  } else if (padding == 2) {
+    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
+    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
+  } else if (padding) {
+    ExpressionResult paddingToAdd;
+    paddingToAdd.set(padding);
+    ExpressionResult stackPointerExp;
+    stackPointerExp.setReg(stackPointerIndex);
+    stackPointerExp.type = &Checker::uint64Value;
+    expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
+  }
+  addBytes({{(bc)pushOp, reg}});
 }
 
 
@@ -871,7 +830,7 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool con
       return generateExpressionUnOp(*currExp.getUnOp());
     }
     case ExpressionType::VALUE: {
-      return loadValue(currExp.getToken());
+      return loadValue(currExp);
     }
     default: {
       std::cerr << "Code generation not implemented for this expression type\n";
@@ -922,20 +881,22 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   {
     Token returnType = getTypeFromTokenList(p_funcDec->returnType);
     uint32_t size = getSizeOfType(returnType);
-    // 8 byte align return type since function assumes it is
-    const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, 8);
-    addSpaceToStack(padding + size);
-    StackItem returnValue {
-      .tempValue {
-        .positionOnStack = getCurrStackPointerPosition() + padding + size
-      },
-      .type = StackItemType::TEMP_VALUE
-    };
-    stackItems.emplace_back(returnValue);
-
+    if (size) {
+      // 8 byte align return type since function assumes it is
+      const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, 8);
+      addSpaceToStack(padding + size);
+      StackItem returnValue {
+        .tempValue {
+          .positionOnStack = getCurrStackPointerPosition() + padding + size
+        },
+        .type = StackItemType::TEMP_VALUE
+      };
+      stackItems.emplace_back(returnValue);
+    }
   }
+  // the function will reset the stack to this point
   const uint32_t resetTo = stackItems.size();
-  // getPositionPushingTypeToStack(returnType, 8);
+
   // add arguments to stack
   if (functionCall.args.curr.getType() != ExpressionType::NONE) {
     const ExpressionList *expressionList = &functionCall.args;
@@ -1135,8 +1096,9 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
 }
 
 
-ExpressionResult CodeGen::loadValue(const Token &token) {
+ExpressionResult CodeGen::loadValue(const Expression &expression) {
   ExpressionResult expRes;
+  const Token& token = expression.getToken();
   switch (token.type) {
     case TokenType::CHAR_LITERAL: {
       std::string charLiteral = tk->extractToken(token);
@@ -1298,25 +1260,23 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
       return expRes;
     }
     case TokenType::IDENTIFIER: {
-      std::string identifier = tk->extractToken(token);
-      uint32_t stackItemIndex = nameToStackItemIndex[identifier];
-      StackVariable &variableInfo = stackItems[stackItemIndex].variable;
-      expRes.type = &variableInfo.varDec.type;
-      if (variableInfo.reg) {
-        expRes.setReg(variableInfo.reg);
-        return expRes;
-      }
-      const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
+      const std::string& identifier = tk->extractToken(token);
+      const uint32_t stackItemIndex = nameToStackItemIndex[identifier];
+      const StackVariable &variableInfo = stackItems[stackItemIndex].variable;
       const uint32_t sizeOfVar = getSizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
       if (sizeOfVar > SIZE_OF_REGISTER) {
-        // too large to fit into a reg, just return offset
-        // TODO: figure out what to make the type in this scenario, maybe need another flag in exp res
-        expRes.set(varOffset);
-        return expRes;
+        return getAddressOfExpression(expression);
       }
+      expRes.type = &variableInfo.varDec.type;
+      // if (variableInfo.reg) {
+      //   expRes.setReg(variableInfo.reg);
+      //   return expRes;
+      // }
       // load value into a register
-      variableInfo.reg = allocateRegister();
-      OpCode loadOp = getLoadOpForSize(sizeOfVar);
+      expRes.setReg(allocateRegister());
+      // variableInfo.reg = expRes.getReg();
+      const OpCode loadOp = getLoadOpForSize(sizeOfVar);
+      const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
       if (varOffset) {
         addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
         ExpressionResult varOffsetExp;
@@ -1325,11 +1285,10 @@ ExpressionResult CodeGen::loadValue(const Token &token) {
         miscRegExp.setReg(miscRegisterIndex);
         varOffsetExp.type = &Checker::uint64Value;
         expressionResWithOp(OpCode::ADD, OpCode::ADD_I, miscRegExp, varOffsetExp);
-        addBytes({{(bc)loadOp, variableInfo.reg, miscRegisterIndex}});
+        addBytes({{(bc)loadOp, expRes.getReg(), miscRegisterIndex}});
       } else {
-        addBytes({{(bc)loadOp, variableInfo.reg, stackPointerIndex}});
+        addBytes({{(bc)loadOp, expRes.getReg(), stackPointerIndex}});
       }
-      expRes.setReg(variableInfo.reg);
       return expRes;
     }
     default: {
@@ -1482,8 +1441,15 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
   // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
   if (binOp.op.type == TokenType::LOGICAL_AND || binOp.op.type == TokenType::LOGICAL_OR) {
     uint64_t shortCircuitIndexStart = 0;
-    ExpressionResult leftResult = generateExpression(binOp.leftSide);
-    if (!leftResult.isReg) {
+    // if left and right are both constant, we need to save the left side till we get the right, and then do the eval
+    // if left is a constant, we can discard the left side since either the expression will not go on, or the result is dependent on the right side
+    // if right is a constant, we still need to have saved the left side before hand, unless it's also a constant
+    
+    // so if left is not a reg, we know it's value does not matter
+
+    ExpressionResult leftResult = generateExpression(binOp.leftSide, controlFlow);
+    // if jump op is set, the flags are already set, 
+    if (!leftResult.isReg && leftResult.jumpOp == OpCode::NOP) {
       // left side is immediate value
       // essentially run !leftResult.value
       ExpressionResult zeroExp;
@@ -1504,31 +1470,44 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
       }
     } else {
       // short-circuit logical ops
-      shortCircuitIndexStart = byteCode.size();
-      if (binOp.op.type == TokenType::LOGICAL_AND) {
+      if (!leftResult.isReg) {
+        leftResult.setReg(allocateRegister());
+        addBytes({{(bc)OpCode::GET_NE, leftResult.getReg()}}); // save the result
+        shortCircuitIndexStart = byteCode.size();
+      } else {
+        shortCircuitIndexStart = byteCode.size();
         addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
+      }
+      if (binOp.op.type == TokenType::LOGICAL_AND) {
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
       }
       else {
-        addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
         addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
         addJumpOp(OpCode::RS_JUMP_NE); // if leftResult is true, skip right side
       }
     }
-    ExpressionResult rightResult = generateExpression(binOp.rightSide);
-    if (!rightResult.isReg) {
+
+    // l no reg immediate
+    // l is reg value is loaded in register
+    
+    ExpressionResult rightResult = generateExpression(binOp.rightSide, controlFlow && !leftResult.isReg);
+    // r no reg r no jump, immediate
+    // r is reg r no jump, value is loaded in register
+    // r is reg r is jump, not possible
+    // r no reg r is jump, flags set
+
+    if (!rightResult.isReg && rightResult.jumpOp == OpCode::NOP) {
       // right side is immediate value
       if (!leftResult.isReg) {
         // both sides are immediate
         return evaluateBinOpImmExpression(binOp.op.type, leftResult, rightResult);
       }
-      // left result is not an immediate, clear out short circuit code
+      // left result is not an immediate
       byteCode.resize(shortCircuitIndexStart);
       ExpressionResult zeroExp;
       zeroExp.type = &Checker::int32Value;
       rightResult = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult, zeroExp);
-      // have to use type to check this
       if (!*(bool*)rightResult.getData()) {
         // for &&, cond is always false
         if (binOp.op.type == TokenType::LOGICAL_AND) {
@@ -1546,10 +1525,58 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     } else {
       if (!leftResult.isReg) {
         addBytes({{(bc)OpCode::SET_FLAGS, rightResult.getReg()}});
-      } else {
+      } else if (rightResult.isReg) {
         addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
         updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOGICAL_BIN_OP_END);
+      } else {
+        assert(rightResult.jumpOp != OpCode::NOP);
+        addBytes({{(bc)OpCode::GET_NE, miscRegisterIndex}});
+        addBytes({{(bc)op, leftResult.getReg(), miscRegisterIndex}});
       }
+    }
+    
+    if (rightResult.isTemp) {
+      freeRegister(rightResult.getReg());
+    }
+    if (leftResult.isTemp) {
+      freeRegister(leftResult.getReg());
+    }
+    ExpressionResult expRes;
+    if (controlFlow) {
+      expRes.jumpOp = jumpOp;
+    } else {
+      expRes.isReg = true;
+      expRes.isTemp = true;
+      const bc reg = allocateRegister();
+      addBytes({{(bc)getOp, reg}});
+      expRes.setReg(reg);
+    }
+    return expRes;
+  } else {
+    ExpressionResult leftResult = generateExpression(binOp.leftSide);
+    ExpressionResult rightResult = generateExpression(binOp.rightSide);
+    if (!leftResult.isReg) { // immediate value
+      if (!rightResult.isReg) {
+        return evaluateBinOpImmExpression(binOp.op.type, leftResult, rightResult);
+      }
+      const bc reg = allocateRegister();
+      moveImmToReg(reg, leftResult);
+      leftResult.isReg = true;
+      leftResult.setReg(reg);
+      leftResult.isTemp = true;
+    } else if (!rightResult.isReg) {
+      const bc reg = allocateRegister();
+      moveImmToReg(reg, rightResult);
+      rightResult.isReg = true;
+      rightResult.setReg(reg);
+      rightResult.isTemp = true;
+    }
+    addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
+    if (rightResult.isTemp) {
+      freeRegister(rightResult.getReg());
+    }
+    if (leftResult.isTemp) {
+      freeRegister(leftResult.getReg());
     }
     ExpressionResult expRes;
     if (controlFlow) {
@@ -1563,43 +1590,6 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
     }
     return expRes;
   }
-
-  ExpressionResult leftResult = generateExpression(binOp.leftSide);
-  ExpressionResult rightResult = generateExpression(binOp.rightSide);
-  if (!leftResult.isReg) { // immediate value
-    if (!rightResult.isReg) {
-      return evaluateBinOpImmExpression(binOp.op.type, leftResult, rightResult);
-    }
-    const bc reg = allocateRegister();
-    moveImmToReg(reg, leftResult);
-    leftResult.isReg = true;
-    leftResult.setReg(reg);
-    leftResult.isTemp = true;
-  } else if (!rightResult.isReg) {
-    const bc reg = allocateRegister();
-    moveImmToReg(reg, rightResult);
-    rightResult.isReg = true;
-    rightResult.setReg(reg);
-    rightResult.isTemp = true;
-  }
-  addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
-  if (rightResult.isTemp) {
-    freeRegister(rightResult.getReg());
-  }
-  if (leftResult.isTemp) {
-    freeRegister(leftResult.getReg());
-  }
-  ExpressionResult expRes;
-  if (controlFlow) {
-    expRes.jumpOp = jumpOp;
-  } else {
-    expRes.isReg = true;
-    expRes.isTemp = true;
-    const bc reg = allocateRegister();
-    addBytes({{(bc)getOp, reg}});
-    expRes.setReg(reg);
-  }
-  return expRes;
 }
 
 ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool controlFlow) {
@@ -2297,7 +2287,6 @@ uint32_t CodeGen::getSizeOfType(Token typeToken) {
     const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
     const StructInformation& structInfo = structLookUp[genDec->structDec];
     return structInfo.size;
-    // struct
   }
   return getSizeOfBuiltinType(typeToken.getType());
 }

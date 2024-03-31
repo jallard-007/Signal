@@ -39,7 +39,7 @@ struct ExpressionResult {
 
   template <class T> void setUntyped(T) requires (std::integral<T> || std::floating_point<T>);
 
-  inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true; }
+  inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true;  /* setting all values as temporary for now to force reloading */ isTemp = true; }
   inline bytecode_t getReg() const { assert(isReg); return data[0]; }
 };
 
@@ -78,7 +78,7 @@ enum class StackMarkerType: uint8_t {
 struct StackVariable {
   const VariableDec &varDec;
   uint32_t positionOnStack = 0;
-  bytecode_t reg = 0;
+  // bytecode_t reg = 0;
 };
 
 struct TempStackValue {
@@ -182,7 +182,7 @@ struct CodeGen {
   ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
   void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
   ExpressionResult getAddressOfExpression(const Expression&);
-  ExpressionResult loadValue(const Token&);
+  ExpressionResult loadValue(const Expression&);
 
 // BINARY EXPRESSIONS
   ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);

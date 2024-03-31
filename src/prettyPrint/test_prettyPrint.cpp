@@ -73,7 +73,6 @@ R"(func getType(type: Type ref): Token {
     CHECK(str == output);
   }
   SECTION("three") {
-    SKIP("Have to incorporate precedence in pretty printer; when the ast does not match precedence, wrap subexpression");
     const std::string str = 
 R"(func getType(): void {
   (1 + 2) * 3;

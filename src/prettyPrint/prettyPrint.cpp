@@ -1,4 +1,5 @@
 #include "nodes.hpp"
+#include "parser/parser.hpp"
 
 const uint8_t indentationSize = 2;
 
@@ -55,19 +56,57 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
 }
 
 void UnOp::prettyPrint(Tokenizer& tk, std::string& str) {
+  bool wrap = false;
+  if (operand.getType() == ExpressionType::BINARY_OP || operand.getType() == ExpressionType::UNARY_OP) {
+    if (operatorPrecedence[(uint8_t)operand.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
+      wrap = true;
+    }
+  }
   if (op.type == TokenType::DECREMENT_POSTFIX || op.type == TokenType::INCREMENT_POSTFIX) {
+    if (wrap) {
+      str += '(';
+    }
     operand.prettyPrint(tk, str);
+    if (wrap) {
+      str += ')';
+    }
     str += typeToString.at(op.type);
   } else {
     str += typeToString.at(op.type);
+    if (wrap) {
+      str += '(';
+    }
     operand.prettyPrint(tk, str);
+    if (wrap) {
+      str += ')';
+    }
   }
 }
 
 void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) {
+  bool wrap = false;
+  if (leftSide.getType() == ExpressionType::BINARY_OP || leftSide.getType() == ExpressionType::UNARY_OP) {
+    if (operatorPrecedence[(uint8_t)leftSide.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
+      wrap = true;
+      str += '(';
+    }
+  }
   leftSide.prettyPrint(tk, str);
+  if (wrap) {
+    str += ')';
+  }
+  wrap = false;
   str += typeToString.at(op.type);
+  if (rightSide.getType() == ExpressionType::BINARY_OP || rightSide.getType() == ExpressionType::UNARY_OP) {
+    if (operatorPrecedence[(uint8_t)rightSide.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
+      wrap = true;
+      str += '(';
+    }
+  }
   rightSide.prettyPrint(tk, str);
+  if (wrap) {
+    str += ')';
+  }
 }
 
 void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {

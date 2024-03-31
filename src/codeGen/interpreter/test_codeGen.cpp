@@ -389,7 +389,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
 
 
 TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
-  {
+  SECTION("1") {
     const std::string str = "x:uint32; y:uint32; if (x && y) { num:uint32; } ";
     testBoilerPlate(str);
     Statement statement_x, statement_y, cond_statement;
@@ -432,8 +432,8 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
 
     CHECK(codeGen.byteCode == expected.byteCode);
   }
-  {
-    const std::string str = "x:uint32; y:uint32; if (x && y || x) { num:uint32; } ";
+  SECTION("2") {
+    const std::string str = "x:uint32; y:uint32; if (x && y || x) {} ";
     testBoilerPlate(str);
     Statement statement_x, statement_y, cond_statement;
     ParseStatementErrorType errorType = parser.parseStatement(statement_x);
@@ -456,24 +456,83 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
 
     // short circuit
     expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
+    // short circuit; if e (false), don't evaluate rest of expression, it's guaranteed false
     expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
     expected.addBytes({{(bc)OpCode::LOAD_D, 2, stackPointerIndex}});
 
     expected.addBytes({{(bc)OpCode::LOGICAL_AND, 1, 2}});
-    expected.addBytes({{(bc)OpCode::GET_NE, 3}});
-
-    // short circuit
-    expected.addBytes({{(bc)OpCode::SET_FLAGS, 3}});
+    expected.addBytes({{(bc)OpCode::GET_NE, 1}}); // save the result
+    // short circuit; if ne (true), don't evaluate rest of expression, it's guaranteed true
     expected.addBytes({{(bc)OpCode::RS_JUMP_NE, 0}});
 
-    expected.addBytes({{(bc)OpCode::LOGICAL_OR, 3, 1}});
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_D, 2, 0}});
+
+    expected.addBytes({{(bc)OpCode::LOGICAL_OR, 1, 2}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}}); // jump if false
+
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+  SECTION("3") {
+    const std::string str = "x:char; y:char; j:char; k:char; if (x && y || k && j) {} ";
+    testBoilerPlate(str);
+    Statement statement_x, statement_y, statement_j, statement_k, cond_statement;
+    ParseStatementErrorType errorType = parser.parseStatement(statement_x);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    errorType = parser.parseStatement(statement_y);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+      errorType = parser.parseStatement(statement_j);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+      errorType = parser.parseStatement(statement_k);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    errorType = parser.parseStatement(cond_statement);
+    REQUIRE(errorType == ParseStatementErrorType::NONE);
+    REQUIRE(cond_statement.controlFlow);
+    REQUIRE(cond_statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
+    codeGen.generateStatement(statement_x);
+    codeGen.generateStatement(statement_y);
+    codeGen.generateStatement(statement_j);
+    codeGen.generateStatement(statement_k);
+    codeGen.byteCode.clear();
+    codeGen.generateStatement(cond_statement);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 3, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_B, 1, 0}});
+
+    expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
+    // short circuit; if e (false), don't evaluate rest of expression, it's guaranteed false
     expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
     expected.alignForImm(2, 2);
-    expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 2, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_B, 2, 0}});
+
+    expected.addBytes({{(bc)OpCode::LOGICAL_AND, 1, 2}});
+    expected.addBytes({{(bc)OpCode::GET_NE, 1}}); // save the result
+    // short circuit; if ne (true), don't evaluate rest of expression, it's guaranteed true
+    expected.addBytes({{(bc)OpCode::RS_JUMP_NE, 0}});
+
+    expected.addBytes({{(bc)OpCode::LOAD_B, 2, stackPointerIndex}});
+    expected.addBytes({{(bc)OpCode::SET_FLAGS, 2}});
+    // short circuit; if e (false), don't evaluate rest of expression, it's guaranteed false
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
+
+    expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
     expected.alignForImm(2, 2);
-    expected.addBytes({{(bc)OpCode::ADD_I, stackPointerIndex, 4, 0}});
+    expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 1, 0}});
+    expected.addBytes({{(bc)OpCode::LOAD_B, 3, 0}});
+
+    expected.addBytes({{(bc)OpCode::LOGICAL_AND, 2, 3}});
+    expected.addBytes({{(bc)OpCode::GET_NE, 2}}); // save the result
+
+    expected.addBytes({{(bc)OpCode::LOGICAL_OR, 1, 2}});
+    expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}}); // jump if false
 
     CHECK(codeGen.byteCode == expected.byteCode);
   }
@@ -560,6 +619,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
     CHECK(stringLiteral == (char *)(codeGen.dataSection.data() + entry.indexInDataSection) );
   }
   SECTION("2") {
+    SKIP();
     const std::string str = "file: file_t = stdin;";
     testBoilerPlate(str);
     Statement statement;

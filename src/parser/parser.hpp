@@ -81,3 +81,5 @@ struct Parser {
   ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
   ParseTypeErrorType getType(TokenList&);
 };
+
+extern uint8_t operatorPrecedence [];

@@ -688,11 +688,13 @@ int Interpreter::runProgram() {
       break;
     }
     case OpCode::LOGICAL_OR: {
+      // zero flag set to true if false
       z = !(registers[*(bc *)ip] || registers[*(bc *)(ip + 1)]);
       ip += 2;
       break;
     }
     case OpCode::LOGICAL_AND: {
+      // zero flag set to true if false
       z = !(registers[*(bc *)ip] && registers[*(bc *)(ip + 1)]);
       ip += 2;
       break;
