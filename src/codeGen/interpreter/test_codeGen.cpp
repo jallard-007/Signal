@@ -793,3 +793,106 @@ R"(
     CHECK(codeGen.byteCode == expected.byteCode);
   }
 }
+
+TEST_CASE("for loop", "[codeGen]") {
+  SECTION("1") {
+  const std::string str = 
+R"(
+  func testFunction(): void {
+    for (i: uint32 = 0; i < 10; ++i) {}
+  }
+)";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    // output should be exactly the same as the for loop code
+    expected.addBytes({{
+      (bc)OpCode::MOVE_SI, 1, 0,
+      (bc)OpCode::PUSH_D, 1,
+    }});
+    const uint32_t jumpIndex = expected.byteCode.size();
+    expected.addBytes({{
+      (bc)OpCode::LOAD_D, 1, 30,
+      (bc)OpCode::MOVE_SI, 2, 10,
+      (bc)OpCode::CMP, 1, 2,
+      (bc)OpCode::RS_JUMP_GE
+    }});
+    const uint32_t conditionJump = expected.byteCode.size();
+    expected.addByte(0);
+    expected.addBytes({{
+      (bc)OpCode::LOAD_D, 1, 30,
+      (bc)OpCode::INC, 1,
+      (bc)OpCode::STORE_D, 1, 30,
+      (bc)OpCode::RS_JUMP
+    }});
+    expected.addByte(jumpIndex - (expected.byteCode.size() - 1));
+    expected.byteCode[conditionJump] = expected.byteCode.size() - (conditionJump - 1);
+    expected.alignForImm(2, 2);
+    expected.addBytes({{
+      (bc)OpCode::ADD_I, 30, 4, 0,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0,
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+}
+
+TEST_CASE("while loop", "[codeGen]") {
+  SECTION("1") {
+  const std::string str = 
+R"(
+  func testFunction(): void {
+    i: uint32 = 0;
+    while i < 10 {
+      ++i;
+    }
+  }
+)";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    // output should be exactly the same as the for loop code
+    expected.addBytes({{
+      (bc)OpCode::MOVE_SI, 1, 0,
+      (bc)OpCode::PUSH_D, 1,
+    }});
+    const uint32_t jumpIndex = expected.byteCode.size();
+    expected.addBytes({{
+      (bc)OpCode::LOAD_D, 1, 30,
+      (bc)OpCode::MOVE_SI, 2, 10,
+      (bc)OpCode::CMP, 1, 2,
+      (bc)OpCode::RS_JUMP_GE
+    }});
+    const uint32_t conditionJump = expected.byteCode.size();
+    expected.addByte(0);
+    expected.addBytes({{
+      (bc)OpCode::LOAD_D, 1, 30,
+      (bc)OpCode::INC, 1,
+      (bc)OpCode::STORE_D, 1, 30,
+      (bc)OpCode::RS_JUMP
+    }});
+    expected.addByte(jumpIndex - (expected.byteCode.size() - 1));
+    expected.byteCode[conditionJump] = expected.byteCode.size() - (conditionJump - 1);
+    expected.alignForImm(2, 2);
+    expected.addBytes({{
+      (bc)OpCode::ADD_I, 30, 4, 0,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::JUMP, 0,
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
+}

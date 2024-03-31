@@ -74,7 +74,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       case OpCode::RS_JUMP_GE:
       case OpCode::RS_JUMP_L:
       case OpCode::RS_JUMP_LE: {
-        int32_t arg1 = vec[++i];
+        int32_t arg1 = (int8_t)vec[++i];
         os << " " << arg1;
         break;
       }
@@ -117,7 +117,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
       // 1 register arg, followed by a 1 byte number
       case OpCode::MOVE_SI: {
         uint32_t arg1 = vec[++i];
-        int32_t arg2 = *(int8_t *)&vec[++i];
+        int32_t arg2 = (int8_t)vec[++i];
         os << " " << arg1 << " " << arg2;
         break;
       }

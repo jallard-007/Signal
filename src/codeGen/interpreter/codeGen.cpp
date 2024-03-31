@@ -165,7 +165,6 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
 void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
   assert(!exp.isReg);
   exp.isTemp = true;
-  exp.isReg = true;
   TokenType rightSideExpType = exp.type->token.getType();
   if (rightSideExpType == TokenType::POINTER) {
     rightSideExpType = TokenType::UINT64_TYPE;
@@ -340,26 +339,21 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     exit(1);
   }
 
-  bc reg = 0;
+  ExpressionResult expRes;
   const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
   if (initialize && varDec.initialAssignment) {
-    ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
-
+    expRes = generateExpression(*varDec.initialAssignment);
     if (!expRes.isReg) {
-      reg = allocateRegister();
-      moveImmToReg(reg, expRes);
+      moveImmToReg(allocateRegister(), expRes);
     } else if (expRes.isPointerToValue) {
       // load value
-    }
-    else {
-      reg = expRes.getReg();
     }
     // stackVar.reg = reg;
   }
   const uint32_t padding = diff - size;
   assert(padding < size);
   assert(size >= 1 && size <= 8);
-  if (!reg) {
+  if (!expRes.isReg) {
     uint32_t spaceToAdd = size + padding;
     ExpressionResult spaceToAddExp;
     spaceToAddExp.set(spaceToAdd);
@@ -374,8 +368,7 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
   if (padding == 1) {
     addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
   } else if (padding == 2) {
-    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
-    addBytes({{(bc)OpCode::DEC, stackPointerIndex}});
+    addBytes({{(bc)OpCode::DEC, stackPointerIndex, (bc)OpCode::DEC, stackPointerIndex}});
   } else if (padding) {
     ExpressionResult paddingToAdd;
     paddingToAdd.set(padding);
@@ -384,7 +377,10 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     stackPointerExp.type = &Checker::uint64Value;
     expressionResWithOp(OpCode::SUB, OpCode::SUB_I, stackPointerExp, paddingToAdd);
   }
-  addBytes({{(bc)pushOp, reg}});
+  addBytes({{(bc)pushOp, expRes.getReg()}});
+  if (expRes.isTemp) {
+    freeRegister(expRes.getReg());
+  }
 }
 
 
@@ -2134,6 +2130,9 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
       addBytes({{(bc)getLoadOpForSize(size), miscRegisterIndex, expRes.getReg()}});
       addBytes({{(bc)getPushOpForSize(size), miscRegisterIndex}});
     }
+    if (expRes.isTemp) {
+      freeRegister(expRes.getReg());
+    }
     return padding + size;
   } else {
     const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
@@ -2158,6 +2157,9 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
       addExpressionResToStack(sizeExp); // add size
       addBytes({{(bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_COPY}});
       addBytes({{(bc)OpCode::POP_Q, miscRegisterIndex}}); // pop return value
+    }
+    if (expRes.isTemp) {
+      freeRegister(expRes.getReg());
     }
     return padding + size;
   }

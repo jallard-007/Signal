@@ -13,9 +13,9 @@ create raw string parser
 - Parser
     - change array access expression type to binary op
 - Code gen
-    - storing values back to memory (assignment bin ops), need address and type of expression
-    - functions, scopes, nested scopes, breaking out of loops (Use stack markers)
     - unary operators
+    - storing values back to memory (assignment bin ops), need address and type of expression
+    - updating jump ops with the correct offset
     - what to do with registers that contain struct members (maybe "variableName.structVariableName" for its name to info map, then store offset info)
 
 Potential future tasks:
