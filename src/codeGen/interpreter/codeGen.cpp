@@ -233,8 +233,8 @@ bool jumpMarkerTypeHasJump(JumpMarkerType markerType) {
 /**
  * \returns the index of the jump marker within the jump markers array
 */
-void CodeGen::addJumpMarker(JumpMarkerType type) {
-  jumpMarkers.emplace_back(byteCode.size(), type);
+JumpMarker& CodeGen::addJumpMarker(JumpMarkerType type) {
+  return jumpMarkers.emplace_back(byteCode.size(), type);
 }
 
 /**
@@ -329,6 +329,20 @@ void CodeGen::writeLocalJumpOffsets() {
     }
   }
 }
+
+void CodeGen::writeFunctionJumpOffsets() {
+  for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
+    JumpMarker& jumpMarker = jumpMarkers[i];
+    if (jumpMarker.type != JumpMarkerType::FUNCTION_CALL) {
+      continue;
+    }
+    const uint32_t functionIndex = functionDecPointerToIndex[jumpMarker.funcDec];
+    assert(jumpMarker.start < UINT32_MAX);
+    const int32_t offset = functionIndex - jumpMarker.start;
+    *(int32_t *)&byteCode[jumpMarker.start + 1] = (int32_t)offset;
+  }
+}
+
 
 
 // ========================================
@@ -916,7 +930,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   // need to lookup return type so we can make room for it
   const std::string& functionName = tk->extractToken(functionCall.name);
   GeneralDec const *const &generalDec = lookUp[functionName];
-  FunctionDec* p_funcDec;
+  const FunctionDec* p_funcDec;
   if (generalDec->type == GeneralDecType::BUILTIN_FUNCTION) {
     p_funcDec = &generalDec->builtinFunc->funcDec;
   } else {
@@ -960,15 +974,30 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
   addSpaceToStack(getPaddingNeeded(getCurrStackPointerPosition(), 8, 8));
   alignForImm(1, 4);
   // register this position to be updated
-  addByteOp(OpCode::CALL);
-  add4ByteNum(0);
+  if (generalDec->type == GeneralDecType::BUILTIN_FUNCTION) {
+    const std::string& builtinFunctionName = tokenizers[generalDec->tokenizerIndex].extractToken(generalDec->builtinFunc->name);
+    if (!builtin_function_to_bytecode_t.contains(builtinFunctionName)) {
+      std::cerr << "Compiler error, builtin function for " << builtinFunctionName << " does not exist\n";
+      exit(1);
+    }
+    BuiltInFunction builtInFunc = builtin_function_to_bytecode_t.at(builtinFunctionName);
+    addByteOp(OpCode::CALL_B);
+    addByte((bytecode_t)builtInFunc);
+  } else {
+    JumpMarker& jumpMarker = addJumpMarker(JumpMarkerType::FUNCTION_CALL);
+    jumpMarker.funcDec = p_funcDec;
+    addByteOp(OpCode::CALL);
+    add4ByteNum(0);
+  }
   while (stackItems.size() > resetTo) {
     stackItems.pop_back();
   }
+
   // have to return 'return value' expression result, which is stored on the stack
   // pointer is in sp register
   ExpressionResult returnValuePointerExpression;
   returnValuePointerExpression.setReg(stackPointerIndex);
+  // returnValuePointerExpression.isPointerToStackValue; ?
   returnValuePointerExpression.type = &p_funcDec->returnType;
   return returnValuePointerExpression;
 }
@@ -1950,6 +1979,7 @@ void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
   assert(stackItems.empty());
   addFunctionSignatureToVirtualStack(funcDec);
   // have checker add empty return statement for void functions
+  functionDecPointerToIndex[&funcDec] = byteCode.size();
   generateStatementList(&funcDec.body.scopeStatements);
   stackItems.clear();
 }

@@ -292,7 +292,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
 }
 
 TEST_CASE("variable creation", "[codeGen]") {
-  {
+  SECTION("1") {
     const std::string str = "x:uint32;";
     testBoilerPlate(str);
     Statement statement;
@@ -305,7 +305,7 @@ TEST_CASE("variable creation", "[codeGen]") {
     expected.addBytes({{(bc)OpCode::SUB_I, stackPointerIndex, 4, 0}});
     CHECK(codeGen.byteCode == expected.byteCode);
   }
-  {
+  SECTION("2") {
     const std::string str = "x:uint32 = 10;";
     testBoilerPlate(str);
     Statement statement;
@@ -386,7 +386,6 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
     CHECK(codeGen.byteCode == expected.byteCode);
   }
 }
-
 
 TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
   SECTION("1") {
@@ -697,6 +696,29 @@ TEST_CASE("generating return statement", "[codeGen]") {
     }});
     CHECK(codeGen.byteCode == expected.byteCode);
   }
+  SECTION("4") {
+    const std::string str = "func testFunction(): int32 { return 1; } ";
+    testBoilerPlate(str);
+    REQUIRE(parser.parse());
+    REQUIRE(checker.check(true));
+    auto genDec = checker.lookUp["testFunction"];
+    REQUIRE(genDec);
+    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+    REQUIRE(genDec->funcDec);
+    FunctionDec& funcDec = *genDec->funcDec;
+    codeGen.generateFunctionDeclaration(funcDec);
+    CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    expected.addBytes({{
+      (bc)OpCode::MOVE_SI, 1, 1,
+      (bc)OpCode::MOVE, 2, 30,
+      (bc)OpCode::ADD_I, 2, 12, 0,
+      (bc)OpCode::STORE_D, 2, 1,
+      (bc)OpCode::POP_Q, 0,
+      (bc)OpCode::ADD_I, 30, 16, 0,
+      (bc)OpCode::JUMP, 0
+    }});
+    CHECK(codeGen.byteCode == expected.byteCode);
+  }
 }
 
 TEST_CASE("generating function call", "[codeGen]") {
@@ -728,7 +750,7 @@ R"(
     }});
     CHECK(codeGen.byteCode == expected.byteCode);
   }
-    SECTION("2") {
+  SECTION("2") {
     const std::string str = 
 R"(
   func testFunction(): void {
@@ -739,23 +761,43 @@ R"(
     testBoilerPlate(str);
     REQUIRE(parser.parse());
     REQUIRE(checker.check(true));
-    auto genDec = checker.lookUp["testFunction"];
-    REQUIRE(genDec);
-    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
-    REQUIRE(genDec->funcDec);
-    FunctionDec& funcDec = *genDec->funcDec;
-    codeGen.generateFunctionDeclaration(funcDec);
+    {
+      auto genDec = checker.lookUp["testFunction"];
+      REQUIRE(genDec);
+      REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+      REQUIRE(genDec->funcDec);
+      FunctionDec& funcDec = *genDec->funcDec;
+      codeGen.generateFunctionDeclaration(funcDec);
+    }
+    const uint32_t codeSizeAfterFunc = codeGen.byteCode.size();
+    {
+      auto genDec = checker.lookUp["otherTestFunction"];
+      REQUIRE(genDec);
+      REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+      REQUIRE(genDec->funcDec);
+      FunctionDec& funcDec = *genDec->funcDec;
+      codeGen.generateFunctionDeclaration(funcDec);
+    }
+    codeGen.byteCode.resize(codeSizeAfterFunc);
+    codeGen.writeFunctionJumpOffsets();
     CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    expected.alignForImm(2, 2);
     expected.addBytes({{
       (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
-      (bc)OpCode::NOP,
-      (bc)OpCode::NOP,
-      (bc)OpCode::NOP,
-      (bc)OpCode::CALL, 0, 0, 0, 0,
+    }});
+    expected.alignForImm(1, 4);
+    const uint32_t indexOfCall = expected.byteCode.size();
+    expected.addBytes({{
+      (bc)OpCode::CALL, 0, 0, 0, 0
+    }});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{
       (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
       (bc)OpCode::POP_Q, 0,
-      (bc)OpCode::JUMP, 0
+      (bc)OpCode::JUMP, 0,
     }});
+    const uint32_t functionIndex = expected.byteCode.size();
+    *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
     CHECK(codeGen.byteCode == expected.byteCode);
   }
   SECTION("3") {
@@ -769,25 +811,49 @@ R"(
     testBoilerPlate(str);
     REQUIRE(parser.parse());
     REQUIRE(checker.check(true));
-    auto genDec = checker.lookUp["testFunction"];
-    REQUIRE(genDec);
-    REQUIRE(genDec->type == GeneralDecType::FUNCTION);
-    REQUIRE(genDec->funcDec);
-    FunctionDec& funcDec = *genDec->funcDec;
-    codeGen.generateFunctionDeclaration(funcDec);
+    {
+      auto genDec = checker.lookUp["testFunction"];
+      REQUIRE(genDec);
+      REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+      REQUIRE(genDec->funcDec);
+      FunctionDec& funcDec = *genDec->funcDec;
+      codeGen.generateFunctionDeclaration(funcDec);
+    }
+    const uint32_t codeSizeAfterFunc = codeGen.byteCode.size();
+    {
+      auto genDec = checker.lookUp["otherTestFunction"];
+      REQUIRE(genDec);
+      REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+      REQUIRE(genDec->funcDec);
+      FunctionDec& funcDec = *genDec->funcDec;
+      codeGen.generateFunctionDeclaration(funcDec);
+    }
+    codeGen.byteCode.resize(codeSizeAfterFunc);
+    codeGen.writeFunctionJumpOffsets();
     CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    expected.alignForImm(2, 2);
     expected.addBytes({{
       (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
       (bc)OpCode::MOVE_SI, 1, 1,
       (bc)OpCode::PUSH_D, 1,
-      (bc)OpCode::NOP,
+    }});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{
       (bc)OpCode::SUB_I, stackPointerIndex, 4, 0,
-      (bc)OpCode::NOP,
-      (bc)OpCode::CALL, 0, 0, 0, 0,
+    }});
+    expected.alignForImm(1, 4);
+    const uint32_t indexOfCall = expected.byteCode.size();
+    expected.addBytes({{
+      (bc)OpCode::CALL, 0, 0, 0, 0
+    }});
+    expected.alignForImm(2, 2);
+    expected.addBytes({{
       (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
       (bc)OpCode::POP_Q, 0,
-      (bc)OpCode::JUMP, 0
+      (bc)OpCode::JUMP, 0,
     }});
+    const uint32_t functionIndex = expected.byteCode.size();
+    *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
     CHECK(codeGen.byteCode == expected.byteCode);
   }
 }

@@ -63,7 +63,10 @@ bool jumpMarkerTypeHasJump(JumpMarkerType);
 
 struct JumpMarker {
   uint64_t start;
-  uint64_t destination;
+  union {
+    uint64_t destination;
+    const FunctionDec *funcDec;
+  };
   JumpMarkerType type;
   JumpMarker() = delete;
   JumpMarker(uint64_t, JumpMarkerType);
@@ -130,7 +133,8 @@ struct DataSectionEntry {
 
 struct CodeGen {
   std::array<RegisterInfo, NUM_REGISTERS> registers;
-  std::map<std::string, uint32_t> nameToStackItemIndex;
+  std::unordered_map<std::string, uint32_t> nameToStackItemIndex;
+  std::unordered_map<const FunctionDec*, uint32_t> functionDecPointerToIndex;
   std::vector<unsigned char> byteCode;
   std::vector<unsigned char> dataSection;
   std::vector<DataSectionEntry> dataSectionEntries;
@@ -168,9 +172,10 @@ struct CodeGen {
   void moveImmToReg(uint8_t, ExpressionResult&);
 
 // JUMP MARKERS
-  void addJumpMarker(JumpMarkerType);
+  JumpMarker& addJumpMarker(JumpMarkerType);
   void updateJumpMarkersTo(uint64_t, JumpMarkerType, uint32_t);
   void writeLocalJumpOffsets();
+  void writeFunctionJumpOffsets();
 
 // DECLARATIONS
   void generateGeneralDeclaration(const GeneralDec&);
