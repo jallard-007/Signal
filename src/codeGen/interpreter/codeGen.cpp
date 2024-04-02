@@ -452,129 +452,129 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
 
 template< class T, class U >
 struct OperatorAdd {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t + u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t + u;
+    }
 };
 template< class T, class U >
 struct OperatorSub {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t - u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t - u;
+    }
 };
 template< class T, class U >
 struct OperatorMul {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t * u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t * u;
+    }
 };
 template< class T, class U >
 struct OperatorDiv {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t / u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t / u;
+    }
 };
 template< class T, class U >
 struct OperatorModulo {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t % u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t % u;
+    }
 };
 template< class T, class U >
 struct OperatorBitwiseOr {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t | u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t | u;
+    }
 };
 template< class T, class U >
 struct OperatorBitwiseAnd {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t & u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t & u;
+    }
 };
 template< class T, class U >
 struct OperatorBitwiseXor {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t ^ u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t ^ u;
+    }
 };
 template< class T, class U >
 struct OperatorShiftLeft {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t << u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t << u;
+    }
 };
 template< class T, class U >
 struct OperatorShiftRight {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t >> u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t >> u;
+    }
 };
 template< class T, class U>
 struct OperatorEqual {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_equal(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept {
-                return t == u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_equal(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t == u;
+    }
 };
 template< class T, class U >
 struct OperatorNotEqual {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_not_equal(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept {
-                return t != u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_not_equal(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t != u;
+    }
 };
 template< class T, class U >
 struct OperatorLogicalAnd {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t && u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t && u;
+    }
 };
 template< class T, class U >
 struct OperatorLogicalOr {
-        constexpr auto operator()(T t, U u) noexcept {
-                return t || u;
-        }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t || u;
+    }
 };
 template< class T, class U >
 struct OperatorGreater {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_greater(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept  {
-                return t > u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_greater(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept  {
+        return t > u;
+    }
 };
 template< class T, class U >
 struct OperatorGreaterEqual {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_greater_equal(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept {
-                return t >= u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_greater_equal(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t >= u;
+    }
 };
 template< class T, class U >
 struct OperatorLess {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_less(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept {
-                return t < u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_less(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t < u;
+    }
 };
 template< class T, class U >
 struct OperatorLessEqual {
-        constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-                return std::cmp_less_equal(t, u);
-        }
-        constexpr auto operator()(T t, U u) noexcept {
-                return t <= u;
-        }
+    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
+        return std::cmp_less_equal(t, u);
+    }
+    constexpr auto operator()(T t, U u) noexcept {
+        return t <= u;
+    }
 };
 
 template<template<typename, typename> class TFunctor>
