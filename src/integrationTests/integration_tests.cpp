@@ -10,18 +10,18 @@
 #define currDir "src/integrationTests/"
 
 TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
-  SECTION("hello world") {
-    std::vector<unsigned char> program;
-    std::string file = currDir "helloWorld.py";
-    REQUIRE(openAndReadFile(file, program));
-    std::vector<Tokenizer> tokenizers; \
-    Tokenizer& tokenizer = tokenizers.emplace_back(file, std::move(program)); \
-    Parser parser{tokenizer, memPool}; \
-    REQUIRE(parser.parse());
-    Checker checker{parser.program, tokenizers, memPool}; \
-    REQUIRE(checker.check());
-    CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
-    codeGen.tk = &tokenizer;
-    REQUIRE(codeGen.generate());
-  }
+    SECTION("hello world") {
+        std::vector<unsigned char> program;
+        std::string file = currDir "helloWorld.py";
+        REQUIRE(openAndReadFile(file, program));
+        std::vector<Tokenizer> tokenizers; \
+        Tokenizer& tokenizer = tokenizers.emplace_back(file, std::move(program)); \
+        Parser parser{tokenizer, memPool}; \
+        REQUIRE(parser.parse());
+        Checker checker{parser.program, tokenizers, memPool}; \
+        REQUIRE(checker.check());
+        CodeGen codeGen{parser.program, tokenizers, checker.lookUp}; \
+        codeGen.tk = &tokenizer;
+        REQUIRE(codeGen.generate());
+    }
 }

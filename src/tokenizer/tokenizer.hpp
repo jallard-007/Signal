@@ -5,40 +5,40 @@
 #include "token.hpp"
 
 struct TokenPositionInfo{
-  uint32_t lineNum;
-  uint32_t linePos;
-  TokenPositionInfo() = delete;
-  TokenPositionInfo(uint32_t, uint32_t);
+    uint32_t lineNum;
+    uint32_t linePos;
+    TokenPositionInfo() = delete;
+    TokenPositionInfo(uint32_t, uint32_t);
 };
 
 struct Tokenizer {
-  std::vector<uint32_t> newlinePositions;
-  const std::string filePath;
-  const std::vector<unsigned char> content;
-  std::string extracted;
-  Token peeked;
-  uint32_t position{0};
-  uint32_t tokenizerIndex{0};
-  TokenType prevType{TokenType::NONE};
+    std::vector<uint32_t> newlinePositions;
+    const std::string filePath;
+    const std::vector<unsigned char> content;
+    std::string extracted;
+    Token peeked;
+    uint32_t position{0};
+    uint32_t tokenizerIndex{0};
+    TokenType prevType{TokenType::NONE};
 
-  Tokenizer() = delete;
+    Tokenizer() = delete;
 
-  explicit Tokenizer(std::string&&, std::vector<unsigned char>&&);
-  explicit Tokenizer(std::string&&, const std::vector<unsigned char>&);
-  explicit Tokenizer(std::string&&, const std::string&);
+    explicit Tokenizer(std::string&&, std::vector<unsigned char>&&);
+    explicit Tokenizer(std::string&&, const std::vector<unsigned char>&);
+    explicit Tokenizer(std::string&&, const std::string&);
 
-  void tokenizeAll(std::vector<Token>&);
-  Token tokenizeNext();
-  Token peekNext();
-  void consumePeek();
-  const std::string& extractToken(const Token&);
-  TokenPositionInfo getTokenPositionInfo(const Token&);
+    void tokenizeAll(std::vector<Token>&);
+    Token tokenizeNext();
+    Token peekNext();
+    void consumePeek();
+    const std::string& extractToken(const Token&);
+    TokenPositionInfo getTokenPositionInfo(const Token&);
 
 private:
-  void moveToNextNonWhiteSpaceChar();
-  void movePastIdentifier();
-  void movePastNumber();
-  void movePastHexNumber();
-  bool movePastLiteral(char);
-  void movePastNewLine();
+    void moveToNextNonWhiteSpaceChar();
+    void movePastIdentifier();
+    void movePastNumber();
+    void movePastHexNumber();
+    bool movePastLiteral(char);
+    void movePastNewLine();
 };
