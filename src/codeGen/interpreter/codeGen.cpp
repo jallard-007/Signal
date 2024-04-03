@@ -344,7 +344,6 @@ void CodeGen::writeFunctionJumpOffsets() {
 }
 
 
-
 // ========================================
 // DECLARATIONS
 // ========================================
@@ -396,12 +395,47 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * \returns the size of the type
 */
 void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+    // if (initialize && varDec.initialAssignment) {
+    //     ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
+    //     if (expRes.isReturnedValue) {
+    //         assert(stackItems.back().type == StackItemType::RETURNED_VALUE);
+    //         StackItem stackItem {
+    //             .variable = {
+    //                 .varDec = varDec,
+    //                 .positionOnStack = getCurrStackPointerPosition(),
+    //             },
+    //             .type = StackItemType::VARIABLE,
+    //         };
+    //         stackItems.pop_back();
+    //         nameToStackItemIndex[tk->extractToken(varDec.name)] = stackItems.size();
+    //         stackItems.emplace_back(stackItem);
+    //         return;
+    //     }
+    //     if (expRes.isPointerToValue) {
+    //         expRes = loadValueFromPointer(expRes);
+    //     }
+    //     if (!expRes.isReg) {
+    //         moveImmToReg(allocateRegister(), expRes);
+    //     }
+    //     if (expRes.isReg) {
+
+    //     }
+    //     // at sp (value returned from function, pop off, use current sp offset as location for this var)
+    //     // in reg (push the value in register to the stack)
+    //     // pointer to value (have to copy the value to the stack)
+
+    //     if (!expRes.isReg) {
+    //     } else  {
+
+    //     }
+    // }
+
     const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
     StackVariable& stackVar = addVarDecToVirtualStack(varDec);
     const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
     const Token typeToken = getTypeFromTokenList(varDec.type);
 
-    if (typeToken.type == TokenType::IDENTIFIER) {
+    if (typeToken.getType() == TokenType::IDENTIFIER) {
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation& structInfo = structLookUp[genDec->structDec];
         const uint32_t size = structInfo.size;
@@ -412,8 +446,8 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         return;
     }
 
-    if (!isBuiltInType(typeToken.type) && typeToken.type != TokenType::REFERENCE) {
-        std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.type << "] in generateVariableDeclaration\n";
+    if (!isBuiltInType(typeToken.getType()) && typeToken.getType() != TokenType::REFERENCE) {
+        std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.getType() << "] in generateVariableDeclaration\n";
         exit(1);
     }
 
@@ -944,10 +978,8 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
             const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, 8);
             addSpaceToStack(padding + size);
             StackItem returnValue {
-                .tempValue {
-                    .positionOnStack = getCurrStackPointerPosition() + padding + size
-                },
-                .type = StackItemType::TEMP_VALUE
+                .positionOnStack = getCurrStackPointerPosition() + padding + size,
+                .type = StackItemType::RETURNED_VALUE
             };
             stackItems.emplace_back(returnValue);
         }
@@ -962,10 +994,8 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
             ExpressionResult expRes = generateExpression(expressionList->curr);
             const uint32_t positionOnStack = addExpressionResToStack(expRes);
             StackItem argumentItem {
-                .tempValue {
-                    .positionOnStack = positionOnStack
-                },
-                .type = StackItemType::TEMP_VALUE
+                .positionOnStack = positionOnStack,
+                .type = StackItemType::ARGUMENT
             };
             stackItems.emplace_back(argumentItem);
             expressionList = expressionList->next;
@@ -996,8 +1026,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     // have to return 'return value' expression result, which is stored on the stack
     // pointer is in sp register
     ExpressionResult returnValuePointerExpression;
-    returnValuePointerExpression.setReg(stackPointerIndex);
-    // returnValuePointerExpression.isPointerToStackValue; ?
+    returnValuePointerExpression.isReturnedValue = true;
     returnValuePointerExpression.type = &p_funcDec->returnType;
     return returnValuePointerExpression;
 }
@@ -1171,7 +1200,7 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
 ExpressionResult CodeGen::loadValue(const Expression &expression) {
     ExpressionResult expRes;
     const Token& token = expression.getToken();
-    switch (token.type) {
+    switch (token.getType()) {
         case TokenType::CHAR_LITERAL: {
             std::string charLiteral = tk->extractToken(token);
             // convert charLiteral to its numeric value and return it
@@ -1244,8 +1273,8 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             return expRes;
         }
         case TokenType::BINARY_NUMBER: {
-            assert(token.length > 2);
-            std::string binaryNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::BINARY_NUMBER});
+            assert(token.getLength() > 2);
+            std::string binaryNumber = tk->extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::BINARY_NUMBER});
             uint64_t num = std::stoull(binaryNumber, nullptr, 2);
             expRes.set(num);
             if (num <= INT32_MAX) {
@@ -1264,8 +1293,8 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             return expRes;
         }
         case TokenType::HEX_NUMBER: { 
-            assert(token.length > 2);
-            std::string hexNumber = tk->extractToken(Token{token.position + 2, (uint16_t)(token.length - 2), TokenType::HEX_NUMBER});
+            assert(token.getLength() > 2);
+            std::string hexNumber = tk->extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::HEX_NUMBER});
             /*
             std::invalid_argument
             std::out_of_range
@@ -1359,18 +1388,20 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
 */
 ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp) {
     assert(pointerExp.isReg);
-    const TokenList* type;
-    if (pointerExp.isPointerToValue) {
-        type = pointerExp.type;
-    } else {
-        assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
-        type = getNextFromTokenList(*pointerExp.type);
-    }
+    assert(pointerExp.isPointerToValue);
+    const TokenList* type = pointerExp.type;
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t sizeOfType = getSizeOfType(typeToken);
-    const OpCode loadOp = getLoadOpForSize(sizeOfType);
-    assert(loadOp != OpCode::NOP);
     ExpressionResult expRes;
+    if (sizeOfType > 8) {
+        expRes.isPointerToValue = true;
+        // cannot be loaded into a register
+        return expRes;
+    }
+    const OpCode loadOp = getLoadOpForSize(sizeOfType);
+    if (loadOp == OpCode::NOP) {
+        // weirdly sized type (3, 5, 6, or 7)
+    }
     expRes.setReg(allocateRegister());
     expRes.type = type;
     addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
@@ -1382,22 +1413,23 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
 */
 void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, ExpressionResult &valueExp) {
     assert(pointerExp.isReg);
+    assert(pointerExp.isPointerToValue);
     if (!valueExp.isReg) {
         moveImmToReg(allocateRegister(), valueExp);
     }
-    const TokenList* type;
-    if (pointerExp.isPointerToValue) {
-        type = pointerExp.type;
-    } else {
-        assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
-        type = getNextFromTokenList(*pointerExp.type);
-    }
+    const TokenList* type = pointerExp.type;
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t sizeOfType = getSizeOfType(typeToken);
     const OpCode storeOp = getStoreOpForSize(sizeOfType);
     assert(storeOp != OpCode::NOP);
     addBytes({{(bc)storeOp, pointerExp.getReg(), valueExp.getReg()}});
 }
+
+void CodeGen::copyValue(ExpressionResult &pointerExp, ExpressionResult &valueExp) {
+    (void)pointerExp;
+    (void)valueExp;
+}
+
 
 /**
  * Adds to a pointer based on type size
@@ -1567,7 +1599,7 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
 */
 ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp, bool controlFlow) {
     // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
-    if (binOp.op.type == TokenType::LOGICAL_AND || binOp.op.type == TokenType::LOGICAL_OR) {
+    if (binOp.op.getType() == TokenType::LOGICAL_AND || binOp.op.getType() == TokenType::LOGICAL_OR) {
         uint64_t shortCircuitIndexStart = 0;
         // if left and right are both constant, we need to save the left side till we get the right, and then do the eval
         // if left is a constant, we can discard the left side since either the expression will not go on, or the result is dependent on the right side
@@ -1586,13 +1618,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             leftResult = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftResult, zeroExp);
             if (!*(bool*)leftResult.getData()) {
                 // for &&, expression is false, don't generate anymore
-                if (binOp.op.type == TokenType::LOGICAL_AND) {
+                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                     return leftResult;
                 }
                 // for ||, need to check next, but can remove left side
             } else {
                 // for ||, expression is true, don't generate anymore
-                if (binOp.op.type == TokenType::LOGICAL_OR) {
+                if (binOp.op.getType() == TokenType::LOGICAL_OR) {
                     return leftResult;
                 }
                 // for &&, need to check next, but can remove left side
@@ -1607,7 +1639,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
                 shortCircuitIndexStart = byteCode.size();
                 addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
             }
-            if (binOp.op.type == TokenType::LOGICAL_AND) {
+            if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                 addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
                 addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
             }
@@ -1630,7 +1662,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             // right side is immediate value
             if (!leftResult.isReg) {
                 // both sides are immediate
-                return evaluateBinOpImmExpression(binOp.op.type, leftResult, rightResult);
+                return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
             }
             // left result is not an immediate
             byteCode.resize(shortCircuitIndexStart);
@@ -1639,13 +1671,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             rightResult = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult, zeroExp);
             if (!*(bool*)rightResult.getData()) {
                 // for &&, cond is always false
-                if (binOp.op.type == TokenType::LOGICAL_AND) {
+                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                     return rightResult;
                 }
                 // for ||, depends on left side
             } else {
                 // for ||, cond is always true
-                if (binOp.op.type == TokenType::LOGICAL_AND) {
+                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                     return rightResult;
                 }
                 // for &&, depends on left side
@@ -1686,7 +1718,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         ExpressionResult rightResult = generateExpression(binOp.rightSide);
         if (!leftResult.isReg) { // immediate value
             if (!rightResult.isReg) {
-                return evaluateBinOpImmExpression(binOp.op.type, leftResult, rightResult);
+                return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
             }
             const bc reg = allocateRegister();
             moveImmToReg(reg, leftResult);
@@ -1722,7 +1754,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
 }
 
 ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool controlFlow) {
-    switch (binOp.op.type) {
+    switch (binOp.op.getType()) {
         // member access
         case TokenType::DOT: {
             return {};
@@ -1825,7 +1857,7 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
             return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_L, OpCode::GET_GE, controlFlow);
         }
         default: {
-            std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.type << "]\n";
+            std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.getType() << "]\n";
             exit(1);
         }
     }
@@ -1899,8 +1931,7 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
         }
         case TokenType::DEREFERENCE: {
             ExpressionResult expRes = generateExpression(unOp.operand);
-            const Token type = getTypeFromTokenList(*expRes.type);
-            assert(type.getType() == TokenType::POINTER);
+            assert(getTypeFromTokenList(*expRes.type).getType() == TokenType::POINTER);
             expRes.type = getNextFromTokenList(*expRes.type);
             expRes.isPointerToValue = true;
             return expRes;
@@ -2011,11 +2042,11 @@ void CodeGen::generateStatement(const Statement& statement) {
         }
         case StatementType::KEYWORD: {
             // continue or break
-            if (statement.keyword.type == TokenType::BREAK) {
+            if (statement.keyword.getType() == TokenType::BREAK) {
                 addJumpMarker(JumpMarkerType::TO_LOOP_END);
                 addJumpOp(OpCode::RS_JUMP);
             }
-            else if (statement.keyword.type == TokenType::CONTINUE) {
+            else if (statement.keyword.getType() == TokenType::CONTINUE) {
                 addJumpMarker(JumpMarkerType::TO_LOOP_START);
                 addJumpOp(OpCode::RS_JUMP);
             }
@@ -2169,18 +2200,31 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
 /**
 */
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
-    (void)returnStatement;
-    // TODO: call destructor for all items in function scope, this includes function parameters
-    // don't clear the virtual stack though, still need it to potentially generate the rest of the function
-
+    // generate return expression
+    const uint32_t returnValueStackIndex = nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER];
+    if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
+        ExpressionResult returnValueExp = generateExpression(returnStatement.returnValue);
+        // store return value in its spot on the stack
+        ExpressionResult returnValueAddressExp;
+        returnValueAddressExp.setReg(allocateRegister());
+        returnValueAddressExp.isPointerToValue = true;
+        returnValueAddressExp.type = returnValueExp.type;
+        addBytes({{(bc)OpCode::MOVE, returnValueAddressExp.getReg(), stackPointerIndex}});
+        const uint32_t offset = getOffsetFromSP(stackItems[returnValueStackIndex].positionOnStack);
+        efficientImmAddOrSub(returnValueAddressExp.getReg(), offset, OpCode::ADD);
+        storeValueToPointer(returnValueAddressExp, returnValueExp);
+        if (returnValueExp.isTemp) {
+            freeRegister(returnValueExp.getReg());
+        }
+        if (returnValueAddressExp.isTemp) {
+            freeRegister(returnValueAddressExp.getReg());
+        }
+    }
     // find where return address is
     const uint32_t returnAddressStackIndex = nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER];
-    // const StackItem& returnAddressItem = stackItems[returnAddressStackIndex];
-    assert(stackItems.size() > 1);
+    assert(stackItems[returnAddressStackIndex].positionOnStack >= 8);
     fakeClearStackFromTo(stackItems.size() - 1, returnAddressStackIndex);
     addBytes({{(bc)OpCode::POP_Q, miscRegisterIndex}});
-    const uint32_t returnValueStackIndex = nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER];
-    assert(stackItems[returnAddressStackIndex].positionOnStack >= 8);
     // since we used POP_Q above, we remove 8 (q word size) from the position so that the clear function
     // adds the right amount to the stack pointer
     stackItems[returnAddressStackIndex].positionOnStack -= 8;
@@ -2199,7 +2243,7 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
  * \returns position of item
 */
 uint32_t CodeGen::getPositionPushingTypeToStack(Token typeToken, uint32_t alignTo) {
-    if (typeToken.type == TokenType::IDENTIFIER) {
+    if (typeToken.getType() == TokenType::IDENTIFIER) {
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation &structInfo = structLookUp[genDec->structDec];
         if (!alignTo) {
@@ -2335,7 +2379,7 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
 void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
     // add return value, 8 byte aligned
     StackItem returnValue {
-        .positionOnStack = funcDec.returnType.token.type != TokenType::VOID ? 
+        .positionOnStack = funcDec.returnType.token.getType() != TokenType::VOID ? 
             getPositionPushingTypeToStack(getTypeFromTokenList(funcDec.returnType), 8) : 0,
         .type = StackItemType::RETURN_VALUE,
     };
@@ -2393,7 +2437,8 @@ uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
         case StackItemType::VARIABLE: { return stackItem.variable.positionOnStack; }
         case StackItemType::RETURN_ADDRESS: 
         case StackItemType::RETURN_VALUE: { return stackItem.positionOnStack; }
-        case StackItemType::TEMP_VALUE: { return stackItem.tempValue.positionOnStack; }
+        case StackItemType::RETURNED_VALUE: { return stackItem.positionOnStack; }
+        case StackItemType::ARGUMENT: { return stackItem.positionOnStack; }
     }
     exit(1);
 }
@@ -2561,9 +2606,14 @@ std::ostream& operator<<(std::ostream& os, const StackItem& obj) {
             os << "Return Value Position: " << obj.positionOnStack;
             break;
         }
-        case StackItemType::TEMP_VALUE: {
-            os << "TEMP_VALUE\n";
-            os << "Temp Value Position: " << obj.tempValue.positionOnStack;
+        case StackItemType::RETURNED_VALUE: {
+            os << "RETURNED_VALUE\n";
+            os << "Returned Value Position: " << obj.positionOnStack;
+            break;
+        }
+        case StackItemType::ARGUMENT: {
+            os << "ARGUMENT\n";
+            os << "Argument Position: " << obj.positionOnStack;
             break;
         }
     }

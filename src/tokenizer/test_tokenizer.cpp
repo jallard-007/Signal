@@ -3,7 +3,7 @@
 
 TokenType firstToken(const std::string& str) {
     Tokenizer tokenizer{"./src/tokenizer/test_tokenizer.cpp", str};
-    return tokenizer.tokenizeNext().type;
+    return tokenizer.tokenizeNext().getType();
 }
 
 TokenType tokenAtN(const std::string& str, uint32_t n) {
@@ -11,7 +11,7 @@ TokenType tokenAtN(const std::string& str, uint32_t n) {
     for (uint32_t i = 0; i < n; ++i) {
         tokenizer.tokenizeNext();
     }
-    return tokenizer.tokenizeNext().type;
+    return tokenizer.tokenizeNext().getType();
 }
 
 TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {

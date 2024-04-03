@@ -59,14 +59,11 @@ bool isSigned(TokenType type) {
     );
 }
 
-Token::Token(const Token& tk): type{tk.type}, length{tk.length}, position{tk.position} {}
 bool Token::operator==(const Token& tk) const {
-    return position == tk.position && length == tk.length && type == tk.type;
+    return (tk.token & ~0xfful) == (token & ~0xfful);
 }
 Token& Token::operator=(const Token& tk) {
-    type = tk.type;
-    length = tk.length;
-    position = tk.position;
+    token = (token & 0xff) | (tk.token & ~0xff);
     return *this;
 }
 

@@ -35,28 +35,28 @@ Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
 // does binary search on the newline list to find the line number
 TokenPositionInfo Tokenizer::getTokenPositionInfo(const Token& tk) {
     if (newlinePositions.empty()) {
-        return {1, tk.position + 1};
+        return {1, tk.getPosition() + 1};
     }
     uint32_t high = (uint32_t)newlinePositions.size() - 1;
     uint32_t low = 0;
     uint32_t middle = high / 2;
     while (low < high) {
-        if (tk.position < newlinePositions[middle]) {
+        if (tk.getPosition() < newlinePositions[middle]) {
             high = middle - 1;
         }
-        else if (tk.position >= newlinePositions[middle + 1]) {
+        else if (tk.getPosition() >= newlinePositions[middle + 1]) {
             low = middle + 1;
         }
         else {
-            return {middle + 1, tk.position + 1 - newlinePositions[middle]};
+            return {middle + 1, tk.getPosition() + 1 - newlinePositions[middle]};
         }
         middle = (high + low) / 2;
     }
-    return {high + 1, tk.position + 1 - newlinePositions[high]};
+    return {high + 1, tk.getPosition() + 1 - newlinePositions[high]};
 }
 
 void Tokenizer::tokenizeAll(std::vector<Token>& tokens) {
-    while (tokens.emplace_back(tokenizeNext()).type != TokenType::END_OF_FILE);
+    while (tokens.emplace_back(tokenizeNext()).getType() != TokenType::END_OF_FILE);
 }
 
 #define END_OF_IDENTIFIER(c) TokenType tNext = numToType[(uint8_t)content[++position]]; \
@@ -71,7 +71,7 @@ if (tNext != TokenType::IDENTIFIER && tNext != TokenType::DECIMAL_NUMBER) { \
  * The Token must be consumed by calling tokenizeNext before peeking to the next
 */
 Token Tokenizer::peekNext() {
-    if (peeked.type != TokenType::NONE) {
+    if (peeked.getType() != TokenType::NONE) {
         return peeked;
     }
     peeked = tokenizeNext();
@@ -79,14 +79,13 @@ Token Tokenizer::peekNext() {
 }
 
 void Tokenizer::consumePeek() {
-    peeked.type = TokenType::NONE;
+    peeked.setType(TokenType::NONE);
 }
 
 Token Tokenizer::tokenizeNext() {
-    if (peeked.type != TokenType::NONE) {
+    if (peeked.getType() != TokenType::NONE) {
         const Token temp = peeked;
-        consumePeek();
-        peeked.type = TokenType::NONE;
+        peeked.setType(TokenType::NONE);
         return temp;
     }
     moveToNextNonWhiteSpaceChar();
@@ -766,8 +765,8 @@ void Tokenizer::movePastNewLine() {
 }
 
 const std::string& Tokenizer::extractToken(const Token &token) {
-    extracted.resize(token.length);
-    ::memcpy(extracted.data(), content.data() + token.position, token.length);
+    extracted.resize(token.getLength());
+    ::memcpy(extracted.data(), content.data() + token.getPosition(), token.getLength());
     // content.copy(extracted.data(), token.length, token.position);
     return extracted;
 }

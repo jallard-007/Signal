@@ -588,7 +588,7 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         CHECK(codeGen.stackItems[1].type == StackItemType::VARIABLE);
         CHECK(codeGen.stackItems[1].variable.positionOnStack == 16);
         CHECK(codeGen.tk->extractToken(codeGen.stackItems[1].variable.varDec.name) == "arg1");
-        CHECK(codeGen.stackItems[1].variable.varDec.type.token.type == TokenType::INT64_TYPE);
+        CHECK(codeGen.stackItems[1].variable.varDec.type.token.getType() == TokenType::INT64_TYPE);
         CHECK(codeGen.stackItems[2].type == StackItemType::RETURN_ADDRESS);
         CHECK(codeGen.stackItems[2].positionOnStack == 24);
     }
@@ -709,12 +709,12 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::MOVE_SI, 1, 1,
-            (bc)OpCode::MOVE, 2, 30,
-            (bc)OpCode::ADD_I, 2, 12, 0,
-            (bc)OpCode::STORE_D, 2, 1,
+            (bc)OpCode::MOVE, 1, 30,
+            (bc)OpCode::NOP,
+            (bc)OpCode::ADD_I, 1, 8, 0,
+            (bc)OpCode::MOVE_SI, 2, 1,
+            (bc)OpCode::STORE_D, 1, 2,
             (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::ADD_I, 30, 16, 0,
             (bc)OpCode::JUMP, 0
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
@@ -857,6 +857,60 @@ R"(
         CHECK(codeGen.byteCode == expected.byteCode);
     }
 }
+
+TEST_CASE("function call in subexpression", "[codeGen]") {
+    SECTION("1") {
+        const std::string str = 
+R"(
+    func testFunction(): void {
+        x:int32 = 2 + otherTestFunction();
+    }
+    func otherTestFunction(): int32 { return 1; }
+)";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        {
+            auto genDec = checker.lookUp["testFunction"];
+            REQUIRE(genDec);
+            REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+            REQUIRE(genDec->funcDec);
+            FunctionDec& funcDec = *genDec->funcDec;
+            codeGen.generateFunctionDeclaration(funcDec);
+        }
+        const uint32_t codeSizeAfterFunc = codeGen.byteCode.size();
+        {
+            auto genDec = checker.lookUp["otherTestFunction"];
+            REQUIRE(genDec);
+            REQUIRE(genDec->type == GeneralDecType::FUNCTION);
+            REQUIRE(genDec->funcDec);
+            FunctionDec& funcDec = *genDec->funcDec;
+            codeGen.generateFunctionDeclaration(funcDec);
+        }
+        codeGen.byteCode.resize(codeSizeAfterFunc);
+        codeGen.writeFunctionJumpOffsets();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
+        }});
+        expected.alignForImm(1, 4);
+        const uint32_t indexOfCall = expected.byteCode.size();
+        expected.addBytes({{
+            (bc)OpCode::CALL, 0, 0, 0, 0,
+            (bc)OpCode::POP_D, 1,
+            (bc)OpCode::ADD_I, stackPointerIndex, 4, 0,
+            (bc)OpCode::ADD_I, 1, 2, 0,
+            (bc)OpCode::PUSH_D, 1,
+            (bc)OpCode::ADD_I, 30, 4, 0,
+            (bc)OpCode::POP_Q, 0,
+            (bc)OpCode::JUMP, 0,
+        }});
+        const uint32_t functionIndex = expected.byteCode.size();
+        *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+}
+
 
 TEST_CASE("for loop", "[codeGen]") {
     SECTION("1") {

@@ -1,15 +1,15 @@
 #include "nodes.hpp"
 #include "parser/parser.hpp"
 
-const uint8_t indentationSize = 2;
+const uint8_t indentationSize = 4;
 
 void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
-    if (token.type == TokenType::NONE) {
+    if (token.getType() == TokenType::NONE) {
         return;
     }
     std::vector<TokenList *> r;
     for (TokenList *iter = this; iter; iter = iter->next) {
-        if (iter->token.type == TokenType::DEC_PTR) {
+        if (iter->token.getType() == TokenType::DEC_PTR) {
             break;
         }
         r.emplace_back(iter);
@@ -49,7 +49,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
             scope->prettyPrint(tk, str, indentation); break;
         case StatementType::VARIABLE_DEC:
             varDec->prettyPrint(tk, str); break;
-        case StatementType::KEYWORD: str += typeToString.at(keyword.type); break;
+        case StatementType::KEYWORD: str += typeToString.at(keyword.getType()); break;
         case StatementType::NONE: break;
         default: str += "{not yet implemented in pretty printer}"; break;
     }
@@ -62,7 +62,7 @@ void UnOp::prettyPrint(Tokenizer& tk, std::string& str) {
             wrap = true;
         }
     }
-    if (op.type == TokenType::DECREMENT_POSTFIX || op.type == TokenType::INCREMENT_POSTFIX) {
+    if (op.getType() == TokenType::DECREMENT_POSTFIX || op.getType() == TokenType::INCREMENT_POSTFIX) {
         if (wrap) {
             str += '(';
         }
@@ -70,9 +70,9 @@ void UnOp::prettyPrint(Tokenizer& tk, std::string& str) {
         if (wrap) {
             str += ')';
         }
-        str += typeToString.at(op.type);
+        str += typeToString.at(op.getType());
     } else {
-        str += typeToString.at(op.type);
+        str += typeToString.at(op.getType());
         if (wrap) {
             str += '(';
         }
@@ -96,7 +96,7 @@ void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) {
         str += ')';
     }
     wrap = false;
-    str += typeToString.at(op.type);
+    str += typeToString.at(op.getType());
     if (rightSide.getType() == ExpressionType::BINARY_OP || rightSide.getType() == ExpressionType::UNARY_OP) {
         if (operatorPrecedence[(uint8_t)rightSide.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
             wrap = true;
@@ -266,7 +266,7 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
 
 void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
-    if (templateTypes.token.type != TokenType::NONE) {
+    if (templateTypes.token.getType() != TokenType::NONE) {
         TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
             str += tk.extractToken(iter->token);
@@ -284,7 +284,7 @@ void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
 
 void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
-    if (templateTypes.token.type != TokenType::NONE) {
+    if (templateTypes.token.getType() != TokenType::NONE) {
         TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
             str += tk.extractToken(iter->token);
@@ -433,7 +433,7 @@ void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) {
 
 void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
     str += typeToString.at(TokenType::CREATE) + " [";
-    if (templateTypes.token.type != TokenType::NONE) {
+    if (templateTypes.token.getType() != TokenType::NONE) {
         str += tk.extractToken(templateTypes.token);
         TokenList * list = templateTypes.next;
         while (list) {

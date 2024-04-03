@@ -25,6 +25,7 @@ struct ExpressionResult {
     bool isReg {false};
     bool isTemp {false};
     bool isPointerToValue {false};
+    bool isReturnedValue {false};
     inline const void *getData() const { return (void *)data; }
 
     template <class T> void set(T) = delete;
@@ -94,7 +95,9 @@ enum class StackItemType: uint8_t {
     VARIABLE,
     RETURN_ADDRESS,
     RETURN_VALUE,
-    TEMP_VALUE,
+    // TEMP_VALUE,
+    RETURNED_VALUE,
+    ARGUMENT
 };
 
 struct StackItem {
@@ -192,6 +195,8 @@ struct CodeGen {
     ExpressionResult loadValueFromPointer(const ExpressionResult &);
     void storeValueToPointer(const ExpressionResult &, ExpressionResult &);
     void doPointerIndex(const ExpressionResult &, ExpressionResult&);
+    void copyValue(ExpressionResult &, ExpressionResult &);
+
 
 // BINARY EXPRESSIONS
     ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);

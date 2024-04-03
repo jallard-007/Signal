@@ -37,33 +37,33 @@ TEST_CASE("checkType", "[checker]") {
     tc.firstTopLevelScan();
     {
         TokenList tokenList;
-        tokenList.token.length = 5;
-        tokenList.token.position = 7;
-        tokenList.token.type = TokenType::IDENTIFIER;
+        tokenList.token.setLength(5);
+        tokenList.token.setPosition(7);
+        tokenList.token.setType(TokenType::IDENTIFIER);
         tc.tk = &tks.back();
         CHECK(tc.checkType(tokenList));
         tokenList.next = nullptr;
         TokenList nextType = tokenList;
         tokenList.next = &nextType;
-        tokenList.token.type = TokenType::POINTER;
+        tokenList.token.setType(TokenType::POINTER);
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextType = tokenList;
         tokenList.next = &nextNextType;
-        tokenList.token.type = TokenType::REFERENCE;
+        tokenList.token.setType(TokenType::REFERENCE);
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextNextType = tokenList;
         tokenList.next = &nextNextNextType;
-        tokenList.token.type = TokenType::POINTER;
+        tokenList.token.setType(TokenType::POINTER);
         CHECK_FALSE(tc.checkType(tokenList));
     }
 
     {
         TokenList notAType;
-        notAType.token.length = 7;
-        notAType.token.position = 38;
-        notAType.token.type = TokenType::IDENTIFIER;
+        notAType.token.setLength(7);
+        notAType.token.setPosition(38);
+        notAType.token.setType(TokenType::IDENTIFIER);
         CHECK_FALSE(tc.checkType(notAType));
     }
 }

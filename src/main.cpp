@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
                 break;
             }
             while (tokenizerIndex > 0) {
-                if (tokenizers[--tokenizerIndex].peekNext().type != TokenType::END_OF_FILE) {
+                if (tokenizers[--tokenizerIndex].peekNext().getType() != TokenType::END_OF_FILE) {
                     parser.swapTokenizer(tokenizers[tokenizerIndex]);
                     currentFileDirectory.clear();
                     splitFilePath(tokenizers[tokenizerIndex].filePath, currentFileDirectory);
@@ -155,28 +155,28 @@ int main(int argc, char **argv) {
         }
         return 1;
     }
-    Checker checker{parser.program, tokenizers, mem};
-    checker.check();
+    // Checker checker{parser.program, tokenizers, mem};
+    // checker.check();
     auto end = std::chrono::high_resolution_clock::now();
     double total = std::chrono::duration_cast<std::chrono::duration<double>>(end - begin).count();
     std::cout << "Execution time: " << total << '\n';
-    for (const CheckerError &err : checker.errors) {
-        std::cout << err.getErrorMessage(tokenizers) << '\n';
-    }
-    if (checker.errors.size() == MAX_ERRORS) {
-        std::cout << "Max errors reached\n";
-    }
-    if (!checker.errors.empty()) {
-        return 1;
-    }
-    CodeGen codeGen{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-    if (parser.program.decs.curr.type == GeneralDecType::NONE) {
-        return 1;
-    }
-    codeGen.tk = &tokenizers[parser.program.decs.curr.tokenizerIndex];
-    codeGen.generate();
-    if (!openAndWriteFile("out.bin", codeGen.byteCode)) {
-        return 1;
-    }
+    // for (const CheckerError &err : checker.errors) {
+    //     std::cout << err.getErrorMessage(tokenizers) << '\n';
+    // }
+    // if (checker.errors.size() == MAX_ERRORS) {
+    //     std::cout << "Max errors reached\n";
+    // }
+    // if (!checker.errors.empty()) {
+    //     return 1;
+    // }
+    // CodeGen codeGen{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+    // if (parser.program.decs.curr.type == GeneralDecType::NONE) {
+    //     return 1;
+    // }
+    // codeGen.tk = &tokenizers[parser.program.decs.curr.tokenizerIndex];
+    // codeGen.generate();
+    // if (!openAndWriteFile("out.bin", codeGen.byteCode)) {
+    //     return 1;
+    // }
     return 0;
 }

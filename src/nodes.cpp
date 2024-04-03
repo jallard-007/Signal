@@ -38,7 +38,7 @@ std::ostream& operator<<(std::ostream& os, const TokenList& obj) {
 
 VariableDec::VariableDec(const Token& tk): name{tk} {}
 std::ostream& operator<<(std::ostream& os, const VariableDec& obj) {
-    os << "Var dec at index " << obj.name.position << " in source, with type " << obj.type;
+    os << "Var dec at index " << obj.name.getPosition() << " in source, with type " << obj.type;
     return os;
 }
 
@@ -84,7 +84,7 @@ bool TokenList::operator==(const TokenList& ref) const {
     const TokenList* refCurr = &ref;
     const TokenList* thisCurr = this;
     while (refCurr && thisCurr) {
-        if (refCurr->token.type != thisCurr->token.type) {
+        if (refCurr->token.getType() != thisCurr->token.getType()) {
             return false;
         }
         refCurr = refCurr->next;

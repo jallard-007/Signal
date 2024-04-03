@@ -149,17 +149,21 @@ enum class TokenType : uint8_t {
 */
 struct Token {
     private:
-    [[maybe_unused]] char padding;
+    uint64_t token = 0;
     public:
-    TokenType type{TokenType::NONE};
-    uint16_t length{0};
-    uint32_t position{0};
     Token() = default;
-    Token(const Token&);
-    Token(uint32_t pos, uint16_t len, TokenType t): type{t}, length{len}, position{pos} {}
+    Token(const Token&) = default;
+    Token(uint32_t pos, uint16_t len, TokenType t) {
+        token = ((uint64_t)t << 8) | ((uint64_t)len << 16) | ((uint64_t)pos << 32);
+    }
     bool operator==(const Token&) const;
     Token& operator=(const Token&);
-    inline TokenType getType() const { return type; };
+    inline TokenType getType() const { return (TokenType)((token & 0xff00) >> 8); };
+    inline void setType(TokenType type) { token = (token & ~0xff00ul) | ((uint64_t)type << 8); };
+    inline uint16_t getLength() const { return (uint16_t)((token & 0xffff0000) >> 16); };
+    inline void setLength(uint16_t length) { token = (token & ~0xffff0000ul) | ((uint64_t)length << 16); };
+    inline uint32_t getPosition() const { return (uint32_t)((token & 0xffffffff00000000) >> 32); };
+    inline void setPosition(uint32_t pos) { token = (token & ~0xffffffff00000000) | ((uint64_t)pos << 32); };
 };
 
 
