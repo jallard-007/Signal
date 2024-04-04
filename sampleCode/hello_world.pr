@@ -1,0 +1,6 @@
+include "std.pr"
+
+func main(argc: uint32, argv: char ptr ptr): int32 {
+  res: uint32 = print_string(stdout, "hello world!\n");
+  return res;
+}

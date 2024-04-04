@@ -62,10 +62,6 @@ bool isSigned(TokenType type) {
 bool Token::operator==(const Token& tk) const {
     return (tk.token & ~0xfful) == (token & ~0xfful);
 }
-Token& Token::operator=(const Token& tk) {
-    token = (token & 0xff) | (tk.token & ~0xff);
-    return *this;
-}
 
 std::ostream& operator<<(std::ostream& os, const TokenType& obj) {
     os << tokenTypeToString[(uint8_t)obj];

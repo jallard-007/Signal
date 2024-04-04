@@ -5,6 +5,14 @@ endif()
 project(main CXX)
 set(CMAKE_CXX_STANDARD 20)
 
+if ( MSVC )
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-attributes)
+    set ( CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g" )
+    set ( CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE} -flto" )
+endif()
+
 # common lib
 add_library(common STATIC
     src/codeGen/interpreter/codeGen.cpp
@@ -46,25 +54,25 @@ if ( UNIX )
     catch_discover_tests(tests)
 endif()
 
-# compiler flags
-set(DEV 1)
-if ( DEV )
-    set(CMAKE_BUILD_TYPE Debug)
-else()
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-if ( UNIX )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror -Wno-attributes")
-    if ( DEV )
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
-    else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
-    endif()
-endif()
+# current method
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 9.67076
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 9.60463
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 9.67158
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 9.56606
 
-if ( MSVC )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /WX")
-endif()
+# strncmp
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 12.2402
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 12.1476
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 12.1315
+# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
+# Execution time: 12.0802
 
 # -fprofile-arcs -ftest-coverage -fPIC -O0 or -O1
 
