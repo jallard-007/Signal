@@ -15,19 +15,17 @@
 #define instructionPointerIndex NUM_REGISTERS - 1
 #define stackPointerIndex NUM_REGISTERS - 2
 #define dataPointerIndex NUM_REGISTERS - 3
+#define returnRegisterIndex 10
 #define miscRegisterIndex 0 // setting the zero register to a reserved register so that we can easily test if a register has been allocated
 
 typedef unsigned char bytecode_t;
 
 /* BUILT IN FUNCTIONS
-arguments are passed on the stack. before calling a function, space for the return value needs to be made
-initial position = sp
-sp += size of return value
-space for return value will be between initial position and new sp (sp will point to start of data since stack grows down)
-each argument will be placed one after the other (padding if necessary) starting with the first argument, ex:
+arguments are passed on the stack. return value is returned in register r10
+if the return value cannot fit in a register, a pointer to space reserved for the return value is passed instead as the first argument
+the first argument must be 8 byte aligned so that the offset are the same
 
 function with args (char, int32) and returns int32
-ADD sp 4  // for 32 bit return value
 PUSH_B arg1  // first argument of size 8 bit (adds 1 to the sp)
 ADD sp 3  // padding for 32 bit value
 PUSH_D arg2  // second argument of size 32 bit (adds 4 to the sp)
@@ -36,9 +34,6 @@ arguments can then be accessed within the function via:
 argument 1: sp + 7 (4 + 3)
 argument 2: sp
 
-and return value via: sp + 8
-
-the return value can be accessed by the caller from sp
 */
 enum class BuiltInFunction: bytecode_t {
     // memory management
@@ -226,6 +221,8 @@ constexpr OpCode upgradeRelativeJumpOp(const OpCode jumpOp) {
     assert(immediateSizeForRelativeJumpOp(jumpOp) == 1);
     return (OpCode)((uint8_t)jumpOp + (uint8_t)OpCode::R_JUMP - (uint8_t)OpCode::RS_JUMP);
 }
+
+bool isReservedRegister(bytecode_t);
 
 extern const char * bytecode_t_to_op [];
 extern const char * bytecode_t_to_builtin_function [];

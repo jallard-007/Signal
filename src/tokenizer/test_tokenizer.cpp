@@ -139,11 +139,21 @@ TEST_CASE("Unit Test - Logical", "[tokenizer][tokenType]") {
 }
 
 TEST_CASE("Unit Test - Types", "[tokenizer][tokenType]") {
+    CHECK(firstToken("bool") == TokenType::BOOL);
     CHECK(firstToken("char") == TokenType::CHAR_TYPE);
+    CHECK(firstToken("int8") == TokenType::INT8_TYPE);
+    CHECK(firstToken("uint8") == TokenType::UINT8_TYPE);
+    CHECK(firstToken("int16") == TokenType::INT16_TYPE);
+    CHECK(firstToken("uint16") == TokenType::UINT16_TYPE);
+    CHECK(firstToken("int32") == TokenType::INT32_TYPE);
     CHECK(firstToken("uint32") == TokenType::UINT32_TYPE);
+    CHECK(firstToken("int64") == TokenType::INT64_TYPE);
+    CHECK(firstToken("uint64") == TokenType::UINT64_TYPE);
     CHECK(firstToken("double") == TokenType::DOUBLE_TYPE);
     CHECK(firstToken("file_t") == TokenType::FILE_TYPE);
+    CHECK(firstToken("ref") == TokenType::REFERENCE);
     CHECK(firstToken("ptr") == TokenType::POINTER);
+    CHECK(firstToken("void") == TokenType::VOID);
 }
 
 TEST_CASE("Unit Test - Token Extraction", "[tokenizer][tokenExtraction]") {

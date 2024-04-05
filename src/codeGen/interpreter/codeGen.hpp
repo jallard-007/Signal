@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <array>
+#include <list>
 #include <span>
 #include <cstdint>
 #include <cassert>
@@ -25,7 +26,6 @@ struct ExpressionResult {
     bool isReg {false};
     bool isTemp {false};
     bool isPointerToValue {false};
-    bool isReturnedValue {false};
     inline const void *getData() const { return (void *)data; }
 
     template <class T> void set(T) = delete;
@@ -85,8 +85,10 @@ struct StackVariable {
     // bytecode_t reg = 0;
 };
 
-struct TempStackValue {
+struct SavedTempValue {
+    const TokenList& type;
     uint32_t positionOnStack = 0;
+    bytecode_t reg = 0;
 };
 
 enum class StackItemType: uint8_t {
@@ -94,15 +96,16 @@ enum class StackItemType: uint8_t {
     MARKER,
     VARIABLE,
     RETURN_ADDRESS,
-    RETURN_VALUE,
-    // TEMP_VALUE,
-    RETURNED_VALUE,
-    ARGUMENT
+    RETURN_VALUE_SPACE_POINTER,
+    RETURNED_VALUE_SPACE,
+    ARGUMENT,
+    SAVED_TEMPORARY,
+    PADDING,
 };
 
 struct StackItem {
     union {
-        TempStackValue tempValue;
+        SavedTempValue savedTempValue;
         StackVariable variable;
         StackMarkerType marker;
         uint32_t positionOnStack;
@@ -131,7 +134,7 @@ struct DataSectionEntry {
     DataSectionEntry(DataSectionEntryType type, uint32_t indexInDataSection): type{type}, indexInDataSection{indexInDataSection} {}
 };
 
-#define STACK_RETURN_VALUE_IDENTIFIER "-rv"
+// #define STACK_RETURN_VALUE_IDENTIFIER "-rvp"
 #define STACK_RETURN_ADDRESS_IDENTIFIER "-ra"
 
 struct CodeGen {
@@ -141,7 +144,7 @@ struct CodeGen {
     std::vector<unsigned char> byteCode;
     std::vector<unsigned char> dataSection;
     std::vector<DataSectionEntry> dataSectionEntries;
-    std::vector<JumpMarker> jumpMarkers;
+    std::list<JumpMarker> jumpMarkers;
     std::vector<StackItem> stackItems;
     Tokenizer *tk{nullptr};
     Program &program;
@@ -192,7 +195,7 @@ struct CodeGen {
     void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
     ExpressionResult getAddressOfExpression(const Expression&);
     ExpressionResult loadValue(const Expression&);
-    ExpressionResult loadValueFromPointer(const ExpressionResult &);
+    ExpressionResult loadValueFromPointer(const ExpressionResult &, bytecode_t);
     void storeValueToPointer(const ExpressionResult &, ExpressionResult &);
     void doPointerIndex(const ExpressionResult &, ExpressionResult&);
     void copyValue(ExpressionResult &, ExpressionResult &);
@@ -219,6 +222,7 @@ struct CodeGen {
 
 // FUNCTIONS
     void generateFunctionDeclaration(const FunctionDec&);
+    bool sizeRequiresReturnValuePointer(uint32_t);
 
 // STATEMENTS
     void generateStatement(const Statement&);
@@ -227,22 +231,24 @@ struct CodeGen {
     void generateReturnStatement(const ReturnStatement&);
 
 // STACK MANAGEMENT
-    uint32_t getPositionPushingTypeToStack(Token, uint32_t = 0);
-    uint32_t getPositionPushingStuctToStack(const StructInformation&);
     uint32_t getPositionOnStack(uint32_t);
-    uint32_t getPositionPushingToStack(uint32_t, uint32_t);
     void addSpaceToStack(uint32_t);
-    StackVariable& addVarDecToVirtualStack(const VariableDec&);
+    void addPaddingToStack(uint32_t);
+    uint32_t addPaddingAndSpaceToStack(uint32_t, uint32_t);
+
+    StackVariable& addVarDecToVirtualStack(const VariableDec&, uint32_t = 0);
     uint32_t getCurrStackPointerPosition();
     void makeRoomOnVirtualStack(Token, uint32_t = 0);
-    uint32_t addExpressionResToStack(ExpressionResult&);
+    StackItem& addExpressionResToStack(ExpressionResult&, StackItemType, uint32_t = 0);
     void addFunctionSignatureToVirtualStack(const FunctionDec&);
 
-    void fakeClearStackFromTo(uint32_t, uint32_t);
+    void fakeClearStackFromTo(uint32_t, int32_t);
     void clearStackFromTo(uint32_t, uint32_t);
     uint32_t getVarOffsetFromSP(const StackVariable &);
     uint32_t getOffsetFromSP(uint32_t);
 
+    void popValue(const TokenList&, bytecode_t);
+    void postFunctionCall();
 
 // OTHER
     bytecode_t allocateRegister();

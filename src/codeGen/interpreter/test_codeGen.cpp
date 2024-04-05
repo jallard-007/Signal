@@ -548,11 +548,9 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         REQUIRE(genDec->funcDec);
         FunctionDec& funcDec = *genDec->funcDec;
         codeGen.addFunctionSignatureToVirtualStack(funcDec);
-        REQUIRE(codeGen.stackItems.size() == 2);
-        CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
-        CHECK(codeGen.stackItems[0].positionOnStack == 0);
-        CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
-        CHECK(codeGen.stackItems[1].positionOnStack == 8);
+        REQUIRE(codeGen.stackItems.size() == 1);
+        CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_ADDRESS);
+        CHECK(codeGen.stackItems[0].positionOnStack == 8);
     }
     SECTION("two") {
         const std::string str = "func testFunction(): int32 { return 10; } ";
@@ -565,11 +563,9 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         REQUIRE(genDec->funcDec);
         FunctionDec& funcDec = *genDec->funcDec;
         codeGen.addFunctionSignatureToVirtualStack(funcDec);
-        REQUIRE(codeGen.stackItems.size() == 2);
-        CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
+        REQUIRE(codeGen.stackItems.size() == 1);
+        CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_ADDRESS);
         CHECK(codeGen.stackItems[0].positionOnStack == 8);
-        CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
-        CHECK(codeGen.stackItems[1].positionOnStack == 16);
     }
     SECTION("three") {
         const std::string str = "func testFunction(arg1: int64): int32 { return 10; } ";
@@ -582,15 +578,13 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         REQUIRE(genDec->funcDec);
         FunctionDec& funcDec = *genDec->funcDec;
         codeGen.addFunctionSignatureToVirtualStack(funcDec);
-        REQUIRE(codeGen.stackItems.size() == 3);
-        CHECK(codeGen.stackItems[0].type == StackItemType::RETURN_VALUE);
-        CHECK(codeGen.stackItems[0].positionOnStack == 8);
-        CHECK(codeGen.stackItems[1].type == StackItemType::VARIABLE);
-        CHECK(codeGen.stackItems[1].variable.positionOnStack == 16);
-        CHECK(codeGen.tk->extractToken(codeGen.stackItems[1].variable.varDec.name) == "arg1");
-        CHECK(codeGen.stackItems[1].variable.varDec.type.token.getType() == TokenType::INT64_TYPE);
-        CHECK(codeGen.stackItems[2].type == StackItemType::RETURN_ADDRESS);
-        CHECK(codeGen.stackItems[2].positionOnStack == 24);
+        REQUIRE(codeGen.stackItems.size() == 2);
+        CHECK(codeGen.stackItems[0].type == StackItemType::VARIABLE);
+        CHECK(codeGen.stackItems[0].variable.positionOnStack == 8);
+        CHECK(codeGen.tk->extractToken(codeGen.stackItems[0].variable.varDec.name) == "arg1");
+        CHECK(codeGen.stackItems[0].variable.varDec.type.token.getType() == TokenType::INT64_TYPE);
+        CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
+        CHECK(codeGen.stackItems[1].positionOnStack == 16);
     }
 }
 
@@ -653,8 +647,8 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -671,9 +665,9 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::POP_Q, 0,
+            (bc)OpCode::POP_Q, 1,
             (bc)OpCode::ADD_I, 30, 8, 0,
-            (bc)OpCode::JUMP, 0
+            (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -690,9 +684,9 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::POP_Q, 0,
+            (bc)OpCode::POP_Q, 1,
             (bc)OpCode::ADD_I, 30, 16, 0,
-            (bc)OpCode::JUMP, 0
+            (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -709,13 +703,9 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::MOVE, 1, 30,
-            (bc)OpCode::NOP,
-            (bc)OpCode::ADD_I, 1, 8, 0,
-            (bc)OpCode::MOVE_SI, 2, 1,
-            (bc)OpCode::STORE_D, 1, 2,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::MOVE_SI, 10, 1,
+            (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -745,8 +735,8 @@ R"(
             (bc)OpCode::NOP,
             (bc)OpCode::NOP,
             (bc)OpCode::CALL, 0, 0, 0, 0,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -781,20 +771,12 @@ R"(
         codeGen.byteCode.resize(codeSizeAfterFunc);
         codeGen.writeFunctionJumpOffsets();
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.alignForImm(2, 2);
-        expected.addBytes({{
-            (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
-        }});
         expected.alignForImm(1, 4);
         const uint32_t indexOfCall = expected.byteCode.size();
         expected.addBytes({{
-            (bc)OpCode::CALL, 0, 0, 0, 0
-        }});
-        expected.alignForImm(2, 2);
-        expected.addBytes({{
-            (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0,
+            (bc)OpCode::CALL, 0, 0, 0, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         const uint32_t functionIndex = expected.byteCode.size();
         *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
@@ -831,26 +813,18 @@ R"(
         codeGen.byteCode.resize(codeSizeAfterFunc);
         codeGen.writeFunctionJumpOffsets();
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.alignForImm(2, 2);
         expected.addBytes({{
-            (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
             (bc)OpCode::MOVE_SI, 1, 1,
-            (bc)OpCode::PUSH_D, 1,
-        }});
-        expected.alignForImm(2, 2);
-        expected.addBytes({{
+            (bc)OpCode::NOP,
             (bc)OpCode::SUB_I, stackPointerIndex, 4, 0,
+            (bc)OpCode::PUSH_D, 1,
         }});
         expected.alignForImm(1, 4);
         const uint32_t indexOfCall = expected.byteCode.size();
         expected.addBytes({{
-            (bc)OpCode::CALL, 0, 0, 0, 0
-        }});
-        expected.alignForImm(2, 2);
-        expected.addBytes({{
-            (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0,
+            (bc)OpCode::CALL, 0, 0, 0, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         const uint32_t functionIndex = expected.byteCode.size();
         *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
@@ -890,20 +864,16 @@ R"(
         codeGen.byteCode.resize(codeSizeAfterFunc);
         codeGen.writeFunctionJumpOffsets();
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.addBytes({{
-            (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
-        }});
         expected.alignForImm(1, 4);
         const uint32_t indexOfCall = expected.byteCode.size();
         expected.addBytes({{
             (bc)OpCode::CALL, 0, 0, 0, 0,
-            (bc)OpCode::POP_D, 1,
-            (bc)OpCode::ADD_I, stackPointerIndex, 4, 0,
+            (bc)OpCode::MOVE, 1, 10,
             (bc)OpCode::ADD_I, 1, 2, 0,
             (bc)OpCode::PUSH_D, 1,
             (bc)OpCode::ADD_I, 30, 4, 0,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         const uint32_t functionIndex = expected.byteCode.size();
         *(int32_t *)&expected.byteCode[indexOfCall + 1] = functionIndex - indexOfCall;
@@ -958,8 +928,8 @@ R"(
             (bc)OpCode::ADD_I, 30, 4, 0,
             (bc)OpCode::DEC, 30,
             (bc)OpCode::INC, 30,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
@@ -1014,8 +984,8 @@ R"(
         expected.addBytes({{
             (bc)OpCode::DEC, 30,
             (bc)OpCode::ADD_I, 30, 5, 0,
-            (bc)OpCode::POP_Q, 0,
-            (bc)OpCode::JUMP, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }

@@ -58,14 +58,11 @@ TEST_CASE("print \"Hello World!\"", "[interpreter]") {
     (bc)OpCode::NOP, (bc)OpCode::NOP,
     // set reg 11 to file *
     (bc)OpCode::MOVE_LI, 11, split[0], split[1], split[2], split[3], split[4], split[5], split[6], split[7],
-    // make space for return value (4 byte int and 4 byte padding to align next argument)
-    (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
     // push file pointer
     (bc)OpCode::PUSH_Q, 11,
     // push pointer to string
     (bc)OpCode::PUSH_Q, dataPointerIndex,
     (bc)OpCode::CALL_B, (bc)BuiltInFunction::PRINT_STRING,
-    (bc)OpCode::SUB_I, stackPointerIndex, 4, 0,
     (bc)OpCode::PUSH_Q, 11,
     (bc)OpCode::CALL_B, (bc)BuiltInFunction::FFLUSH,
     (bc)OpCode::EXIT, 0,
@@ -105,14 +102,12 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
 
     // loop here
     (bc)OpCode::NOP,
-    (bc)OpCode::SUB_I, stackPointerIndex, 8, 0, // make room for return value (int) + padding (4 bytes)
     (bc)OpCode::PUSH_Q, 11, // add file ptr to stack
     (bc)OpCode::CALL_B, (bc)BuiltInFunction::READ_CHAR,
-    (bc)OpCode::POP_D, 2, // load return value
-    (bc)OpCode::STORE_B, 13, 2,
+    (bc)OpCode::STORE_B, 13, 10,
     (bc)OpCode::INC, 13, // increment i,
-    (bc)OpCode::CMP, 2, 12, // compare character to newline
-    (bc)OpCode::RS_JUMP_NE, (bc)(-19), // loop if its not newline
+    (bc)OpCode::CMP, 10, 12, // compare character to newline
+    (bc)OpCode::RS_JUMP_NE, (bc)(-13), // loop if its not newline
 
     // add null termination to end of string
     (bc)OpCode::XOR, 2, 2,

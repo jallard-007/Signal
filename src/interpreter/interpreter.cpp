@@ -8,6 +8,7 @@
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
 #define dp registers[dataPointerIndex]
+#define rr registers[returnRegisterIndex]
 #define misc registers[miscIndex]
 #define getInstructionByte(offset) *(char *)(ip + offset)
 
@@ -75,14 +76,14 @@ int Interpreter::runProgram() {
             switch ((BuiltInFunction)*(bc *)ip++) {
                 // memory
                 case BuiltInFunction::ALLOCATE: {
-                    // 8 bytes return value | 8 bytes size
-                    UINT64_SP(8) = (uint64_t)malloc(UINT64_SP(0));
+                    // 8 bytes size
+                    rr = (uint64_t)malloc(UINT64_SP(0));
                     sp += 8;
                     break;
                 }
                 case BuiltInFunction::REALLOCATE: {
-                    // 8 bytes return value | 8 bytes pointer | 8 bytes size
-                    UINT64_SP(16) = (uint64_t)realloc((void *)UINT64_SP(8), *(uint64_t *)UINT64_SP(0));
+                    // 8 bytes pointer | 8 bytes size
+                    rr = (uint64_t)realloc((void *)UINT64_SP(8), *(uint64_t *)UINT64_SP(0));
                     sp += 16;
                     break;
                 }
@@ -95,110 +96,110 @@ int Interpreter::runProgram() {
 
                 // general
                 case BuiltInFunction::MEM_COPY: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
-                    UINT64_SP(24) = (uint64_t)std::memcpy((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes size
+                    rr = (uint64_t)std::memcpy((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
                     sp += 24;
                     break;
                 }
                 case BuiltInFunction::MEM_MOVE: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
-                    UINT64_SP(24) = (uint64_t)std::memmove((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes size
+                    rr = (uint64_t)std::memmove((void *)UINT64_SP(16), (void *)UINT64_SP(8), UINT64_SP(0));
                     sp += 24;
                     break;
                 }
                 case BuiltInFunction::MEM_COMPARE: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2 | 8 bytes size
-                    INT32_SP(28) = std::memcmp(VOID_P_SP(16), VOID_P_SP(8), UINT64_SP(0));
-                    sp += 28;
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes size
+                    rr = std::memcmp(VOID_P_SP(16), VOID_P_SP(8), UINT64_SP(0));
+                    sp += 24;
                     break;
                 }
     
                 // strings
                 case BuiltInFunction::STR_LENGTH: {
-                    // 8 bytes return value | 8 bytes string pointer
-                    UINT64_SP(8) = strlen(CHAR_P_SP(0));
+                    // 8 bytes string pointer
+                    rr = strlen(CHAR_P_SP(0));
                     sp += 8;
                     break;
                 }
                 case BuiltInFunction::STR_COMPARE: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2
-                    INT32_SP(20) = strcmp(CHAR_P_SP(8), CHAR_P_SP(0));
-                    sp += 20;
+                    // 8 bytes str1 | 8 bytes str2
+                    rr = strcmp(CHAR_P_SP(8), CHAR_P_SP(0));
+                    sp += 16;
                     // res is 0 if equal, >0 if str1 is greater, <0 if str2 is greater
                     break;
                 }
                 case BuiltInFunction::STR_N_COMPARE: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes str1 | 8 bytes str2 | 8 bytes n
-                    INT32_SP(28) = strncmp(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
-                    sp += 28;
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes n
+                    rr = strncmp(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
+                    sp += 24;
                     break;
                 }
                 case BuiltInFunction::STR_COPY: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2
-                    CHAR_P_SP(16) = strcpy(CHAR_P_SP(8), CHAR_P_SP(0));
+                    // 8 bytes str1 | 8 bytes str2
+                    rr = (uint64_t)strcpy(CHAR_P_SP(8), CHAR_P_SP(0));
                     sp += 16;
                     break;
                 }
                 case BuiltInFunction::STR_N_COPY: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
-                    CHAR_P_SP(24) = strncpy(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes size
+                    rr = (uint64_t)strncpy(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
                     sp += 24;
                     break;
                 }
                 case BuiltInFunction::STR_CAT: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2
-                    CHAR_P_SP(16) = strcat(CHAR_P_SP(8), CHAR_P_SP(0));
+                    // 8 bytes str1 | 8 bytes str2
+                    rr = (uint64_t)strcat(CHAR_P_SP(8), CHAR_P_SP(0));
                     sp += 16;
                     break;
                 }
                 case BuiltInFunction::STR_N_CAT: {
-                    // 8 bytes return value | 8 bytes str1 | 8 bytes str2 | 8 bytes size
-                    CHAR_P_SP(24) = strncat(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
+                    // 8 bytes str1 | 8 bytes str2 | 8 bytes size
+                    rr = (uint64_t)strncat(CHAR_P_SP(16), CHAR_P_SP(8), UINT64_SP(0));
                     sp += 24;
                     break;
                 }
 
                 // printing
                 case BuiltInFunction::PRINT_STRING: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 bytes str
-                    INT32_SP(20) = fputs(CHAR_P_SP(0), FILE_P_SP(8));
-                    sp += 20;
+                    // 8 bytes file pointer | 8 bytes str
+                    rr = fputs(CHAR_P_SP(0), FILE_P_SP(8));
+                    sp += 16;
                     break;
                 }
                 case BuiltInFunction::PRINT_CHAR: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 1 byte char
-                    INT32_SP(13) = fputc(CHAR_SP(0), FILE_P_SP(1));
-                    sp += 13;
+                    // 8 bytes file pointer | 1 byte char
+                    rr = fputc(CHAR_SP(0), FILE_P_SP(1));
+                    sp += 9;
                     break;
                 }
                 case BuiltInFunction::PRINT_SIGNED: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
-                    INT32_SP(20) = fprintf(FILE_P_SP(8), "%" PRId64, (int64_t)UINT64_SP(0));
-                    sp += 20;
+                    // 8 bytes file pointer | 8 byte num
+                    rr = fprintf(FILE_P_SP(8), "%" PRId64, (int64_t)UINT64_SP(0));
+                    sp += 16;
                     break;
                 }
                 case BuiltInFunction::PRINT_UNSIGNED: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
-                    INT32_SP(20) = fprintf(FILE_P_SP(8), "%" PRIu64, UINT64_SP(0));
-                    sp += 20;
+                    // 8 bytes file pointer | 8 byte num
+                    rr = fprintf(FILE_P_SP(8), "%" PRIu64, UINT64_SP(0));
+                    sp += 16;
                     break;
                 }
                 case BuiltInFunction::PRINT_HEX: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 byte num
-                    INT32_SP(20) = fprintf(FILE_P_SP(0), "0x%08" PRIx64, UINT64_SP(8));
-                    sp += 20;
+                    // 8 bytes file pointer | 8 byte num
+                    rr = fprintf(FILE_P_SP(0), "0x%08" PRIx64, UINT64_SP(8));
+                    sp += 16;
                     break;
                 }
                 case BuiltInFunction::FFLUSH: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
-                    INT32_SP(12) = fflush(FILE_P_SP(0));
-                    sp += 12;
+                    // 8 bytes file pointer
+                    rr = fflush(FILE_P_SP(0));
+                    sp += 8;
                     break;
                 }
                 
                 // files
                 case BuiltInFunction::OPEN: {
-                    // 8 bytes return value | 8 bytes str | 8 bytes str
+                    // 8 bytes str | 8 bytes str
                     // modes =
                     //   "r" read
                     //   "w" write
@@ -206,37 +207,37 @@ int Interpreter::runProgram() {
                     //   "r+" read and write
                     //   "w+" create, read and write
                     //   "a+" create, read and append
-                    FILE_P_SP(16) = fopen(CHAR_P_SP(8), CHAR_P_SP(0));
+                    rr = (uint64_t)fopen(CHAR_P_SP(8), CHAR_P_SP(0));
                     sp += 16;
                     break;
                 }
                 case BuiltInFunction::CLOSE: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
-                    INT32_SP(12) = fclose(FILE_P_SP(0));
-                    sp += 12;
+                    // 8 bytes file pointer
+                    rr = fclose(FILE_P_SP(0));
+                    sp += 8;
                     break;
                 }
                 case BuiltInFunction::READ: {
-                    // 8 bytes return value | 8 bytes buffer | 8 bytes n | 8 bytes file pointer
-                    UINT64_SP(24) = fread(VOID_P_SP(16), 1, UINT64_SP(8), FILE_P_SP(0));
+                    // 8 bytes buffer | 8 bytes n | 8 bytes file pointer
+                    rr = fread(VOID_P_SP(16), 1, UINT64_SP(8), FILE_P_SP(0));
                     sp += 24;
                     break;
                 }
                 case BuiltInFunction::READ_LINE: {
-                    // 8 bytes return value | 8 bytes buffer | 4 bytes n | 4 bytes padding | 8 bytes file pointer
-                    CHAR_P_SP(24) = fgets(CHAR_P_SP(16), INT32_SP(12), FILE_P_SP(0));
+                    // 8 bytes buffer | 4 bytes n | 4 bytes padding | 8 bytes file pointer
+                    rr = (uint64_t)fgets(CHAR_P_SP(16), INT32_SP(12), FILE_P_SP(0));
                     sp += 24;
                     break;
                 }
                 case BuiltInFunction::READ_CHAR: {
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer
-                    INT32_SP(12) = getc(FILE_P_SP(0));
-                    sp += 12;
+                    // 8 bytes file pointer
+                    rr = getc(FILE_P_SP(0));
+                    sp += 8;
                     break;
                 }
                 case BuiltInFunction::WRITE: {
-                    // 8 bytes return value | 8 bytes data | 8 bytes n | 8 bytes file pointer
-                    UINT64_SP(24) = fwrite(VOID_P_SP(16), 1, UINT64_SP(12), FILE_P_SP(0));
+                    // 8 bytes data | 8 bytes n | 8 bytes file pointer
+                    rr = fwrite(VOID_P_SP(16), 1, UINT64_SP(12), FILE_P_SP(0));
                     sp += 24;
                     break;
                 }
@@ -245,8 +246,8 @@ int Interpreter::runProgram() {
                     //   SEEK_SET start of file
                     //   SEEK_CUR curr position
                     //   SEEK_END end of file
-                    // 4 bytes return value | 4 bytes padding | 8 bytes file pointer | 8 bytes offset | 4 bytes whence
-                    INT32_SP(24) = fseek(FILE_P_SP(12), INT64_SP(4), INT32_SP(0));
+                    // 8 bytes file pointer | 8 bytes offset | 4 bytes whence
+                    rr = fseek(FILE_P_SP(12), INT64_SP(4), INT32_SP(0));
                     sp += 24;
                     break;
                 }
@@ -540,26 +541,26 @@ int Interpreter::runProgram() {
             break;
         }
         case OpCode::PUSH_B: {
+            *(uint8_t *)(sp - 1) = (uint8_t)registers[*(bc *)ip];
             --sp;
-            *(uint8_t *)sp = (uint8_t)registers[*(bc *)ip];
             ++ip;
             break;
         }
         case OpCode::PUSH_W: {
+            *(uint16_t *)(sp - 2) = (uint16_t)registers[*(bc *)ip];
             sp -= 2;
-            *(uint16_t *)sp = (uint16_t)registers[*(bc *)ip];
             ++ip;
             break;
         }
         case OpCode::PUSH_D: {
+            *(uint32_t *)(sp - 4) = (uint32_t)registers[*(bc *)ip];
             sp -= 4;
-            *(uint32_t *)sp = (uint32_t)registers[*(bc *)ip];
             ++ip;
             break;
         }
         case OpCode::PUSH_Q: {
+            *(uint64_t *)(sp - 8) = registers[*(bc *)ip];
             sp -= 8;
-            *(uint64_t *)sp = registers[*(bc *)ip];
             ++ip;
             break;
         }

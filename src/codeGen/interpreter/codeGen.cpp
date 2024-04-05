@@ -238,15 +238,14 @@ JumpMarker& CodeGen::addJumpMarker(JumpMarkerType type) {
 }
 
 /**
- * Updates jump markers with destination. Sets type of each updated marker to none
+ * Updates jump markers with destination. Sets type of each updated marker to JumpMarkerType::SET
  * \param destination the destination
  * \param type type of jump marker to update
- * \param until keep updating markers till this type is reached. if none, updates the first marker and stops
- * \param clear set the 'until' marker to type none if reached
+ * \param from update markers from this index within the jumper markers container until the end
 */
 void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, uint32_t from) {
-    for (; from < jumpMarkers.size(); ++from) {
-        JumpMarker& jumpMarker = jumpMarkers[from];
+    for (auto iter = std::next(jumpMarkers.begin(), from); iter != jumpMarkers.end(); ++iter) {
+        JumpMarker& jumpMarker = *iter;
         if (jumpMarker.type == type) {
             jumpMarker.type = JumpMarkerType::SET;
             jumpMarker.destination = destination;
@@ -258,9 +257,9 @@ void CodeGen::writeLocalJumpOffsets() {
     // first pass is to shift and update jump markers as needed depending on offset distance
     while (true) {
         bool updated = false;
-        for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
-            // only jumps within a function, no function calls
-            JumpMarker& jumpMarker = jumpMarkers[i];
+        for (auto iter = jumpMarkers.begin(); iter != jumpMarkers.end(); ++iter) {
+            JumpMarker& jumpMarker = *iter;
+            // only updated set jump markers
             if (jumpMarker.type != JumpMarkerType::SET) {
                 continue;
             }
@@ -275,7 +274,7 @@ void CodeGen::writeLocalJumpOffsets() {
             if (jumpOpImmSize == minImmSize) {
                 continue;
             }
-            assert(minImmSize == 4);
+            assert(minImmSize == 4 && minImmSize > jumpOpImmSize);
             byteCode[jumpMarker.start] = (bc)OpCode::NOP;
             // currently we only have the 4 byte relative immediate, so
             // extend by 8 bytes since moving by a multiple of 8 bytes keep everything after aligned
@@ -290,8 +289,8 @@ void CodeGen::writeLocalJumpOffsets() {
             }
             byteCode[jumpMarker.start] = (bc)upgradeRelativeJumpOp(jumpOp);
 
-            for (uint32_t k = 0; k < jumpMarkers.size(); ++k) {
-                JumpMarker& otherJumpMarker = jumpMarkers[k];
+            for (auto subIter = jumpMarkers.begin(); subIter != jumpMarkers.end(); ++subIter) {
+                JumpMarker& otherJumpMarker = *subIter;
                 if (otherJumpMarker.destination > jumpMarker.start) {
                     otherJumpMarker.destination += shiftAmount;
                     updated = true;
@@ -308,9 +307,10 @@ void CodeGen::writeLocalJumpOffsets() {
     }
 
     // second pass is to write the offset in
-    for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
-        JumpMarker& jumpMarker = jumpMarkers[i];
+    for (auto iter = jumpMarkers.begin(); iter != jumpMarkers.end();) {
+        JumpMarker& jumpMarker = *iter;
         if (jumpMarker.type != JumpMarkerType::SET) {
+            ++iter;
             continue;
         }
         const OpCode jumpOp = (OpCode)byteCode[jumpMarker.start];
@@ -323,23 +323,26 @@ void CodeGen::writeLocalJumpOffsets() {
         } else if (immSize == 4) {
             *(int32_t *)&byteCode[jumpMarker.start + 1] = (int32_t)res;
         } else {
-            // compiler 
             std::cerr << "Compiler error, unsupported relative jump immediate size\n";
             exit(1);
         }
+        iter = jumpMarkers.erase(iter);
     }
 }
 
 void CodeGen::writeFunctionJumpOffsets() {
-    for (uint32_t i = 0; i < jumpMarkers.size(); ++i) {
-        JumpMarker& jumpMarker = jumpMarkers[i];
-        if (jumpMarker.type != JumpMarkerType::FUNCTION_CALL) {
+    auto iter = jumpMarkers.begin();
+    while (iter != jumpMarkers.end()) {
+        JumpMarker& jumpMarker = *iter;
+        if (jumpMarker.type != JumpMarkerType::FUNCTION_CALL || !functionDecPointerToIndex.contains(jumpMarker.funcDec)) {
+            ++iter;
             continue;
         }
         const uint32_t functionIndex = functionDecPointerToIndex[jumpMarker.funcDec];
         assert(jumpMarker.start < UINT32_MAX);
         const int32_t offset = functionIndex - jumpMarker.start;
         *(int32_t *)&byteCode[jumpMarker.start + 1] = (int32_t)offset;
+        iter = jumpMarkers.erase(iter);
     }
 }
 
@@ -441,8 +444,7 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         const uint32_t size = structInfo.size;
         const uint32_t padding = diff - size;
         assert(padding < size);
-        uint32_t spaceToAdd = size + padding;
-        efficientImmAddOrSub(stackPointerIndex, spaceToAdd, OpCode::SUB);
+        addPaddingAndSpaceToStack(padding, size);
         return;
     }
 
@@ -458,7 +460,8 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         if (!expRes.isReg) {
             moveImmToReg(allocateRegister(), expRes);
         } else if (expRes.isPointerToValue) {
-            expRes = loadValueFromPointer(expRes);
+            bytecode_t reg = allocateRegister();
+            expRes = loadValueFromPointer(expRes, reg);
         }
         // stackVar.reg = reg;
     }
@@ -964,46 +967,93 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     // need to lookup return type so we can make room for it
     const std::string& functionName = tk->extractToken(functionCall.name);
     GeneralDec const *const &generalDec = lookUp[functionName];
+    Tokenizer* oldTk = tk;
+    tk = &tokenizers[generalDec->tokenizerIndex];
     const FunctionDec* p_funcDec;
     if (generalDec->type == GeneralDecType::BUILTIN_FUNCTION) {
         p_funcDec = &generalDec->builtinFunc->funcDec;
     } else {
         p_funcDec = generalDec->funcDec;
     }
-    {
+    bool returnValuePointerArgNeeded = false;
+    ExpressionResult returnValuePointerExp;
+    { // add return value space if needed
         Token returnType = getTypeFromTokenList(p_funcDec->returnType);
-        uint32_t size = getSizeOfType(returnType);
-        if (size) {
-            // 8 byte align return type since function assumes it is
-            const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, 8);
-            addSpaceToStack(padding + size);
-            StackItem returnValue {
-                .positionOnStack = getCurrStackPointerPosition() + padding + size,
-                .type = StackItemType::RETURNED_VALUE
+        uint32_t alignTo, size;
+        if (returnType.getType() == TokenType::IDENTIFIER) {
+            const std::string& typeIdent = tk->extractToken(returnType);
+            const GeneralDec* structGenDec = lookUp[typeIdent];
+            assert(structGenDec->type == GeneralDecType::STRUCT);
+            StructInformation& structInfo = structLookUp[structGenDec->structDec];
+            size = structInfo.size;
+            alignTo = structInfo.alignTo;
+        } else {
+            size = getSizeOfBuiltinType(returnType.getType());
+            alignTo = size;
+        }
+        if (sizeRequiresReturnValuePointer(size)) {
+            returnValuePointerArgNeeded = true;
+            const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, alignTo);
+            const uint32_t pos = addPaddingAndSpaceToStack(padding, size);
+            StackItem varSpaceItem = {
+                .positionOnStack = pos,
+                .type = StackItemType::RETURNED_VALUE_SPACE
             };
-            stackItems.emplace_back(returnValue);
+            stackItems.emplace_back(varSpaceItem);
+            returnValuePointerExp.setReg(stackPointerIndex);
+            returnValuePointerExp.isTemp = false;
         }
     }
+
+    // after we add return value space, we need to save any registers currently in use
+    bool returnRegisterUsed = false;
+    {
+        bool needToSaveReturnValuePointer = returnValuePointerArgNeeded;
+        for (bytecode_t reg = 0; reg < NUM_REGISTERS; ++reg) {
+            if (isReservedRegister(reg) || !registers[reg].inUse || reg == returnValuePointerExp.getReg()) {
+                continue;
+            }
+            if (needToSaveReturnValuePointer) {
+                needToSaveReturnValuePointer = false;
+                assert(returnValuePointerExp.getReg());
+                const bytecode_t temp = allocateRegister();
+                addBytes({{(bc)OpCode::MOVE, temp, returnValuePointerExp.getReg()}});
+                returnValuePointerExp.setReg(temp);
+            }
+            if (reg == returnRegisterIndex) {
+                returnRegisterUsed = true;
+            }
+            ExpressionResult regVal;
+            regVal.setReg(reg);
+            regVal.type = &Checker::uint64Value;
+            addExpressionResToStack(regVal, StackItemType::SAVED_TEMPORARY);
+        }
+    }
+
     // the function will reset the stack to this point
     const uint32_t resetTo = stackItems.size();
 
     // add arguments to stack
+    if (returnValuePointerArgNeeded) {
+        assert(returnValuePointerExp.getReg());
+        addExpressionResToStack(returnValuePointerExp, StackItemType::ARGUMENT);
+        if (returnValuePointerExp.isTemp) {
+            freeRegister(returnValuePointerExp.getReg());
+        }
+    }
     if (functionCall.args.curr.getType() != ExpressionType::NONE) {
         const ExpressionList *expressionList = &functionCall.args;
-        do {
+        ExpressionResult expRes = generateExpression(expressionList->curr);
+        addExpressionResToStack(expRes, StackItemType::ARGUMENT, returnValuePointerArgNeeded ? 0 : 8);
+        expressionList = expressionList->next;
+        while (expressionList) {
             ExpressionResult expRes = generateExpression(expressionList->curr);
-            const uint32_t positionOnStack = addExpressionResToStack(expRes);
-            StackItem argumentItem {
-                .positionOnStack = positionOnStack,
-                .type = StackItemType::ARGUMENT
-            };
-            stackItems.emplace_back(argumentItem);
+            addExpressionResToStack(expRes, StackItemType::ARGUMENT);
             expressionList = expressionList->next;
-        } while (expressionList);
+        }
     }
-    addSpaceToStack(getPaddingNeeded(getCurrStackPointerPosition(), 8, 8));
-    alignForImm(1, 4);
-    // register this position to be updated
+
+    // add function call
     if (generalDec->type == GeneralDecType::BUILTIN_FUNCTION) {
         const std::string& builtinFunctionName = tokenizers[generalDec->tokenizerIndex].extractToken(generalDec->builtinFunc->name);
         if (!builtin_function_to_bytecode_t.contains(builtinFunctionName)) {
@@ -1014,21 +1064,46 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
         addByteOp(OpCode::CALL_B);
         addByte((bytecode_t)builtInFunc);
     } else {
+        // add padding to align return address
+        addPaddingToStack(getPaddingNeeded(getCurrStackPointerPosition(), 8, 8));
+        alignForImm(1, 4);
+        // register this position to be updated
         JumpMarker& jumpMarker = addJumpMarker(JumpMarkerType::FUNCTION_CALL);
         jumpMarker.funcDec = p_funcDec;
         addByteOp(OpCode::CALL);
         add4ByteNum(0);
     }
+
+    // pop all arguments off
     while (stackItems.size() > resetTo) {
         stackItems.pop_back();
     }
 
-    // have to return 'return value' expression result, which is stored on the stack
-    // pointer is in sp register
-    ExpressionResult returnValuePointerExpression;
-    returnValuePointerExpression.isReturnedValue = true;
-    returnValuePointerExpression.type = &p_funcDec->returnType;
-    return returnValuePointerExpression;
+    ExpressionResult returnValueExpression;
+    // if using return value pointer arg, need special flag
+    // otherwise return value is in returnRegisterIndex
+    // if returnRegisterIndex register was being used before, move it to a different reg
+    if (returnRegisterUsed) {
+        const bytecode_t moveTo = allocateRegister();
+        addBytes({{(bc)OpCode::MOVE, moveTo, returnRegisterIndex}});
+        returnValueExpression.setReg(moveTo);
+    } else {
+        returnValueExpression.setReg(returnRegisterIndex);
+    }
+    returnValueExpression.type = &p_funcDec->returnType;
+
+    // put saved values back into their expected registers (reverse of pushed)
+    for (int16_t reg = NUM_REGISTERS - 1; reg >= 0; --reg) {
+        if (isReservedRegister(reg) || !registers[reg].inUse) {
+            continue;
+        }
+        assert(stackItems.back().type == StackItemType::SAVED_TEMPORARY);
+        popValue(Checker::uint64Value, reg);
+    }
+
+    tk = oldTk;
+
+    return returnValueExpression;
 }
 
 
@@ -1386,7 +1461,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
 /**
  * Loads the data pointed at by expRes into a register
 */
-ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp) {
+ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp, bytecode_t reg) {
     assert(pointerExp.isReg);
     assert(pointerExp.isPointerToValue);
     const TokenList* type = pointerExp.type;
@@ -1402,7 +1477,7 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
     if (loadOp == OpCode::NOP) {
         // weirdly sized type (3, 5, 6, or 7)
     }
-    expRes.setReg(allocateRegister());
+    expRes.setReg(reg);
     expRes.type = type;
     addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
     return expRes;
@@ -1569,7 +1644,7 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
     ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
     assert(leftResult.isReg);
     assert(leftResult.isPointerToValue);
-    ExpressionResult leftValue = loadValueFromPointer(leftResult);
+    ExpressionResult leftValue = loadValueFromPointer(leftResult, allocateRegister());
     // registers[leftResult.getReg()].changed = true;
     expressionResWithOp(op, opImm, leftValue, rightResult);
     if (rightResult.isTemp){
@@ -1887,7 +1962,7 @@ ExpressionResult CodeGen::defaultUnOp(const UnOp& unOp, OpCode op) {
 ExpressionResult CodeGen::incrementOrDecrement(const UnOp& unOp, TokenType op) {
     assert(op == TokenType::DECREMENT_PREFIX || op == TokenType::INCREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX);
     ExpressionResult addressExp = getAddressOfExpression(unOp.operand);
-    ExpressionResult dataExp = loadValueFromPointer(addressExp);
+    ExpressionResult dataExp = loadValueFromPointer(addressExp, allocateRegister());
     ExpressionResult incrementExp;
     OpCode opCode;
     if (op == TokenType::DECREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX) {
@@ -2005,6 +2080,10 @@ void CodeGen::endSoftScope() {
 // ========================================
 // FUNCTIONS
 // ========================================
+
+bool CodeGen::sizeRequiresReturnValuePointer(uint32_t typeSize) {
+    return typeSize > SIZE_OF_REGISTER;
+}
 
 void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
     assert(stackItems.empty());
@@ -2201,36 +2280,53 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
 */
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
     // generate return expression
-    const uint32_t returnValueStackIndex = nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER];
-    if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
-        ExpressionResult returnValueExp = generateExpression(returnStatement.returnValue);
-        // store return value in its spot on the stack
-        ExpressionResult returnValueAddressExp;
-        returnValueAddressExp.setReg(allocateRegister());
-        returnValueAddressExp.isPointerToValue = true;
-        returnValueAddressExp.type = returnValueExp.type;
-        addBytes({{(bc)OpCode::MOVE, returnValueAddressExp.getReg(), stackPointerIndex}});
-        const uint32_t offset = getOffsetFromSP(stackItems[returnValueStackIndex].positionOnStack);
-        efficientImmAddOrSub(returnValueAddressExp.getReg(), offset, OpCode::ADD);
-        storeValueToPointer(returnValueAddressExp, returnValueExp);
-        if (returnValueExp.isTemp) {
-            freeRegister(returnValueExp.getReg());
-        }
-        if (returnValueAddressExp.isTemp) {
-            freeRegister(returnValueAddressExp.getReg());
-        }
-    }
-    // find where return address is
+    ExpressionResult returnValueExp = generateExpression(returnStatement.returnValue);
+    // clear until return address
     const uint32_t returnAddressStackIndex = nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER];
     assert(stackItems[returnAddressStackIndex].positionOnStack >= 8);
     fakeClearStackFromTo(stackItems.size() - 1, returnAddressStackIndex);
-    addBytes({{(bc)OpCode::POP_Q, miscRegisterIndex}});
+    // might want to change this to an allocated register
+    bytecode_t raReg = allocateRegister();
+    if (raReg == returnRegisterIndex) {
+        raReg = allocateRegister();
+    }
+    addBytes({{(bc)OpCode::POP_Q, raReg}});
     // since we used POP_Q above, we remove 8 (q word size) from the position so that the clear function
     // adds the right amount to the stack pointer
-    stackItems[returnAddressStackIndex].positionOnStack -= 8;
-    fakeClearStackFromTo(returnAddressStackIndex, returnValueStackIndex);
-    stackItems[returnAddressStackIndex].positionOnStack += 8;
-    addBytes({{(bc)OpCode::JUMP, miscRegisterIndex}});
+    if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
+        const Token typeToken = getTypeFromTokenList(*returnValueExp.type);
+        const uint32_t typeSize = getSizeOfType(typeToken);
+        if (sizeRequiresReturnValuePointer(typeSize)) {
+            assert(stackItems.size() > 0 && stackItems[0].type == StackItemType::RETURN_VALUE_SPACE_POINTER);
+            assert(returnAddressStackIndex > 0);
+            fakeClearStackFromTo(returnAddressStackIndex - 1, 0);
+            // TODO: 
+            assert(false);
+        } else {
+            // move value into returnRegisterIndex
+            if (returnAddressStackIndex > 0) {
+                fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
+            }
+            if (returnValueExp.isPointerToValue) {
+                returnValueExp = loadValueFromPointer(returnValueExp, returnRegisterIndex);
+            } else if (returnValueExp.isReg) {
+                if (returnValueExp.getReg() != returnRegisterIndex) {
+                    addBytes({{(bc)OpCode::MOVE, returnRegisterIndex, returnValueExp.getReg()}});
+                }
+            } else {
+                moveImmToReg(returnRegisterIndex, returnValueExp);
+            }
+        }
+    }
+    else if (returnAddressStackIndex > 0) {
+        fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
+    }
+    addBytes({{(bc)OpCode::JUMP, raReg}});
+    freeRegister(raReg);
+    freeRegister(returnRegisterIndex);
+    if (returnValueExp.isTemp) {
+        freeRegister(returnValueExp.getReg());
+    }
 }
 
 
@@ -2238,47 +2334,68 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
 // STACK MANAGEMENT
 // ========================================
 
+
+void CodeGen::addSpaceToStack(uint32_t space) {
+    efficientImmAddOrSub(stackPointerIndex, space, OpCode::SUB);
+}
+
+void CodeGen::addPaddingToStack(uint32_t padding) {
+    if (padding) {
+        addSpaceToStack(padding);
+        StackItem paddingItem = {
+            .positionOnStack = getCurrStackPointerPosition() + padding,
+            .type = StackItemType::PADDING
+        };
+        stackItems.emplace_back(paddingItem);
+    }
+}
+
 /**
- * 
- * \returns position of item
+ * Adds padding + space room to the stack, and adds a stack item for the padding
+ * \param padding how much padding to add
+ * \param space how much space after the padding to add
+ * \returns the offset for start of 'space'
 */
-uint32_t CodeGen::getPositionPushingTypeToStack(Token typeToken, uint32_t alignTo) {
+uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
+    assert(space);
+    addSpaceToStack(padding + space);
+    const uint32_t currSP = getCurrStackPointerPosition();
+    if (padding) {
+        StackItem paddingItem = {
+            .positionOnStack = currSP + padding,
+            .type = StackItemType::PADDING
+        };
+        stackItems.emplace_back(paddingItem);
+    }
+    return currSP + padding + space;
+}
+
+StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec, uint32_t alignTo) {
+    const Token typeToken = getTypeFromTokenList(varDec.type);
+    uint32_t padding, size;
     if (typeToken.getType() == TokenType::IDENTIFIER) {
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation &structInfo = structLookUp[genDec->structDec];
         if (!alignTo) {
             alignTo = structInfo.alignTo;
         }
-        return getPositionPushingToStack(structInfo.size, alignTo);
+        size = structInfo.size;
+        padding = getPaddingNeeded(getCurrStackPointerPosition(), structInfo.size, alignTo);
+    } else {
+        size = getSizeOfBuiltinType(typeToken.getType());
+        if (!alignTo) {
+            alignTo = size;
+        }
+        else if (alignTo > size) {
+            size = alignTo;
+        }
+        padding = getPaddingNeeded(getCurrStackPointerPosition(), size, alignTo);
     }
-    uint32_t sizeOfParameter = getSizeOfBuiltinType(typeToken.getType());
-    if (!alignTo) {
-        alignTo = sizeOfParameter;
-    }
-    else if (alignTo > sizeOfParameter) {
-        sizeOfParameter = alignTo;
-    }
-    return getPositionPushingToStack(sizeOfParameter, alignTo);
-}
-
-uint32_t CodeGen::getPositionPushingStuctToStack(const StructInformation &structInfo) {
-    return getPositionPushingToStack(structInfo.size, structInfo.alignTo);
-}
-
-uint32_t CodeGen::getPositionPushingToStack(const uint32_t sizeOfType, const uint32_t alignTo) {
-    const uint32_t curr_sp_position = getCurrStackPointerPosition();
-    return curr_sp_position + getPaddingNeeded(curr_sp_position, sizeOfType, alignTo) + sizeOfType;
-}
-
-void CodeGen::addSpaceToStack(uint32_t space) {
-    efficientImmAddOrSub(stackPointerIndex, space, OpCode::SUB);
-}
-
-StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec) {
+    addPaddingToStack(padding);
     StackItem stackItem {
         .variable = {
             .varDec = varDec,
-            .positionOnStack = getPositionPushingTypeToStack(getTypeFromTokenList(varDec.type)),
+            .positionOnStack = getCurrStackPointerPosition() + size,
         },
         .type = StackItemType::VARIABLE,
     };
@@ -2308,19 +2425,20 @@ void CodeGen::makeRoomOnVirtualStack(Token token, uint32_t alignTo) {
 /**
  * 
 */
-uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
+StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemType stackItemType, uint32_t alignTo) {
     const TokenList* type = expRes.type;
-    if (expRes.isPointerToValue) {
-        type = getNextFromTokenList(*type);
-    } else if (!expRes.isReg) {
+    assert(type);
+    if (!expRes.isReg) {
         moveImmToReg(allocateRegister(), expRes);
     }
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t spPosition = getCurrStackPointerPosition();
     if (typeToken.getType() != TokenType::IDENTIFIER) {
         const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
-        const uint32_t padding = getPaddingNeeded(spPosition, size, size);
-        addSpaceToStack(padding);
+        const uint32_t padding = getPaddingNeeded(spPosition, size, alignTo ? alignTo : size);
+        if (padding) {
+            addPaddingToStack(padding);
+        }
         if (!expRes.isPointerToValue) {
             addBytes({{(bc)getPushOpForSize(size), expRes.getReg()}});
         }
@@ -2331,73 +2449,105 @@ uint32_t CodeGen::addExpressionResToStack(ExpressionResult& expRes) {
         if (expRes.isTemp) {
             freeRegister(expRes.getReg());
         }
-        return padding + size;
+        StackItem si = {
+            .positionOnStack = getCurrStackPointerPosition() + size,
+            .type = stackItemType
+        };
+        return stackItems.emplace_back(si);
     } else {
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation& structInfo = structLookUp[genDec->structDec];
         uint32_t size = structInfo.size;
-        const uint32_t padding = getPaddingNeeded(spPosition, size, structInfo.alignTo);
+        const uint32_t padding = getPaddingNeeded(spPosition, size, alignTo ? alignTo : structInfo.alignTo);
         if (!expRes.isPointerToValue) {
-            addSpaceToStack(padding);
+            addPaddingToStack(padding);
             addBytes({{(bc)getPushOpForSize(size), expRes.getReg()}});
         }
         else if (getLoadOpForSize(size) != OpCode::NOP) {
+            addPaddingToStack(padding);
             addBytes({{(bc)getLoadOpForSize(size), miscRegisterIndex, expRes.getReg()}});
             addBytes({{(bc)getPushOpForSize(size), miscRegisterIndex}});
         }
         else {
-            addSpaceToStack(padding + size);
-            addBytes({{(bc)OpCode::PUSH_D, miscRegisterIndex}}); // add space for return value
+            addPaddingAndSpaceToStack(padding, size);
             addBytes({{(bc)OpCode::PUSH_D, stackPointerIndex}}); // add destination
             addBytes({{(bc)OpCode::PUSH_D, expRes.getReg()}}); // add source
             ExpressionResult sizeExp;
             sizeExp.set(size);
-            addExpressionResToStack(sizeExp); // add size
+            addExpressionResToStack(sizeExp, StackItemType::ARGUMENT); // add size
             addBytes({{(bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_COPY}});
             addBytes({{(bc)OpCode::POP_Q, miscRegisterIndex}}); // pop return value
+            size = 0;
         }
         if (expRes.isTemp) {
             freeRegister(expRes.getReg());
         }
-        return padding + size;
+        StackItem si = {
+            .positionOnStack = getCurrStackPointerPosition() + size,
+            .type = stackItemType
+        };
+        return stackItems.emplace_back(si);
     }
 }
 
 /*
-  * This doesn't actually need to be known before hand, maybe just add to stack of each function...
-  * Naturally, generate each function independently
-  * 
-  * 
-  * Memory layout information needs to be standardized before hand per function,
-  * but generally, memory layout for a function call:
+  * Memory layout information needs to be standardized per function,
+  * but general memory layout for a function call:
   *    HIGH ADDRESS                                              LOW ADDRESS
-  *  Return Value | Argument 1 | Argument 2 | ... | Argument N | Return Address
+  *  *Return Value Pointer | Argument 1 | Argument 2 | ... | Argument N | Return Address
   * 
-  * - Caller needs to 8 byte align 'Return Value'
-  * - Callee unwinds and destructs all variables after 'Return Value' on return
+  * - Callee unwinds and destructs all variables on return
+  * - *If the return type size cannot fit in a register, an extra parameter is added to the function call,
+  *     this parameter is a pointer to some space reserved for the return value
+  * - If the return type can fit in a register, it is returned using r10
 */
 void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
-    // add return value, 8 byte aligned
-    StackItem returnValue {
-        .positionOnStack = funcDec.returnType.token.getType() != TokenType::VOID ? 
-            getPositionPushingTypeToStack(getTypeFromTokenList(funcDec.returnType), 8) : 0,
-        .type = StackItemType::RETURN_VALUE,
-    };
-    nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER] = stackItems.size();
-    stackItems.emplace_back(returnValue);
+    // add return value pointer if return type larger than register size
+    const Token typeToken = getTypeFromTokenList(funcDec.returnType);
+    bool firstItem = true;
+    const uint32_t sizeOfPointer = getSizeOfBuiltinType(TokenType::POINTER);
+    if (sizeRequiresReturnValuePointer(getSizeOfType(typeToken))) {
+        firstItem = false;
+        // add return address
+        const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfPointer, sizeOfPointer);
+        if (padding) {
+            StackItem paddingItem {
+                .positionOnStack = getCurrStackPointerPosition() + padding,
+                .type = StackItemType::PADDING,
+            };
+            stackItems.emplace_back(paddingItem);   
+        }
+        StackItem returnValue {
+            .positionOnStack = getCurrStackPointerPosition() + sizeOfPointer,
+            .type = StackItemType::RETURN_VALUE_SPACE_POINTER,
+        };
+        // nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER] = stackItems.size();
+        stackItems.emplace_back(returnValue);
+    } // else use r10 to return the value, don't need a stack item
 
     // add parameters
     if (funcDec.params.curr.type != StatementType::NONE) {
         const StatementList *parameterList = &funcDec.params;
-        do {
+        // need to align first one to 8 bytes if a return value address has not already been added
+        addVarDecToVirtualStack(*parameterList->curr.varDec, firstItem ? 8 : 0);
+        parameterList = parameterList->next;
+        while (parameterList) {
             addVarDecToVirtualStack(*parameterList->curr.varDec);
             parameterList = parameterList->next;
-        } while (parameterList);
+        }
     }
 
     // add return address
+    const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfPointer, sizeOfPointer);
+    if (padding) {
+        StackItem paddingItem {
+            .positionOnStack = getCurrStackPointerPosition() + padding,
+            .type = StackItemType::PADDING,
+        };
+        stackItems.emplace_back(paddingItem);   
+    }
     StackItem returnAddress {
-        .positionOnStack = getPositionPushingTypeToStack(Token{0, 0, TokenType::POINTER}),
+        .positionOnStack = getCurrStackPointerPosition() + sizeOfPointer,
         .type = StackItemType::RETURN_ADDRESS,
     };
     nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER] = stackItems.size();
@@ -2405,17 +2555,18 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
 }
 
 /**
- * Generates the byte code needed to clear the stack at index 'from' until 'to'
- * Does not remove any items from the virtual stack
+ * Generates the byte code needed to clear the stack at index 'from' until 'to'.
+ * A negative 'to' value results in the entire stack being cleared.
+ * Does not remove any items from the virtual stack.
  * 
- * Have to be careful using this since we have to pass the indexes in
+ * Have to be careful using this since we have to pass the indexes in.
  * For example, when we want to do a return statement, we clear the stack until the return address index
  * pop the return address off, clear the rest of the stack (function arguments) until the return value index, and then return.
  * 
  * \param from the index to start from
  * \param to the index to go to
 */
-void CodeGen::fakeClearStackFromTo(const uint32_t from, const uint32_t to) {
+void CodeGen::fakeClearStackFromTo(const uint32_t from, const int32_t to) {
     // this for loop is going in the wrong order for destruction
     // must be reverse order of placed on stack, not same order
     // for  (uint32_t i = from; i > to; --i) {
@@ -2424,8 +2575,14 @@ void CodeGen::fakeClearStackFromTo(const uint32_t from, const uint32_t to) {
     //   }
     //   // call destructor for each variable
     // }
-    assert(from < stackItems.size() && to < stackItems.size() && from >= to);
-    const uint32_t stackUsage = getPositionOnStack(from) - getPositionOnStack(to);
+    assert(from < stackItems.size());
+    uint32_t stackUsage;
+    if (to < 0) {
+        stackUsage = getPositionOnStack(from);
+    } else { // to is a positive value
+        assert((uint32_t)to < stackItems.size() && from >= (uint32_t)to);
+        stackUsage = getPositionOnStack(from) - getPositionOnStack(to);
+    }
     efficientImmAddOrSub(stackPointerIndex, stackUsage, OpCode::ADD);
 }
 
@@ -2435,10 +2592,12 @@ uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
         case StackItemType::NONE: { assert(false); break; }
         case StackItemType::MARKER: { assert(false); break; }
         case StackItemType::VARIABLE: { return stackItem.variable.positionOnStack; }
+        case StackItemType::PADDING:
+        case StackItemType::ARGUMENT:
         case StackItemType::RETURN_ADDRESS: 
-        case StackItemType::RETURN_VALUE: { return stackItem.positionOnStack; }
-        case StackItemType::RETURNED_VALUE: { return stackItem.positionOnStack; }
-        case StackItemType::ARGUMENT: { return stackItem.positionOnStack; }
+        case StackItemType::RETURN_VALUE_SPACE_POINTER:
+        case StackItemType::RETURNED_VALUE_SPACE: { return stackItem.positionOnStack; }
+        case StackItemType::SAVED_TEMPORARY: { return stackItem.savedTempValue.positionOnStack; }
     }
     exit(1);
 }
@@ -2453,6 +2612,32 @@ uint32_t CodeGen::getOffsetFromSP(uint32_t positionOnStack) {
     // | value |
     return getCurrStackPointerPosition() - positionOnStack;
 }
+
+/**
+ * Pops the item at the top of the stack off
+*/
+void CodeGen::popValue(const TokenList& type, const bytecode_t reg) {
+    const uint32_t size = getSizeOfType(getTypeFromTokenList(type));
+    const OpCode popOp = getPopOpForSize(size);
+    if (popOp == OpCode::NOP) {
+        // TODO:
+    }
+    addBytes({{(bc)popOp, reg}});
+    stackItems.pop_back();
+}
+
+/**
+ * Pops saved values back into the registers where they are expected to be.
+ * Should always be called after an expression with isReturnedValue is acquired,
+ * but the returned value should be popped first
+*/
+void CodeGen::postFunctionCall() {
+    while (stackItems.back().type == StackItemType::SAVED_TEMPORARY) {
+        SavedTempValue& savedTemp = stackItems.back().savedTempValue;
+        popValue(savedTemp.type, savedTemp.reg);
+    }
+}
+
 
 // ========================================
 // OTHER
@@ -2598,22 +2783,32 @@ std::ostream& operator<<(std::ostream& os, const StackItem& obj) {
         }
         case StackItemType::RETURN_ADDRESS: {
             os << "RETURN_ADDRESS\n";
-            os << "Return Address Position: " << obj.positionOnStack;
+            os << "Position: " << obj.positionOnStack;
             break;
         }
-        case StackItemType::RETURN_VALUE: {
-            os << "RETURN_VALUE\n";
-            os << "Return Value Position: " << obj.positionOnStack;
+        case StackItemType::RETURN_VALUE_SPACE_POINTER: {
+            os << "RETURN_VALUE_SPACE_POINTER\n";
+            os << "Position: " << obj.positionOnStack;
             break;
         }
-        case StackItemType::RETURNED_VALUE: {
-            os << "RETURNED_VALUE\n";
-            os << "Returned Value Position: " << obj.positionOnStack;
+        case StackItemType::RETURNED_VALUE_SPACE: {
+            os << "RETURNED_VALUE_SPACE\n";
+            os << "Position: " << obj.positionOnStack;
+            break;
+        }
+        case StackItemType::SAVED_TEMPORARY: {
+            os << "SAVED_TEMPORARY\n";
+            os << "Position: " << obj.savedTempValue.positionOnStack;
             break;
         }
         case StackItemType::ARGUMENT: {
             os << "ARGUMENT\n";
-            os << "Argument Position: " << obj.positionOnStack;
+            os << "Position: " << obj.positionOnStack;
+            break;
+        }
+        case StackItemType::PADDING: {
+            os << "PADDING\n";
+            os << "Position: " << obj.positionOnStack;
             break;
         }
     }

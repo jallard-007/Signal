@@ -1,6 +1,15 @@
 #include <cassert>
 #include "bytecodeDesign.hpp"
 
+bool isReservedRegister(bytecode_t reg) {
+    return (
+        reg == instructionPointerIndex ||
+        reg == stackPointerIndex ||
+        reg == dataPointerIndex ||
+        reg == returnRegisterIndex ||
+        reg == miscRegisterIndex
+    );
+}
 
 std::ostream& operator<<(std::ostream& os, const std::vector<bytecode_t>& vec) {
     for (uint64_t i = 0; i < vec.size(); ++i) {
