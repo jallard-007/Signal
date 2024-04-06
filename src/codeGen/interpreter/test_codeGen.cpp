@@ -823,6 +823,7 @@ R"(
         const uint32_t indexOfCall = expected.byteCode.size();
         expected.addBytes({{
             (bc)OpCode::CALL, 0, 0, 0, 0,
+            (bc)OpCode::ADD_I, 30, 4, 0,
             (bc)OpCode::POP_Q, 1,
             (bc)OpCode::JUMP, 1,
         }});
@@ -868,9 +869,8 @@ R"(
         const uint32_t indexOfCall = expected.byteCode.size();
         expected.addBytes({{
             (bc)OpCode::CALL, 0, 0, 0, 0,
-            (bc)OpCode::MOVE, 1, 10,
-            (bc)OpCode::ADD_I, 1, 2, 0,
-            (bc)OpCode::PUSH_D, 1,
+            (bc)OpCode::ADD_I, 10, 2, 0,
+            (bc)OpCode::PUSH_D, 10,
             (bc)OpCode::ADD_I, 30, 4, 0,
             (bc)OpCode::POP_Q, 1,
             (bc)OpCode::JUMP, 1,

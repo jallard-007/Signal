@@ -433,18 +433,14 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
     //     }
     // }
 
-    const uint32_t preAddStackPointerOffset = getCurrStackPointerPosition();
-    StackVariable& stackVar = addVarDecToVirtualStack(varDec);
-    const uint32_t diff = stackVar.positionOnStack - preAddStackPointerOffset;
     const Token typeToken = getTypeFromTokenList(varDec.type);
 
     if (typeToken.getType() == TokenType::IDENTIFIER) {
+        // to improve
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation& structInfo = structLookUp[genDec->structDec];
         const uint32_t size = structInfo.size;
-        const uint32_t padding = diff - size;
-        assert(padding < size);
-        addPaddingAndSpaceToStack(padding, size);
+        addSpaceToStack(size);
         return;
     }
 
@@ -465,17 +461,14 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
         }
         // stackVar.reg = reg;
     }
-    const uint32_t padding = diff - size;
-    assert(padding < size);
+    addVarDecToStack(varDec);
     assert(size >= 1 && size <= 8);
     if (!expRes.isReg) {
-        uint32_t spaceToAdd = size + padding;
-        efficientImmAddOrSub(stackPointerIndex, spaceToAdd, OpCode::SUB);
+        efficientImmAddOrSub(stackPointerIndex, size, OpCode::SUB);
         return;
     }
     const OpCode pushOp = getPushOpForSize(size);
     assert(pushOp != OpCode::NOP);
-    efficientImmAddOrSub(stackPointerIndex, padding, OpCode::SUB);
     addBytes({{(bc)pushOp, expRes.getReg()}});
     if (expRes.isTemp) {
         freeRegister(expRes.getReg());
@@ -1031,7 +1024,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     }
 
     // the function will reset the stack to this point
-    const uint32_t resetTo = stackItems.size();
+    uint32_t resetTo = stackItems.size();
 
     // add arguments to stack
     if (returnValuePointerArgNeeded) {
@@ -1075,6 +1068,9 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     }
 
     // pop all arguments off
+    if (stackItems.size() > resetTo && stackItems.at(resetTo).type == StackItemType::PADDING) {
+        ++resetTo;
+    }
     while (stackItems.size() > resetTo) {
         stackItems.pop_back();
     }
@@ -2104,7 +2100,10 @@ void CodeGen::generateStatement(const Statement& statement) {
             break;
         }
         case StatementType::EXPRESSION: {
-            generateExpression(*statement.expression);
+            ExpressionResult exp = generateExpression(*statement.expression);
+            if (exp.isTemp) {
+                freeRegister(exp.getReg());
+            }
             break;
         }
         case StatementType::CONTROL_FLOW: {
@@ -2147,7 +2146,12 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
             const uint64_t startOfLoopIndex = byteCode.size();
             const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
             const BranchStatementResult res = generateBranchStatement(controlFlowStatement.forLoop->statement);
-            generateExpression(controlFlowStatement.forLoop->iteration);
+            {
+                const ExpressionResult iterExp = generateExpression(controlFlowStatement.forLoop->iteration);
+                if (iterExp.isTemp) {
+                    freeRegister(iterExp.getReg());
+                }
+            }
             addJumpMarker(JumpMarkerType::TO_LOOP_START);
             addJumpOp(OpCode::RS_JUMP);
             if (res == BranchStatementResult::ADDED_JUMP) {
@@ -2339,9 +2343,16 @@ void CodeGen::addSpaceToStack(uint32_t space) {
     efficientImmAddOrSub(stackPointerIndex, space, OpCode::SUB);
 }
 
-void CodeGen::addPaddingToStack(uint32_t padding) {
+/**
+ * Adds padding to the stack
+ * \param padding how much padding to add
+ * \param virtualOnly if padding should only be added to the virtual stack
+*/
+void CodeGen::addPaddingToStack(uint32_t padding, bool virtualOnly) {
     if (padding) {
-        addSpaceToStack(padding);
+        if (!virtualOnly) {
+            addSpaceToStack(padding);
+        }
         StackItem paddingItem = {
             .positionOnStack = getCurrStackPointerPosition() + padding,
             .type = StackItemType::PADDING
@@ -2370,7 +2381,14 @@ uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
     return currSP + padding + space;
 }
 
-StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec, uint32_t alignTo) {
+/**
+ * Adds a variable dec to the virtual stack. Also adds padding if necessary.
+ * \param varDec the variable declaration to be added
+ * \param alignTo optionally set the alignment. if left at the default of 0, will use the type's alignment
+ * \param virtualOnly if set to true, only adds padding and var dec to virtual stack (does not update bytecode)
+ *  otherwise will update the bytecode by padding, and padding only
+*/
+StackVariable& CodeGen::addVarDecToStack(const VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     uint32_t padding, size;
     if (typeToken.getType() == TokenType::IDENTIFIER) {
@@ -2391,11 +2409,11 @@ StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec, uint3
         }
         padding = getPaddingNeeded(getCurrStackPointerPosition(), size, alignTo);
     }
-    addPaddingToStack(padding);
+    addPaddingToStack(padding, virtualOnly);
     StackItem stackItem {
         .variable = {
             .varDec = varDec,
-            .positionOnStack = getCurrStackPointerPosition() + size,
+            .positionOnStack = getCurrStackPointerPosition() + padding + size,
         },
         .type = StackItemType::VARIABLE,
     };
@@ -2403,6 +2421,8 @@ StackVariable& CodeGen::addVarDecToVirtualStack(const VariableDec& varDec, uint3
     stackItems.emplace_back(stackItem);
     return stackItems.back().variable;
 }
+
+
 
 uint32_t CodeGen::getCurrStackPointerPosition() {
     auto iter = stackItems.rbegin();
@@ -2415,11 +2435,6 @@ uint32_t CodeGen::getCurrStackPointerPosition() {
         ++iter;
     }
     return 0;
-}
-
-void CodeGen::makeRoomOnVirtualStack(Token token, uint32_t alignTo) {
-    (void)token;
-    (void)alignTo;
 }
 
 /**
@@ -2529,10 +2544,10 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
     if (funcDec.params.curr.type != StatementType::NONE) {
         const StatementList *parameterList = &funcDec.params;
         // need to align first one to 8 bytes if a return value address has not already been added
-        addVarDecToVirtualStack(*parameterList->curr.varDec, firstItem ? 8 : 0);
+        addVarDecToStack(*parameterList->curr.varDec, firstItem ? 8 : 0, true);
         parameterList = parameterList->next;
         while (parameterList) {
-            addVarDecToVirtualStack(*parameterList->curr.varDec);
+            addVarDecToStack(*parameterList->curr.varDec, 0, true);
             parameterList = parameterList->next;
         }
     }
@@ -2705,7 +2720,7 @@ void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
 }
 
 
-constexpr OpCode getLoadOpForSize(const uint32_t size) {
+OpCode getLoadOpForSize(const uint32_t size) {
     switch(size) {
         case 1: return OpCode::LOAD_B;
         case 2: return OpCode::LOAD_W;
@@ -2715,7 +2730,7 @@ constexpr OpCode getLoadOpForSize(const uint32_t size) {
     }
 }
 
-constexpr OpCode getStoreOpForSize(const uint32_t size) {
+OpCode getStoreOpForSize(const uint32_t size) {
     switch(size) {
         case 1: return OpCode::STORE_B;
         case 2: return OpCode::STORE_W;
@@ -2725,7 +2740,7 @@ constexpr OpCode getStoreOpForSize(const uint32_t size) {
     }
 }
 
-constexpr OpCode getPushOpForSize(const uint32_t size) {
+OpCode getPushOpForSize(const uint32_t size) {
     switch(size) {
         case 1: return OpCode::PUSH_B;
         case 2: return OpCode::PUSH_W;
@@ -2735,7 +2750,7 @@ constexpr OpCode getPushOpForSize(const uint32_t size) {
     }
 }
 
-constexpr OpCode getPopOpForSize(const uint32_t size) {
+OpCode getPopOpForSize(const uint32_t size) {
     switch(size) {
         case 1: return OpCode::POP_B;
         case 2: return OpCode::POP_W;

@@ -188,29 +188,29 @@ struct CodeGen {
     void generateVariableDeclaration(const VariableDec&, bool = true);
 
 // GENERAL EXPRESSIONS
-    ExpressionResult generateExpression(const Expression&, bool = false);
-    ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
-    ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
-    ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
+    [[nodiscard]] ExpressionResult generateExpression(const Expression&, bool = false);
+    [[nodiscard]] ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
+    [[nodiscard]] ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
+    [[nodiscard]] ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
     void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
-    ExpressionResult getAddressOfExpression(const Expression&);
-    ExpressionResult loadValue(const Expression&);
-    ExpressionResult loadValueFromPointer(const ExpressionResult &, bytecode_t);
+    [[nodiscard]] ExpressionResult getAddressOfExpression(const Expression&);
+    [[nodiscard]] ExpressionResult loadValue(const Expression&);
+    [[nodiscard]] ExpressionResult loadValueFromPointer(const ExpressionResult &, bytecode_t);
     void storeValueToPointer(const ExpressionResult &, ExpressionResult &);
     void doPointerIndex(const ExpressionResult &, ExpressionResult&);
     void copyValue(ExpressionResult &, ExpressionResult &);
 
 
 // BINARY EXPRESSIONS
-    ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
-    ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
-    ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
-    ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
+    [[nodiscard]] ExpressionResult mathematicalBinOp(const BinOp&, OpCode, OpCode);
+    [[nodiscard]] ExpressionResult assignmentBinOp(const BinOp&, OpCode, OpCode);
+    [[nodiscard]] ExpressionResult booleanBinOp(const BinOp&, OpCode, OpCode, OpCode, bool = false);
+    [[nodiscard]] ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
 
 // UNARY EXPRESSIONS
-    ExpressionResult generateExpressionUnOp(const UnOp&);
-    ExpressionResult defaultUnOp(const UnOp&, OpCode);
-    ExpressionResult incrementOrDecrement(const UnOp&, TokenType);
+    [[nodiscard]] ExpressionResult generateExpressionUnOp(const UnOp&);
+    [[nodiscard]] ExpressionResult defaultUnOp(const UnOp&, OpCode);
+    [[nodiscard]] ExpressionResult incrementOrDecrement(const UnOp&, TokenType);
 
 // STRUCTS
 
@@ -233,17 +233,16 @@ struct CodeGen {
 // STACK MANAGEMENT
     uint32_t getPositionOnStack(uint32_t);
     void addSpaceToStack(uint32_t);
-    void addPaddingToStack(uint32_t);
+    void addPaddingToStack(uint32_t, bool = false);
     uint32_t addPaddingAndSpaceToStack(uint32_t, uint32_t);
+    StackVariable& addVarDecToStack(const VariableDec&, uint32_t = 0, bool = false);
+    StackVariable& addItemToStack(uint32_t, uint32_t, bool = false);
 
-    StackVariable& addVarDecToVirtualStack(const VariableDec&, uint32_t = 0);
     uint32_t getCurrStackPointerPosition();
-    void makeRoomOnVirtualStack(Token, uint32_t = 0);
     StackItem& addExpressionResToStack(ExpressionResult&, StackItemType, uint32_t = 0);
     void addFunctionSignatureToVirtualStack(const FunctionDec&);
 
     void fakeClearStackFromTo(uint32_t, int32_t);
-    void clearStackFromTo(uint32_t, uint32_t);
     uint32_t getVarOffsetFromSP(const StackVariable &);
     uint32_t getOffsetFromSP(uint32_t);
 
@@ -257,10 +256,10 @@ struct CodeGen {
     void efficientImmAddOrSub(bytecode_t, uint64_t, OpCode);
 };
 
-constexpr OpCode getLoadOpForSize(uint32_t);
-constexpr OpCode getStoreOpForSize(uint32_t);
-constexpr OpCode getPopOpForSize(uint32_t);
-constexpr OpCode getPushOpForSize(uint32_t);
+OpCode getLoadOpForSize(uint32_t);
+OpCode getStoreOpForSize(uint32_t);
+OpCode getPopOpForSize(uint32_t);
+OpCode getPushOpForSize(uint32_t);
 // ExpressionResult evaluateUnaryOpImmExpression(TokenType, ExpressionResult&);
 // ExpressionResult evaluateBinOpImmExpression(TokenType, ExpressionResult&, ExpressionResult&);
 
