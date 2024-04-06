@@ -9,6 +9,7 @@ int main(int argc, char **argv) {
     if (!openAndReadFile(argv[1], file)) {
         exit(1);
     }
-    Interpreter interpreter{(bytecode_t *)file.data(), (bytecode_t *)nullptr, 1000000};
+    bytecode_t data[24];
+    Interpreter interpreter{file.data(), data, 1000000};
     return interpreter.runProgram();
 }

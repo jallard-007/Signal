@@ -10,9 +10,7 @@ if 1 != 1 {
 }
 */
 void printIfBlah() {
-    bc data[16];
-    ((FILE **)data)[0] = stdout;
-    ((FILE **)data)[1] = stdin;
+    bc data[24];
     bc const program[] = {
         (bc)OpCode::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data
         (bc)OpCode::NOP, (bc)OpCode::NOP, (bc)OpCode::NOP,
@@ -40,9 +38,7 @@ for i: int8 = 0; i < 10; ++i {
 }
 */
 void loopToTen() {
-    bc data[16];
-    ((FILE **)data)[0] = stdout;
-    ((FILE **)data)[1] = stdin;
+    bc data[24];
     bytecode_t const program [] =
     {
     (bc)OpCode::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data

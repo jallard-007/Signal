@@ -33,6 +33,9 @@ Interpreter::Interpreter(
     sp = (uint64_t)stack + stackSize;
     dp = (uint64_t)programData;
     ip = (uint64_t)programInstructions;
+    *(decltype(stdin)*)&programData[stdinDataIndex] = stdin;
+    *(decltype(stdout)*)&programData[stdoutDataIndex] = stdout;
+    *(decltype(stderr)*)&programData[stderrDataIndex] = stderr;
 }
 
 #define arithmeticOp(op) \

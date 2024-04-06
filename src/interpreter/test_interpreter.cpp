@@ -11,7 +11,8 @@ TEST_CASE("move", "[interpreter]") {
         bc const program [] = {(bc)OpCode::NOP,(bc)OpCode::NOP,
         (bc)OpCode::MOVE_I, 0, 1, 0, 0, 0, (bc)OpCode::EXIT, 0};
         REQUIRE(program[2] == (bc)OpCode::MOVE_I);
-        Interpreter interpreter(program, nullptr, 128);
+        bytecode_t data[24];
+        Interpreter interpreter(program, data, 128);
         interpreter.runProgram();
         CHECK(interpreter.registers[0] == 1);
     }
@@ -20,7 +21,8 @@ TEST_CASE("move", "[interpreter]") {
         bc const program [] = {(bc)OpCode::NOP,(bc)OpCode::NOP,
         (bc)OpCode::MOVE_I, 0, 0, 0x80, 0, 0, (bc)OpCode::EXIT, 0};
         REQUIRE(program[2] == (bc)OpCode::MOVE_I);
-        Interpreter interpreter(program, nullptr, 128);
+        bytecode_t data[24];
+        Interpreter interpreter(program, data, 128);
         interpreter.runProgram();
         CHECK(interpreter.registers[0] == 0x8000);
     }
@@ -40,7 +42,8 @@ TEST_CASE("push/pop", "[interpreter]") {
         (bc)OpCode::EXIT, 0,
         };
         REQUIRE(program[2] == (bc)OpCode::MOVE_I);
-        Interpreter interpreter(program, nullptr, 128);
+        bytecode_t data[24];
+        Interpreter interpreter(program, data, 128);
         interpreter.runProgram();
         CHECK(interpreter.registers[0] == 0x01010101);
     }
@@ -50,31 +53,31 @@ TEST_CASE("print \"Hello World!\"", "[interpreter]") {
     int fd[2]{0};
     REQUIRE(pipe(fd) == 0);
     FILE *fp = fdopen(fd[1], "w");
-    bc *split = (bc *)&fp;
     bc const program [] =
     {
-    (bc)OpCode::NOP, (bc)OpCode::NOP,
-    (bc)OpCode::NOP, (bc)OpCode::NOP,
-    (bc)OpCode::NOP, (bc)OpCode::NOP,
     // set reg 11 to file *
-    (bc)OpCode::MOVE_LI, 11, split[0], split[1], split[2], split[3], split[4], split[5], split[6], split[7],
     // push file pointer
+    (bc)OpCode::MOVE, 12, dataPointerIndex,
+    (bc)OpCode::LOAD_Q, 11, 12,
     (bc)OpCode::PUSH_Q, 11,
+    (bc)OpCode::ADD_I, 12, 24, 0,
     // push pointer to string
-    (bc)OpCode::PUSH_Q, dataPointerIndex,
+    (bc)OpCode::PUSH_Q, 12,
     (bc)OpCode::CALL_B, (bc)BuiltInFunction::PRINT_STRING,
     (bc)OpCode::PUSH_Q, 11,
     (bc)OpCode::CALL_B, (bc)BuiltInFunction::FFLUSH,
     (bc)OpCode::EXIT, 0,
     };
-    REQUIRE(program[6] == (bc)OpCode::MOVE_LI);
-    std::string data = "Hello World!\n";
-    Interpreter interpreter(program, (bc *)data.data(), 128);
+    const char str [] = "Hello World!\n";
+    bytecode_t data[24 + sizeof(str)];
+    strcpy((char *)data + 24, str);
+    Interpreter interpreter(program, data, 128);
+    *(FILE **)&data[0] = fp;
     interpreter.runProgram();
     std::string buffer;
-    buffer.resize(data.size());
+    buffer.resize(sizeof(str) - 1);
     REQUIRE(read(fd[0], buffer.data(), buffer.size())); // read from pipe
-    CHECK(buffer == data);
+    CHECK(buffer == str);
     CHECK(interpreter.registers[0] == 0);
     close(fd[0]);
     close(fd[1]);
@@ -84,10 +87,7 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
     int fd[2]{0};
     REQUIRE_FALSE(pipe(fd) == -1);
     FILE *fp = fdopen(fd[0],"r");
-    FILE *fp_stdout = stdout;
-    bc data[16];
-    ((FILE**)&data)[0] = fp_stdout;
-    ((FILE**)&data)[1] = fp;
+
     const std::string input = "Hello World!\n";
     REQUIRE(write(fd[1], input.data(), input.size()));
     bc const program [] =
@@ -116,7 +116,9 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
     (bc)OpCode::EXIT, 0,
     };
     REQUIRE(program[4] == (bc)OpCode::ADD_I);
+    bc data[24];
     Interpreter interpreter(program, data, 128);
+    ((FILE**)&data)[1] = fp;
     interpreter.runProgram();
     std::string output{(char *)interpreter.registers[stackPointerIndex]};
     CHECK(output == input);
@@ -126,11 +128,7 @@ TEST_CASE("read line and store on stack", "[interpreter]") {
 
 
 TEST_CASE("jump", "[interpreter]") {
-    FILE *fp_stdout = stdout;
-    FILE *fp_stdin = stdin;
-    bc data[16];
-    ((FILE**)&data)[0] = fp_stdout;
-    ((FILE**)&data)[1] = fp_stdin;
+    bc data[24];
     bc const program[] = {
         (bc)OpCode::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data
         (bc)OpCode::MOVE_SI, 0, 1,
@@ -147,11 +145,7 @@ TEST_CASE("jump", "[interpreter]") {
 }
 
 TEST_CASE("loop", "[interpreter]") {
-    FILE *fp_stdout = stdout;
-    FILE *fp_stdin = stdin;
-    bc data[16];
-    ((FILE**)&data)[0] = fp_stdout;
-    ((FILE**)&data)[1] = fp_stdin;
+    bc data[24];
     bc const program [] =
     {
     (bc)OpCode::LOAD_Q, 11, dataPointerIndex, // load stdout FILE * from data
