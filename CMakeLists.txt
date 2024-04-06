@@ -28,7 +28,7 @@ add_library(common STATIC
 target_include_directories(common PRIVATE src)
 
 # interpreter lib
-add_library(interpreter STATIC src/interpreter/interpreter.cpp)
+add_library(interpreter STATIC src/interpreter/interpreter.cpp src/bytecodeDesign/bytecodeDesign.cpp)
 target_include_directories(interpreter PRIVATE src)
 
 # set lib properties

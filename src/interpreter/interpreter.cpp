@@ -56,16 +56,12 @@ Interpreter::Interpreter(
 
 int Interpreter::runProgram() {
     while (running) {
-    OpCode op = (OpCode)*(bc *)ip++;
-    #define MY_DEBUG
+    // #define MY_DEBUG
     #ifdef MY_DEBUG
-    uint32_t arg1 = *(bc *)ip;
-    (void)arg1;
-    uint32_t arg2 = *(bc *)(ip+1);
-    (void)arg2;
-    uint64_t *curr_stack = (uint64_t *)sp;
-    (void)curr_stack;
+    printInstruction(std::cout, (bytecode_t *)ip);
+    std::cout << '\n';
     #endif
+    OpCode op = (OpCode)*(bc *)ip++;
     switch (op) {
         case OpCode::NOP: {
             break;

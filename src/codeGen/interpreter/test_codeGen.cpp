@@ -1033,3 +1033,15 @@ TEST_CASE("get address of expression", "[codeGen]") {
         CHECK(res_y.type->token.getType() == TokenType::INT32_TYPE);
     }
 }
+
+TEST_CASE("generate struct", "[codeGen]") {
+    SECTION("1") {
+        const std::string str = "struct MyStruct { var: int32; } func MyFunc(): void { var: MyStruct; } ";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        codeGen.generate();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+}

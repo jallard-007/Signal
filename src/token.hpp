@@ -142,6 +142,9 @@ enum class TokenType : uint8_t {
 
     // extra types used by checker
     DEC_PTR,
+
+    // special tokens that are not directly parsed
+    THIS,
 };
 
 /**

@@ -357,9 +357,8 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
             break;
         }
         case GeneralDecType::STRUCT: {
-            // generate the functions within, add a parameter for 'this'
-            std::cerr << "Unsupported dec STRUCT\n";
-            exit(1);
+            generateStructDeclaration(*genDec.structDec);
+            break;
         }
         case GeneralDecType::VARIABLE: {
             generateVariableDeclaration(*genDec.varDec);
@@ -2027,6 +2026,25 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
 // ========================================
 // STRUCTS
 // ========================================
+
+void CodeGen::generateStructDeclaration(const StructDec& structDec) {
+    const StructDecList* structDecList = &structDec.decs;
+    while (structDecList) {
+        switch (structDecList->type) {
+            case StructDecType::NONE: {
+                break;
+            }
+            case StructDecType::FUNC: {
+                generateFunctionDeclaration(*structDecList->funcDec);
+                break;
+            }
+            case StructDecType::VAR: {
+                break;
+            }
+        }
+        structDecList = structDecList->next;
+    }
+}
 
 
 // ========================================

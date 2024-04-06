@@ -378,6 +378,16 @@ void Checker::fullScan() {
     for (GeneralDecList* list = &program.decs; list; list = list->next) {
         tk = &tokenizers[list->curr.tokenizerIndex];
         switch (list->curr.type) {
+            case GeneralDecType::STRUCT: {
+                StructDecList* structDecList = &list->curr.structDec->decs;
+                while (structDecList) {
+                    if (structDecList->type == StructDecType::FUNC) {
+                        checkFunction(*structDecList->funcDec);
+                    }
+                    structDecList = structDecList->next;
+                }
+                break;
+            }
             case GeneralDecType::FUNCTION: {
                 checkFunction(*list->curr.funcDec);
                 break;
@@ -386,6 +396,7 @@ void Checker::fullScan() {
         }
     }
 }
+
 bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
     bool valid = true;
     // check return type
@@ -451,6 +462,15 @@ void Checker::validateStructTopLevel(StructDec& structDec) {
             checkType(inner->varDec->type);
         }
         else if (inner->type == StructDecType::FUNC) {
+            FunctionDec& funcDec = *inner->funcDec;
+            StatementList *statementList = memPool.makeStatementList();
+            *statementList = funcDec.params;
+            funcDec.params.curr.type = StatementType::VARIABLE_DEC;
+            funcDec.params.curr.varDec = memPool.makeVariableDec(VariableDec{Token{0, 0, TokenType::THIS}});
+            funcDec.params.curr.varDec->type.token.setType(TokenType::POINTER);
+            funcDec.params.curr.varDec->type.next = memPool.makeTokenList();
+            funcDec.params.curr.varDec->type.next->token = structDec.name;
+            funcDec.params.next = statementList;
             validateFunctionHeader(*inner->funcDec);
         }
     }
@@ -463,7 +483,6 @@ void Checker::validateStructTopLevel(StructDec& structDec) {
   */
 void Checker::checkFunction(FunctionDec& funcDec) {
     // validate parameter names
-    std::vector<std::string> locals;
     if (funcDec.params.curr.type != StatementType::NONE) {
         StatementList *list = &funcDec.params;
         while (list) {

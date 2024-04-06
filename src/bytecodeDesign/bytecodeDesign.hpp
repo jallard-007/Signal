@@ -223,6 +223,7 @@ constexpr OpCode upgradeRelativeJumpOp(const OpCode jumpOp) {
 }
 
 bool isReservedRegister(bytecode_t);
+const bytecode_t *printInstruction(std::ostream& os, const bytecode_t *bytecode);
 
 extern const char * bytecode_t_to_op [];
 extern const char * bytecode_t_to_builtin_function [];

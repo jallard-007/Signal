@@ -213,6 +213,7 @@ struct CodeGen {
     [[nodiscard]] ExpressionResult incrementOrDecrement(const UnOp&, TokenType);
 
 // STRUCTS
+    void generateStructDeclaration(const StructDec&);
 
 // SCOPES
     void generateScope(const Scope&);
