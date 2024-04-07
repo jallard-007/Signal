@@ -33,7 +33,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("max int32") {
@@ -48,7 +48,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("min int32") {
@@ -63,7 +63,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("max uint32") {
@@ -78,7 +78,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("negative max uint32") {
@@ -94,7 +94,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("complex") {
@@ -110,7 +110,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::DOUBLE_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("overflow") {
@@ -126,7 +126,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 1") {
@@ -142,7 +142,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 2") {
@@ -158,7 +158,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::DOUBLE_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 3") {
@@ -174,7 +174,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::BOOL);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 4") {
@@ -190,7 +190,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 5") {
@@ -206,7 +206,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 6") {
@@ -222,7 +222,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 7") {
@@ -238,7 +238,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::BOOL);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 8") {
@@ -254,7 +254,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::BOOL);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 9") {
@@ -270,7 +270,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::BOOL);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 10") {
@@ -286,7 +286,7 @@ TEST_CASE("constant expressions", "[codeGen]") {
         ExpressionResult expRes = codeGen.generateExpression(expression);
         CHECK_FALSE(expRes.isReg);
         CHECK_FALSE(expRes.isTemp);
-        CHECK(expRes.type->token.getType() == TokenType::BOOL);
+        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
 }
@@ -409,10 +409,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         codeGen.byteCode.clear();
         codeGen.generateStatement(cond_statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::MOVE, 2, stackPointerIndex}});
         expected.alignForImm(2, 2);
-        expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
-        expected.addBytes({{(bc)OpCode::LOAD_D, 1, 0}});
+        expected.addBytes({{(bc)OpCode::ADD_I, 2, 4, 0}});
+        expected.addBytes({{(bc)OpCode::LOAD_D, 1, 2}});
 
         // short circuit
         expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
@@ -448,10 +448,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         codeGen.byteCode.clear();
         codeGen.generateStatement(cond_statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::MOVE, 2, stackPointerIndex}});
         expected.alignForImm(2, 2);
-        expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
-        expected.addBytes({{(bc)OpCode::LOAD_D, 1, 0}});
+        expected.addBytes({{(bc)OpCode::ADD_I, 2, 4, 0}});
+        expected.addBytes({{(bc)OpCode::LOAD_D, 1, 2}});
 
         // short circuit
         expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
@@ -465,10 +465,10 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         // short circuit; if ne (true), don't evaluate rest of expression, it's guaranteed true
         expected.addBytes({{(bc)OpCode::RS_JUMP_NE, 0}});
 
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::MOVE, 3, stackPointerIndex}});
         expected.alignForImm(2, 2);
-        expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 4, 0}});
-        expected.addBytes({{(bc)OpCode::LOAD_D, 2, 0}});
+        expected.addBytes({{(bc)OpCode::ADD_I, 3, 4, 0}});
+        expected.addBytes({{(bc)OpCode::LOAD_D, 2, 3}});
 
         expected.addBytes({{(bc)OpCode::LOGICAL_OR, 1, 2}});
         expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}}); // jump if false
@@ -498,19 +498,19 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         codeGen.byteCode.clear();
         codeGen.generateStatement(cond_statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::MOVE, 2, stackPointerIndex}});
         expected.alignForImm(2, 2);
-        expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 3, 0}});
-        expected.addBytes({{(bc)OpCode::LOAD_B, 1, 0}});
+        expected.addBytes({{(bc)OpCode::ADD_I, 2, 3, 0}});
+        expected.addBytes({{(bc)OpCode::LOAD_B, 1, 2}});
 
         expected.addBytes({{(bc)OpCode::SET_FLAGS, 1}});
         // short circuit; if e (false), don't evaluate rest of expression, it's guaranteed false
         expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::MOVE, 3, stackPointerIndex}});
         expected.alignForImm(2, 2);
-        expected.addBytes({{(bc)OpCode::ADD_I, miscRegisterIndex, 2, 0}});
-        expected.addBytes({{(bc)OpCode::LOAD_B, 2, 0}});
+        expected.addBytes({{(bc)OpCode::ADD_I, 3, 2, 0}});
+        expected.addBytes({{(bc)OpCode::LOAD_B, 2, 3}});
 
         expected.addBytes({{(bc)OpCode::LOGICAL_AND, 1, 2}});
         expected.addBytes({{(bc)OpCode::GET_NE, 1}}); // save the result
@@ -522,9 +522,9 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         // short circuit; if e (false), don't evaluate rest of expression, it's guaranteed false
         expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}});
 
-        expected.addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-        expected.addBytes({{(bc)OpCode::INC, miscRegisterIndex}});
-        expected.addBytes({{(bc)OpCode::LOAD_B, 3, 0}});
+        expected.addBytes({{(bc)OpCode::MOVE, 4, stackPointerIndex}});
+        expected.addBytes({{(bc)OpCode::INC, 4}});
+        expected.addBytes({{(bc)OpCode::LOAD_B, 3, 4}});
 
         expected.addBytes({{(bc)OpCode::LOGICAL_AND, 2, 3}});
         expected.addBytes({{(bc)OpCode::GET_NE, 2}}); // save the result
@@ -582,7 +582,7 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         CHECK(codeGen.stackItems[0].type == StackItemType::VARIABLE);
         CHECK(codeGen.stackItems[0].variable.positionOnStack == 8);
         CHECK(codeGen.tk->extractToken(codeGen.stackItems[0].variable.varDec.name) == "arg1");
-        CHECK(codeGen.stackItems[0].variable.varDec.type.token.getType() == TokenType::INT64_TYPE);
+        CHECK(codeGen.stackItems[0].variable.varDec.type.exp.getToken().getType() == TokenType::INT64_TYPE);
         CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
         CHECK(codeGen.stackItems[1].positionOnStack == 16);
     }
@@ -881,7 +881,6 @@ R"(
     }
 }
 
-
 TEST_CASE("for loop", "[codeGen]") {
     SECTION("1") {
     const std::string str = 
@@ -1025,12 +1024,12 @@ TEST_CASE("get address of expression", "[codeGen]") {
         CHECK(res_x.isPointerToValue);
         CHECK(res_x.isReg);
         CHECK(res_x.getReg() == 1);
-        CHECK(res_x.type->token.getType() == TokenType::UINT32_TYPE);
+        CHECK(res_x.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
         CHECK(res_y.isPointerToValue);
         CHECK(res_y.isReg);
         CHECK(res_y.getReg() == 30);
         CHECK_FALSE(res_y.isTemp);
-        CHECK(res_y.type->token.getType() == TokenType::INT32_TYPE);
+        CHECK(res_y.type->exp.getToken().getType() == TokenType::INT32_TYPE);
     }
 }
 
@@ -1042,6 +1041,52 @@ TEST_CASE("generate struct", "[codeGen]") {
         REQUIRE(checker.check(true));
         codeGen.generate();
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, 30, 4, 0,
+            (bc)OpCode::ADD_I, 30, 4, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("2") {
+        const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): MyStruct { g: MyStruct; return g; } ";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        codeGen.generate();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
+            (bc)OpCode::LOAD_Q, 1, stackPointerIndex,
+            (bc)OpCode::NOP,
+            (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
+            (bc)OpCode::POP_Q, 2,
+            (bc)OpCode::MOVE, returnRegisterIndex, 1,
+            (bc)OpCode::JUMP, 2,
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("3") {
+        const std::string str = "struct MyStruct { x:char ; c: char; y:char; } func MyFunc(): MyStruct { g: MyStruct; return g; } ";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        codeGen.generate();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, stackPointerIndex, 3, 0,
+            (bc)OpCode::MOVE, 2, stackPointerIndex,
+            (bc)OpCode::LOAD_W, 1, 2,
+            (bc)OpCode::ADD_I, 2, 2, 0,
+            (bc)OpCode::LOAD_B, 0, 2,
+            (bc)OpCode::SHIFT_L_I, 0, 16, 0,
+            (bc)OpCode::OR, 1, 0,
+            (bc)OpCode::ADD_I, stackPointerIndex, 3, 0,
+            (bc)OpCode::POP_Q, 2,
+            (bc)OpCode::MOVE, returnRegisterIndex, 1,
+            (bc)OpCode::JUMP, 2,
+        }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
 }

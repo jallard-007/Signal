@@ -77,7 +77,7 @@ struct Parser {
     ParseStatementErrorType parseVariableDec(VariableDec&);
     ParseExpressionErrorType parseExpression(Expression&);
     ParseExpressionErrorType parseLeaf(Expression&);
-    ParseExpressionErrorType parseArrayOrStructLiteral(ArrayOrStructLiteral&, TokenType);
+    ParseExpressionErrorType parseContainerLiteral(ContainerLiteral&, TokenType);
     ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
     ParseTypeErrorType getType(TokenList&);
 };

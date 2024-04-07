@@ -24,7 +24,7 @@ class NodeMemPool {
     MemPool<Scope> scopes;
     MemPool<StatementList> statementLists;
     MemPool<StructDecList> structDecLists;
-    MemPool<ArrayOrStructLiteral> arraysOrStructs;
+    MemPool<ContainerLiteral> containerLiterals;
     MemPool<FunctionDec> functionDecs;
     MemPool<StructDec> structDecs;
     MemPool<TemplateDec> templateDecs;
@@ -56,7 +56,7 @@ public:
         scopes.reset();
         statementLists.reset();
         structDecLists.reset();
-        arraysOrStructs.reset();
+        containerLiterals.reset();
         functionDecs.reset();
         structDecs.reset();
         templateDecs.reset();
@@ -87,7 +87,7 @@ public:
     Scope* makeScope() {return scopes.get();}
     StatementList* makeStatementList() {return statementLists.get();}
     StructDecList* makeStructDecList() {return structDecLists.get();}
-    ArrayOrStructLiteral* makeArrayOrStruct() {return arraysOrStructs.get();}
+    ContainerLiteral* makeContainerLiteral() {return containerLiterals.get();}
     FunctionDec* makeFunctionDec() {return functionDecs.get();}
     StructDec* makeStructDec() {return structDecs.get();}
     TemplateDec* makeTemplateDec() {return templateDecs.get();}
@@ -117,7 +117,7 @@ public:
     void release(Scope* ptr) { scopes.release(ptr);}
     void release(StatementList* ptr) { statementLists.release(ptr);}
     void release(StructDecList* ptr) { structDecLists.release(ptr);}
-    void release(ArrayOrStructLiteral* ptr) { arraysOrStructs.release(ptr);}
+    void release(ContainerLiteral* ptr) { containerLiterals.release(ptr);}
     void release(FunctionDec* ptr) { functionDecs.release(ptr);}
     void release(StructDec* ptr) { structDecs.release(ptr);}
     void release(TemplateDec* ptr) { templateDecs.release(ptr);}

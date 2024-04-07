@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include "tokenizer/tokenizer.hpp"
 
 typedef class NodeMemPool NodeMemPool;
@@ -10,7 +11,7 @@ typedef struct BinOp BinOp;
 typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
-typedef struct ArrayOrStructLiteral ArrayOrStructLiteral;
+typedef struct ContainerLiteral ContainerLiteral;
 
 enum class ExpressionType: uint8_t {
     NONE,
@@ -19,8 +20,7 @@ enum class ExpressionType: uint8_t {
     VALUE,
     FUNCTION_CALL,
     ARRAY_ACCESS,
-    // ARRAY_LITERAL,
-    // STRUCT_LITERAL,
+    CONTAINER_LITERAL,
 };
 
 struct Expression {
@@ -32,7 +32,7 @@ struct Expression {
         Token value;
         FunctionCall *funcCall;
         ArrayAccess *arrAccess;
-        ArrayOrStructLiteral *arrayOrStruct;
+        ContainerLiteral *containerLiteral;
     };
     public:
     Expression();
@@ -42,21 +42,22 @@ struct Expression {
     void prettyPrint(Tokenizer&, std::string&);
     Expression deepCopy(NodeMemPool&);
     #define EXPRESSION_MASK 0x7
-    inline BinOp* getBinOp() const { return (BinOp *)((uint64_t)binOp & ~EXPRESSION_MASK); } 
-    inline UnOp* getUnOp() const { return (UnOp *)((uint64_t)unOp & ~EXPRESSION_MASK); }
-    inline Token getToken() const { return value; }
-    inline FunctionCall* getFunctionCall() const { return (FunctionCall *)((uint64_t)funcCall & ~EXPRESSION_MASK); }
-    inline ArrayAccess* getArrayAccess() const { return (ArrayAccess *)((uint64_t)arrAccess & ~EXPRESSION_MASK); }
-    inline ArrayOrStructLiteral* getArrayOrStructLiteral() const { return (ArrayOrStructLiteral *)((uint64_t)arrayOrStruct & ~EXPRESSION_MASK); }
+    inline BinOp* getBinOp() const { /* assert(getType() == ExpressionType::BINARY_OP); */ return (BinOp *)((uint64_t)binOp & ~EXPRESSION_MASK); } 
+    inline UnOp* getUnOp() const { assert(getType() == ExpressionType::UNARY_OP); return (UnOp *)((uint64_t)unOp & ~EXPRESSION_MASK); }
+    inline Token getToken() const { assert(getType() == ExpressionType::VALUE); return value; }
+    inline FunctionCall* getFunctionCall() const { assert(getType() == ExpressionType::FUNCTION_CALL); return (FunctionCall *)((uint64_t)funcCall & ~EXPRESSION_MASK); }
+    inline ArrayAccess* getArrayAccess() const { assert(getType() == ExpressionType::ARRAY_ACCESS); return (ArrayAccess *)((uint64_t)arrAccess & ~EXPRESSION_MASK); }
+    inline ContainerLiteral* getContainerLiteral() const { assert(getType() == ExpressionType::CONTAINER_LITERAL); return (ContainerLiteral *)((uint64_t)containerLiteral & ~EXPRESSION_MASK); }
     inline ExpressionType getType() const { return (ExpressionType)(type & EXPRESSION_MASK); }
 
-    #define SET_EXP binOp = (BinOp *)((type & EXPRESSION_MASK) | ((uint64_t)ref & ~EXPRESSION_MASK))
-    inline void setBinOp(BinOp *ref) { SET_EXP; }
-    inline void setUnOp(UnOp *ref) { SET_EXP; }
-    inline void setToken(Token ref) { value = ref; }
-    inline void setFunctionCall(FunctionCall *ref) { SET_EXP; }
-    inline void setArrayAccess(ArrayAccess *ref) { SET_EXP; }
-    inline void setArrayOrStructLiteral(ArrayOrStructLiteral *ref) { SET_EXP; }
+    #define SET_EXP(expType) binOp = (BinOp *)(((uint8_t)expType & EXPRESSION_MASK) | ((uint64_t)ref & ~EXPRESSION_MASK))
+    inline void setBinOp(BinOp *ref) { SET_EXP(ExpressionType::BINARY_OP); }
+    inline void setUnOp(UnOp *ref) { SET_EXP(ExpressionType::BINARY_OP); }
+    inline void setToken(Token ref) { value = ref; setType(ExpressionType::VALUE); }
+    inline void setToken(TokenType ref) { value.setType(ref); setType(ExpressionType::VALUE); }
+    inline void setFunctionCall(FunctionCall *ref) { SET_EXP(ExpressionType::FUNCTION_CALL); }
+    inline void setArrayAccess(ArrayAccess *ref) { SET_EXP(ExpressionType::ARRAY_ACCESS); }
+    inline void setContainerLiteral(ContainerLiteral *ref) { SET_EXP(ExpressionType::CONTAINER_LITERAL); }
     inline void setType(ExpressionType ref) { type = (type & ~EXPRESSION_MASK) | ((char)ref & EXPRESSION_MASK); }
     #undef SET_EXP
     #undef EXPRESSION_MASK
@@ -106,7 +107,8 @@ struct Statement {
 //                     // | typeQualifier [number | nothing] indirectionTypeList ignore arrays for now
 //                     | typeQualifier ref
 struct TokenList {
-    Token token{0,0,TokenType::NONE};
+    static_assert(sizeof(Expression) == sizeof(Token));
+    Expression exp;
     TokenList *next{nullptr};
     TokenList() = default;
     TokenList(const Token&);
@@ -208,12 +210,12 @@ struct FunctionCall {
 
 // arrayLiteral:= [ expressionList ]
 // structLiteral:= { expressionList }
-struct ArrayOrStructLiteral {
+struct ContainerLiteral {
     ExpressionList values;
-    ArrayOrStructLiteral() = default;
-    ArrayOrStructLiteral(const ArrayOrStructLiteral&) = default;
+    ContainerLiteral() = default;
+    ContainerLiteral(const ContainerLiteral&) = default;
     void prettyPrint(Tokenizer&, std::string&);
-    ArrayOrStructLiteral *deepCopy(NodeMemPool&);
+    ContainerLiteral *deepCopy(NodeMemPool&);
 };
 
 // CONDITIONAL STATEMENTS

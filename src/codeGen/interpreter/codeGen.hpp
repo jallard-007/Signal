@@ -150,13 +150,13 @@ struct CodeGen {
     Program &program;
     std::vector<Tokenizer> &tokenizers;
     std::unordered_map<std::string, GeneralDec *>& lookUp;
-    std::unordered_map<StructDec *, StructInformation>& structLookUp;
+    std::unordered_map<const StructDec *, StructInformation>& structLookUp;
 
     CodeGen(
         Program&,
         std::vector<Tokenizer>&,
         std::unordered_map<std::string, GeneralDec *>&,
-        std::unordered_map<StructDec *, StructInformation>&
+        std::unordered_map<const StructDec *, StructInformation>&
     );
 
     // main driver
@@ -190,7 +190,7 @@ struct CodeGen {
 // GENERAL EXPRESSIONS
     [[nodiscard]] ExpressionResult generateExpression(const Expression&, bool = false);
     [[nodiscard]] ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
-    [[nodiscard]] ExpressionResult generateExpressionArrOrStructLit(const ArrayOrStructLiteral&);
+    [[nodiscard]] ExpressionResult generateExpressionContainerLiteral(const ContainerLiteral&);
     [[nodiscard]] ExpressionResult generateExpressionFunctionCall(const FunctionCall&);
     void expressionResWithOp(OpCode, OpCode, const ExpressionResult&, const ExpressionResult&);
     [[nodiscard]] ExpressionResult getAddressOfExpression(const Expression&);
@@ -223,7 +223,6 @@ struct CodeGen {
 
 // FUNCTIONS
     void generateFunctionDeclaration(const FunctionDec&);
-    bool sizeRequiresReturnValuePointer(uint32_t);
 
 // STATEMENTS
     void generateStatement(const Statement&);
@@ -236,7 +235,7 @@ struct CodeGen {
     void addSpaceToStack(uint32_t);
     void addPaddingToStack(uint32_t, bool = false);
     uint32_t addPaddingAndSpaceToStack(uint32_t, uint32_t);
-    StackVariable& addVarDecToStack(const VariableDec&, uint32_t = 0, bool = false);
+    const StructInformation* addVarDecToStack(const VariableDec&, uint32_t = 0, bool = false);
     StackVariable& addItemToStack(uint32_t, uint32_t, bool = false);
 
     uint32_t getCurrStackPointerPosition();

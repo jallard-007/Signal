@@ -37,33 +37,29 @@ TEST_CASE("checkType", "[checker]") {
     tc.firstTopLevelScan();
     {
         TokenList tokenList;
-        tokenList.token.setLength(5);
-        tokenList.token.setPosition(7);
-        tokenList.token.setType(TokenType::IDENTIFIER);
+        tokenList.exp.setToken({7, 5, TokenType::IDENTIFIER});
         tc.tk = &tks.back();
         CHECK(tc.checkType(tokenList));
         tokenList.next = nullptr;
         TokenList nextType = tokenList;
         tokenList.next = &nextType;
-        tokenList.token.setType(TokenType::POINTER);
+        tokenList.exp.setToken(TokenType::POINTER);
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextType = tokenList;
         tokenList.next = &nextNextType;
-        tokenList.token.setType(TokenType::REFERENCE);
+        tokenList.exp.setToken(TokenType::REFERENCE);
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextNextType = tokenList;
         tokenList.next = &nextNextNextType;
-        tokenList.token.setType(TokenType::POINTER);
+        tokenList.exp.setToken(TokenType::POINTER);
         CHECK_FALSE(tc.checkType(tokenList));
     }
 
     {
         TokenList notAType;
-        notAType.token.setLength(7);
-        notAType.token.setPosition(38);
-        notAType.token.setType(TokenType::IDENTIFIER);
+        notAType.exp.setToken({38, 7, TokenType::IDENTIFIER});
         CHECK_FALSE(tc.checkType(notAType));
     }
 }
@@ -104,7 +100,9 @@ struct customType {
     Checker tc{pr.program, tks, memPool};
     tc.firstTopLevelScan();
     tc.secondTopLevelScan(true);
-    CHECK(tc.errors.empty());
+    REQUIRE(tc.errors.size() == 1);
+    CHECK(tc.errors.back().type == CheckerErrorType::TYPE_TOO_LARGE_TO_BE_AN_ARGUMENT);
+    CHECK(tks.back().extractToken(tc.errors.back().token) == "customType");
 }
 
 
@@ -121,11 +119,8 @@ func main(): int32 {
     return 1;
 }
 
-func functionName(param1: int32, param2: customType): bool {
-    if (param2.size < param1) {
-        return false;
-    }
-    return true;
+func functionName(param1: int32, param2: customType ref): bool {
+    return param2.size < param1;
 }
 
 struct customType {
@@ -160,7 +155,10 @@ class TestFixture_GetStructInfo {
         checker.tk = &tokenizer;
         REQUIRE(parser.parse());
         REQUIRE(checker.check(true));
-        structInfo = checker.getStructInfo(*checker.lookUp["StructName"]);
+        GeneralDec* genDec = checker.lookUp["StructName"];
+        REQUIRE(genDec);
+        REQUIRE(genDec->structDec);
+        structInfo = checker.getStructInfo(*genDec->structDec);
     }
 };
 

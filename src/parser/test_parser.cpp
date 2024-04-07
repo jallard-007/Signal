@@ -12,9 +12,9 @@ TEST_CASE("getType", "[parser]") {
         REQUIRE(tokens.next);
         REQUIRE(tokens.next->next);
         CHECK_FALSE(tokens.next->next->next);
-        CHECK(tokens.token.getType() == TokenType::POINTER);
-        CHECK(tokens.next->token.getType() == TokenType::POINTER);
-        CHECK(tokens.next->next->token.getType() == TokenType::CHAR_TYPE);
+        CHECK(tokens.exp.getToken().getType() == TokenType::POINTER);
+        CHECK(tokens.next->exp.getToken().getType() == TokenType::POINTER);
+        CHECK(tokens.next->next->exp.getToken().getType() == TokenType::CHAR_TYPE);
     }
     REQUIRE(tokenizer.peekNext().getType() == TokenType::COMMA);
     tokenizer.consumePeek();
@@ -24,9 +24,9 @@ TEST_CASE("getType", "[parser]") {
         REQUIRE(tokens.next);
         REQUIRE(tokens.next->next);
         CHECK_FALSE(tokens.next->next->next);
-        CHECK(tokens.token.getType() == TokenType::POINTER);
-        CHECK(tokens.next->token.getType() == TokenType::POINTER);
-        CHECK(tokens.next->next->token.getType() == TokenType::UINT32_TYPE);
+        CHECK(tokens.exp.getToken().getType() == TokenType::POINTER);
+        CHECK(tokens.next->exp.getToken().getType() == TokenType::POINTER);
+        CHECK(tokens.next->next->exp.getToken().getType() == TokenType::UINT32_TYPE);
     }
 }
 
@@ -48,13 +48,13 @@ TEST_CASE("Function Declaration", "[parser]") {
     REQUIRE(func->params.curr.type == StatementType::VARIABLE_DEC);
     REQUIRE(func->params.curr.varDec);
     CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
-    CHECK(func->params.curr.varDec->type.token.getType() == TokenType::POINTER);
+    CHECK(func->params.curr.varDec->type.exp.getToken().getType() == TokenType::POINTER);
     REQUIRE(func->params.curr.varDec->type.next);
-    CHECK(func->params.curr.varDec->type.next->token.getType() == TokenType::UINT16_TYPE);
+    CHECK(func->params.curr.varDec->type.next->exp.getToken().getType() == TokenType::UINT16_TYPE);
 
     // check return type
     CHECK(func->returnType.next == nullptr);
-    CHECK(func->returnType.token.getType() == TokenType::UINT32_TYPE);
+    CHECK(func->returnType.exp.getToken().getType() == TokenType::UINT32_TYPE);
     CHECK(func->body.scopeStatements.curr.type == StatementType::NONE);
 }
 
@@ -688,7 +688,7 @@ TEST_CASE("Template Declaration", "[parser]") {
     auto& t = parser.program.decs.curr;
     REQUIRE(t.type == GeneralDecType::TEMPLATE);
     REQUIRE(t.tempDec);
-    CHECK(tokenizer.extractToken(t.tempDec->templateTypes.token) == "T");
+    CHECK(tokenizer.extractToken(t.tempDec->templateTypes.exp.getToken()) == "T");
 
     CHECK(t.tempDec->templateTypes.next == nullptr);
     CHECK(parser.program.decs.next == nullptr);
@@ -699,14 +699,34 @@ TEST_CASE("Template Declaration", "[parser]") {
 }
 
 TEST_CASE("Variable Declaration", "[parser]") {
-    const std::string str = "thing: stuff;";
-    Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
-    Parser parser{tokenizer, memPool};
-    parser.parse();
-    REQUIRE(parser.expected.empty());
-    REQUIRE(parser.unexpected.empty());
-    CHECK(parser.program.decs.next == nullptr);
-    CHECK(parser.program.decs.curr.type == GeneralDecType::VARIABLE);
+    SECTION("1") {
+        const std::string str = "thing: stuff;";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        parser.parse();
+        REQUIRE(parser.expected.empty());
+        REQUIRE(parser.unexpected.empty());
+        CHECK(parser.program.decs.next == nullptr);
+        CHECK(parser.program.decs.curr.type == GeneralDecType::VARIABLE);
+    }
+    SECTION("2") {
+        const std::string str = " var: uint8 []; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("3") {
+        const std::string str = " var: uint8 [10]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
 }
 
 TEST_CASE("Keywords", "[parser]") {
@@ -725,22 +745,6 @@ TEST_CASE("Keywords", "[parser]") {
         CHECK(statement.controlFlow->conditional->elifStatement == nullptr);
         CHECK(statement.controlFlow->conditional->elseStatement == nullptr);
     }
-
-    // structs not currently supported
-    // {
-    //   const std::string str = "return {thing, 0}; ";
-    //   Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
-    //   Parser parser{tokenizer, memPool};
-    //   Statement statement;
-    //   parser.parseStatement(statement);
-    //   CHECK(parser.unexpected.empty());
-    //   CHECK(parser.expected.empty());
-    //   CHECK(statement.type == StatementType::CONTROL_FLOW);
-    //   REQUIRE(statement.controlFlow);
-    //   REQUIRE(statement.controlFlow->type == ControlFlowStatementType::RETURN_STATEMENT);
-    //   CHECK(statement.controlFlow->returnStatement->returnValue.getType() == ExpressionType::STRUCT_LITERAL);
-    //   REQUIRE(statement.controlFlow->returnStatement->returnValue.getArrayOrStructLiteral());
-    // }
 
     {
         const std::string str = "for (i : int = 0; i < 34; ++i) {doSomething.something(); } }";
@@ -780,4 +784,86 @@ TEST_CASE("Switch Statement", "[parser]") {
     parser.parseStatement(statement);
     CHECK(parser.expected.empty());
     CHECK(parser.unexpected.empty());
+}
+
+TEST_CASE("Container literal", "[parser]") {
+    SECTION("1") {
+        const std::string str = " [1]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("2") {
+        const std::string str = " [1, 2, 3]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("3") {
+        const std::string str = " [1, 2, ]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.unexpected.empty());
+        REQUIRE(parser.expected.size() == 1);
+        CHECK(parser.expected.back().expectedType == ExpectedType::EXPRESSION);
+        CHECK(parser.expected.back().tokenWhereExpected.getPosition() == 8);
+    }
+    SECTION("4") {
+        const std::string str = " []; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("5") {
+        const std::string str = " [; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.unexpected.empty());
+        REQUIRE(parser.expected.size() == 1);
+        CHECK(parser.expected.back().expectedType == ExpectedType::EXPRESSION);
+        CHECK(parser.expected.back().tokenWhereExpected.getPosition() == 2);
+    }
+    SECTION("6") {
+        const std::string str = " [1; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        REQUIRE(parser.expected.size() == 1);
+        CHECK(parser.unexpected.empty());
+        CHECK(parser.expected.back().expectedType == ExpectedType::TOKEN);
+        CHECK(parser.expected.back().expectedTokenType == TokenType::CLOSE_BRACKET);
+        CHECK(parser.expected.back().tokenWhereExpected.getPosition() == 3);
+    }
+    SECTION("7") {
+        const std::string str = "[x = 1, y = 2]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("8") {
+        const std::string str = "[0 = 1, 10 = 2]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
 }

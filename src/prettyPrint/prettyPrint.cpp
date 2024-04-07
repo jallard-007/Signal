@@ -4,21 +4,22 @@
 const uint8_t indentationSize = 4;
 
 void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
-    if (token.getType() == TokenType::NONE) {
+    if (exp.getType() == ExpressionType::NONE) {
         return;
     }
     std::vector<TokenList *> r;
     for (TokenList *iter = this; iter; iter = iter->next) {
-        if (iter->token.getType() == TokenType::DEC_PTR) {
+        if (iter->exp.getType() == ExpressionType::VALUE && iter->exp.getToken().getType() == TokenType::DEC_PTR) {
             break;
         }
         r.emplace_back(iter);
     }
     if (!r.empty()) {
         for (size_t i = r.size() - 1; i > 0 ; --i) {
-            str += tk.extractToken(r[i]->token) + " ";
+            r[i]->exp.prettyPrint(tk, str);
+            str += " ";
         }
-        str += tk.extractToken(r.front()->token);
+        r.front()->exp.prettyPrint(tk, str);
     }
 }
 
@@ -184,7 +185,9 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
     str += typeToString.at(TokenType::ENUM) + tk.extractToken(name) + "{\n";
     indentation += indentationSize;
     for (TokenList *iter = &members; iter; iter = iter->next) {
-        str += std::string(indentation, ' ') + tk.extractToken(iter->token) + ",\n";
+        str += std::string(indentation, ' ');
+        iter->exp.prettyPrint(tk, str);
+        str += ",\n";
     }
     indentation -= indentationSize;
     str += std::string(indentation, ' ') + "}\n";
@@ -266,13 +269,13 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
 
 void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
-    if (templateTypes.token.getType() != TokenType::NONE) {
+    if (templateTypes.exp.getType() != ExpressionType::NONE) {
         TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
-            str += tk.extractToken(iter->token);
+            iter->exp.prettyPrint(tk, str);
             str += ", ";
         }
-        str += tk.extractToken(iter->token);
+        iter->exp.prettyPrint(tk, str);
     }
     str += "] ";
     if (isStruct) {
@@ -284,13 +287,13 @@ void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
 
 void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
-    if (templateTypes.token.getType() != TokenType::NONE) {
+    if (templateTypes.exp.getType() != ExpressionType::NONE) {
         TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
-            str += tk.extractToken(iter->token);
+            iter->exp.prettyPrint(tk, str);
             str += ", ";
         }
-        str += tk.extractToken(iter->token);
+        iter->exp.prettyPrint(tk, str);
     }
     str += "] ";
     if (isStruct) {
@@ -310,18 +313,17 @@ void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
     }
     switch (getType()) {
         case ExpressionType::ARRAY_ACCESS: getArrayAccess()->prettyPrint(tk ,str); break;
-        // case ExpressionType::ARRAY_LITERAL:
-        // case ExpressionType::STRUCT_LITERAL: getArrayOrStructLiteral()->prettyPrint(tk, str); break;
         case ExpressionType::BINARY_OP: getBinOp()->prettyPrint(tk, str); break;
         case ExpressionType::FUNCTION_CALL: getFunctionCall()->prettyPrint(tk, str); break;
         case ExpressionType::UNARY_OP: getUnOp()->prettyPrint(tk, str); break;
         case ExpressionType::VALUE: str += tk.extractToken(getToken()); break;
+        case ExpressionType::CONTAINER_LITERAL: getContainerLiteral()->prettyPrint(tk, str); break;
         case ExpressionType::NONE: break;
         default: str += "{not yet implemented in pretty printer}"; break;
     }
 }
 
-void ArrayOrStructLiteral::prettyPrint(Tokenizer& tk, std::string& str) {
+void ContainerLiteral::prettyPrint(Tokenizer& tk, std::string& str) {
     str += '[';
     ExpressionList*list = &values;
     for (; list->next; list = list->next) {
@@ -433,11 +435,12 @@ void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) {
 
 void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
     str += typeToString.at(TokenType::CREATE) + " [";
-    if (templateTypes.token.getType() != TokenType::NONE) {
-        str += tk.extractToken(templateTypes.token);
+    if (templateTypes.exp.getType() != ExpressionType::NONE) {
+        templateTypes.exp.prettyPrint(tk, str);
         TokenList * list = templateTypes.next;
         while (list) {
-            str += ", " + tk.extractToken(list->token);
+            str += ", ";
+            list->exp.prettyPrint(tk, str);
             list = list->next;
         }
     }

@@ -61,7 +61,7 @@ CodeGen::CodeGen(
     Program& program,
     std::vector<Tokenizer>& tokenizers,
     std::unordered_map<std::string, GeneralDec *>& lookUp,
-    std::unordered_map<StructDec *, StructInformation>& structLookup
+    std::unordered_map<const StructDec *, StructInformation>& structLookup
 ): program{program}, tokenizers{tokenizers}, lookUp{lookUp}, structLookUp{structLookup} {
     sp.inUse = true;
     ip.inUse = true;
@@ -165,7 +165,7 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
 void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     assert(!exp.isReg);
     exp.isTemp = true;
-    TokenType rightSideExpType = exp.type->token.getType();
+    TokenType rightSideExpType = exp.type->exp.getToken().getType();
     if (rightSideExpType == TokenType::POINTER) {
         rightSideExpType = TokenType::UINT64_TYPE;
     }
@@ -397,80 +397,46 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * \returns the size of the type
 */
 void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
-    // if (initialize && varDec.initialAssignment) {
-    //     ExpressionResult expRes = generateExpression(*varDec.initialAssignment);
-    //     if (expRes.isReturnedValue) {
-    //         assert(stackItems.back().type == StackItemType::RETURNED_VALUE);
-    //         StackItem stackItem {
-    //             .variable = {
-    //                 .varDec = varDec,
-    //                 .positionOnStack = getCurrStackPointerPosition(),
-    //             },
-    //             .type = StackItemType::VARIABLE,
-    //         };
-    //         stackItems.pop_back();
-    //         nameToStackItemIndex[tk->extractToken(varDec.name)] = stackItems.size();
-    //         stackItems.emplace_back(stackItem);
-    //         return;
-    //     }
-    //     if (expRes.isPointerToValue) {
-    //         expRes = loadValueFromPointer(expRes);
-    //     }
-    //     if (!expRes.isReg) {
-    //         moveImmToReg(allocateRegister(), expRes);
-    //     }
-    //     if (expRes.isReg) {
-
-    //     }
-    //     // at sp (value returned from function, pop off, use current sp offset as location for this var)
-    //     // in reg (push the value in register to the stack)
-    //     // pointer to value (have to copy the value to the stack)
-
-    //     if (!expRes.isReg) {
-    //     } else  {
-
-    //     }
-    // }
-
     const Token typeToken = getTypeFromTokenList(varDec.type);
-
-    if (typeToken.getType() == TokenType::IDENTIFIER) {
-        // to improve
-        const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
-        const StructInformation& structInfo = structLookUp[genDec->structDec];
-        const uint32_t size = structInfo.size;
-        addSpaceToStack(size);
-        return;
+    if (typeToken.getType() == TokenType::REFERENCE) {
+        // TODO: implement as pointer to result? 
     }
-
-    if (!isBuiltInType(typeToken.getType()) && typeToken.getType() != TokenType::REFERENCE) {
-        std::cerr << "Invalid TokenType [" << (uint32_t)typeToken.getType() << "] in generateVariableDeclaration\n";
-        exit(1);
-    }
-
-    ExpressionResult expRes;
-    const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
-    if (initialize && varDec.initialAssignment) {
-        expRes = generateExpression(*varDec.initialAssignment);
-        if (!expRes.isReg) {
-            moveImmToReg(allocateRegister(), expRes);
-        } else if (expRes.isPointerToValue) {
-            bytecode_t reg = allocateRegister();
-            expRes = loadValueFromPointer(expRes, reg);
+    else if (isBuiltInType(typeToken.getType())) {
+        ExpressionResult expRes;
+        if (initialize && varDec.initialAssignment) {
+            expRes = generateExpression(*varDec.initialAssignment);
+            if (!expRes.isReg) {
+                moveImmToReg(allocateRegister(), expRes);
+            } else if (expRes.isPointerToValue) {
+                bytecode_t reg = allocateRegister();
+                expRes = loadValueFromPointer(expRes, reg);
+            }
         }
-        // stackVar.reg = reg;
+        addVarDecToStack(varDec);
+        const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
+        assert(size >= 1 && size <= 8);
+        if (!expRes.isReg) {
+            efficientImmAddOrSub(stackPointerIndex, size, OpCode::SUB);
+            return;
+        }
+        const OpCode pushOp = getPushOpForSize(size);
+        assert(pushOp != OpCode::NOP);
+        addBytes({{(bc)pushOp, expRes.getReg()}});
+        if (expRes.isTemp) {
+            freeRegister(expRes.getReg());
+        }
     }
-    addVarDecToStack(varDec);
-    assert(size >= 1 && size <= 8);
-    if (!expRes.isReg) {
-        efficientImmAddOrSub(stackPointerIndex, size, OpCode::SUB);
-        return;
+    else if (typeToken.getType() == TokenType::IDENTIFIER) {
+        // TODO:
+        // valid initial assignment can be an initializer list
+        // need special generator for that
+        const uint32_t beforePos = getCurrStackPointerPosition();
+        addVarDecToStack(varDec, 0, true);
+        addSpaceToStack(getCurrStackPointerPosition() - beforePos);
     }
-    const OpCode pushOp = getPushOpForSize(size);
-    assert(pushOp != OpCode::NOP);
-    addBytes({{(bc)pushOp, expRes.getReg()}});
-    if (expRes.isTemp) {
-        freeRegister(expRes.getReg());
+    // TODO: add array support
+    else {
+        assert(false);
     }
 }
 
@@ -608,8 +574,8 @@ struct OperatorLessEqual {
 
 template<template<typename, typename> class TFunctor>
 void doBinaryEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
-    const TokenType leftSideType = left.type->token.getType();
-    const TokenType rightSideType = right.type->token.getType();
+    const TokenType leftSideType = left.type->exp.getToken().getType();
+    const TokenType rightSideType = right.type->exp.getToken().getType();
     assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE);
     if (leftSideType == TokenType::DOUBLE_TYPE) {
@@ -650,8 +616,8 @@ void doBinaryEvaluate(const ExpressionResult& left, const ExpressionResult& righ
 
 template<template<typename, typename> class TFunctor>
 void doBinaryIntegralEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
-    const TokenType leftSideType = left.type->token.getType();
-    const TokenType rightSideType = right.type->token.getType();
+    const TokenType leftSideType = left.type->exp.getToken().getType();
+    const TokenType rightSideType = right.type->exp.getToken().getType();
     assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     if (leftSideType == TokenType::UINT64_TYPE) {
@@ -676,17 +642,17 @@ void doBinaryIntegralEvaluate(const ExpressionResult& left, const ExpressionResu
 ExpressionResult evaluateBinOpImmExpression(TokenType op, ExpressionResult& left, ExpressionResult& right) {
     assert(!left.isReg && !right.isReg);
     assert(left.type && right.type);
-    const TokenType leftSideType = left.type->token.getType();
-    const TokenType rightSideType = right.type->token.getType();
+    const TokenType leftSideType = left.type->exp.getToken().getType();
+    const TokenType rightSideType = right.type->exp.getToken().getType();
     assert(isBuiltInType(leftSideType) && leftSideType != TokenType::VOID && leftSideType != TokenType::STRING_TYPE);
     assert(isBuiltInType(rightSideType) && rightSideType != TokenType::VOID && rightSideType != TokenType::STRING_TYPE);
     ExpressionResult res;
     // assign to largest type, minimum of int32
     res.type = &Checker::int32Value;
-    if (leftSideType > res.type->token.getType()) {
+    if (leftSideType > res.type->exp.getToken().getType()) {
         res.type = left.type;
     }
-    if (rightSideType > res.type->token.getType()) {
+    if (rightSideType > res.type->exp.getToken().getType()) {
         res.type = right.type;
     }
 
@@ -830,7 +796,7 @@ struct OperatorNot {
 
 template<template<typename> class TFunctor>
 void doUnaryEvaluate(const ExpressionResult& operand, ExpressionResult& res) {
-    TokenType operandType = operand.type->token.getType();
+    TokenType operandType = operand.type->exp.getToken().getType();
     assert(operandType == TokenType::DOUBLE_TYPE || operandType == TokenType::UINT64_TYPE || operandType == TokenType::INT64_TYPE);
     if (operandType == TokenType::DOUBLE_TYPE) {
         auto unaryOpValue = TFunctor<double>()(*(double*)operand.getData());
@@ -847,12 +813,12 @@ void doUnaryEvaluate(const ExpressionResult& operand, ExpressionResult& res) {
 ExpressionResult evaluateUnaryOpImmExpression(TokenType op, ExpressionResult& operand) {
     assert(!operand.isReg && operand.type);
     ExpressionResult res;
-    const TokenType operandType = operand.type->token.getType();
+    const TokenType operandType = operand.type->exp.getToken().getType();
     assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::STRING_TYPE);
     
     // assign to largest type, minimum of int32
     res.type = &Checker::int32Value;
-    if (operandType > res.type->token.getType()) {
+    if (operandType > res.type->exp.getToken().getType()) {
         res.type = operand.type;
     }
     if (isUnsigned(operandType) || operandType == TokenType::BOOL) {
@@ -942,8 +908,8 @@ ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAcce
     return {};
 }
 
-ExpressionResult CodeGen::generateExpressionArrOrStructLit(const ArrayOrStructLiteral &arrOrStructLit) {
-    if (arrOrStructLit.values.next) {
+ExpressionResult CodeGen::generateExpressionContainerLiteral(const ContainerLiteral &containerLiteral) {
+    if (containerLiteral.values.next) {
         return {};
     }
     return {};
@@ -967,50 +933,13 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     } else {
         p_funcDec = generalDec->funcDec;
     }
-    bool returnValuePointerArgNeeded = false;
-    ExpressionResult returnValuePointerExp;
-    { // add return value space if needed
-        Token returnType = getTypeFromTokenList(p_funcDec->returnType);
-        uint32_t alignTo, size;
-        if (returnType.getType() == TokenType::IDENTIFIER) {
-            const std::string& typeIdent = tk->extractToken(returnType);
-            const GeneralDec* structGenDec = lookUp[typeIdent];
-            assert(structGenDec->type == GeneralDecType::STRUCT);
-            StructInformation& structInfo = structLookUp[structGenDec->structDec];
-            size = structInfo.size;
-            alignTo = structInfo.alignTo;
-        } else {
-            size = getSizeOfBuiltinType(returnType.getType());
-            alignTo = size;
-        }
-        if (sizeRequiresReturnValuePointer(size)) {
-            returnValuePointerArgNeeded = true;
-            const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), size, alignTo);
-            const uint32_t pos = addPaddingAndSpaceToStack(padding, size);
-            StackItem varSpaceItem = {
-                .positionOnStack = pos,
-                .type = StackItemType::RETURNED_VALUE_SPACE
-            };
-            stackItems.emplace_back(varSpaceItem);
-            returnValuePointerExp.setReg(stackPointerIndex);
-            returnValuePointerExp.isTemp = false;
-        }
-    }
 
-    // after we add return value space, we need to save any registers currently in use
+    // save any registers currently in use
     bool returnRegisterUsed = false;
     {
-        bool needToSaveReturnValuePointer = returnValuePointerArgNeeded;
         for (bytecode_t reg = 0; reg < NUM_REGISTERS; ++reg) {
-            if (isReservedRegister(reg) || !registers[reg].inUse || reg == returnValuePointerExp.getReg()) {
+            if (isReservedRegister(reg) || !registers[reg].inUse) {
                 continue;
-            }
-            if (needToSaveReturnValuePointer) {
-                needToSaveReturnValuePointer = false;
-                assert(returnValuePointerExp.getReg());
-                const bytecode_t temp = allocateRegister();
-                addBytes({{(bc)OpCode::MOVE, temp, returnValuePointerExp.getReg()}});
-                returnValuePointerExp.setReg(temp);
             }
             if (reg == returnRegisterIndex) {
                 returnRegisterUsed = true;
@@ -1026,17 +955,10 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     uint32_t resetTo = stackItems.size();
 
     // add arguments to stack
-    if (returnValuePointerArgNeeded) {
-        assert(returnValuePointerExp.getReg());
-        addExpressionResToStack(returnValuePointerExp, StackItemType::ARGUMENT);
-        if (returnValuePointerExp.isTemp) {
-            freeRegister(returnValuePointerExp.getReg());
-        }
-    }
     if (functionCall.args.curr.getType() != ExpressionType::NONE) {
         const ExpressionList *expressionList = &functionCall.args;
         ExpressionResult expRes = generateExpression(expressionList->curr);
-        addExpressionResToStack(expRes, StackItemType::ARGUMENT, returnValuePointerArgNeeded ? 0 : 8);
+        addExpressionResToStack(expRes, StackItemType::ARGUMENT, 8);
         expressionList = expressionList->next;
         while (expressionList) {
             ExpressionResult expRes = generateExpression(expressionList->curr);
@@ -1075,8 +997,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     }
 
     ExpressionResult returnValueExpression;
-    // if using return value pointer arg, need special flag
-    // otherwise return value is in returnRegisterIndex
+    // return value is in returnRegisterIndex
     // if returnRegisterIndex register was being used before, move it to a different reg
     if (returnRegisterUsed) {
         const bytecode_t moveTo = allocateRegister();
@@ -1115,7 +1036,7 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
     }
     assert(immOp != OpCode::NOP);
     bool large;
-    TokenType rightSideExpType = right.type->token.getType();
+    TokenType rightSideExpType = right.type->exp.getToken().getType();
     assert(isBuiltInType(rightSideExpType));
     // need to covert types to their highest level (uint64_t, int64_t, or double)
 
@@ -1240,7 +1161,7 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
                 expRes.isTemp = false;
             }
             expRes.type = &stackVar.varDec.type;
-            if (expRes.type->token.getType() == TokenType::REFERENCE) {
+            if (expRes.type->exp.getToken().getType() == TokenType::REFERENCE) {
                 // always move past references
                 expRes.type = expRes.type->next;
             }
@@ -1423,27 +1344,25 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             const std::string& identifier = tk->extractToken(token);
             const uint32_t stackItemIndex = nameToStackItemIndex[identifier];
             const StackVariable &variableInfo = stackItems[stackItemIndex].variable;
-            const uint32_t sizeOfVar = getSizeOfType(getTypeFromTokenList(variableInfo.varDec.type));
-            if (sizeOfVar > SIZE_OF_REGISTER) {
-                return getAddressOfExpression(expression);
-            }
-            expRes.type = &variableInfo.varDec.type;
-            // if (variableInfo.reg) {
-            //   expRes.setReg(variableInfo.reg);
-            //   return expRes;
-            // }
-            // load value into a register
-            expRes.setReg(allocateRegister());
-            // variableInfo.reg = expRes.getReg();
-            const OpCode loadOp = getLoadOpForSize(sizeOfVar);
+            const bytecode_t resReg = allocateRegister();
+            ExpressionResult pointerExp;
+            pointerExp.isPointerToValue = true;
+            pointerExp.type = &variableInfo.varDec.type;
             const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
             if (varOffset) {
-                addBytes({{(bc)OpCode::MOVE, miscRegisterIndex, stackPointerIndex}});
-                efficientImmAddOrSub(miscRegisterIndex, varOffset, OpCode::ADD);
-                addBytes({{(bc)loadOp, expRes.getReg(), miscRegisterIndex}});
+                pointerExp.setReg(allocateRegister());
+                addBytes({{(bc)OpCode::MOVE, pointerExp.getReg(), stackPointerIndex}});
+                efficientImmAddOrSub(pointerExp.getReg(), varOffset, OpCode::ADD);
             } else {
-                addBytes({{(bc)loadOp, expRes.getReg(), stackPointerIndex}});
+                pointerExp.setReg(stackPointerIndex);
+                pointerExp.isTemp = false;
             }
+            expRes = loadValueFromPointer(pointerExp, resReg);
+            if (expRes.getReg() == resReg) {
+                if (pointerExp.isTemp) {
+                    freeRegister(pointerExp.getReg());
+                }
+            } // else failed to load, type too big
             return expRes;
         }
         default: {
@@ -1462,19 +1381,54 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
     const TokenList* type = pointerExp.type;
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t sizeOfType = getSizeOfType(typeToken);
-    ExpressionResult expRes;
     if (sizeOfType > 8) {
-        expRes.isPointerToValue = true;
         // cannot be loaded into a register
-        return expRes;
+        return pointerExp;
     }
-    const OpCode loadOp = getLoadOpForSize(sizeOfType);
-    if (loadOp == OpCode::NOP) {
-        // weirdly sized type (3, 5, 6, or 7)
-    }
+    ExpressionResult expRes;
     expRes.setReg(reg);
     expRes.type = type;
-    addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
+    const OpCode loadOp = getLoadOpForSize(sizeOfType);
+    if (loadOp != OpCode::NOP) {
+        addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
+        return expRes;
+    }
+    // size can be one of 3, 5, 6, 7
+    assert(sizeOfType == 3 || sizeOfType == 5 || sizeOfType == 6 || sizeOfType == 7);
+    bytecode_t pointerReg = pointerExp.getReg();
+    if (!pointerExp.isTemp) {
+        pointerReg = allocateRegister();
+        addBytes({{(bc)OpCode::MOVE, pointerReg, pointerExp.getReg()}});
+    }
+    uint32_t leftToLoad = sizeOfType;
+    if (leftToLoad >= 4) {
+        addBytes({{(bc)OpCode::LOAD_D, reg, pointerReg}});
+        addBytes({{(bc)OpCode::ADD_I, pointerReg, 4, 0}});
+        leftToLoad -= 4;
+    }
+    if (leftToLoad >= 2) {
+        leftToLoad -= 2;
+        if ((sizeOfType < 4)) {
+            addBytes({{(bc)OpCode::LOAD_W, reg, pointerReg}});
+        } else {
+            addBytes({{(bc)OpCode::LOAD_W, miscRegisterIndex, pointerReg}});
+            addBytes({{(bc)OpCode::SHIFT_L_I, miscRegisterIndex, 32, 0}});
+            addBytes({{(bc)OpCode::OR, reg, miscRegisterIndex}});
+        }
+        if (leftToLoad) {
+            addBytes({{(bc)OpCode::ADD_I, pointerReg, 2, 0}});
+        }
+    }
+    if (leftToLoad == 1) {
+        addBytes({{(bc)OpCode::LOAD_B, miscRegisterIndex, pointerReg}});
+        addBytes({{(bc)OpCode::SHIFT_L_I, miscRegisterIndex, (bc)((sizeOfType - 1) * 8), 0}});
+        addBytes({{(bc)OpCode::OR, reg, miscRegisterIndex}});
+        --leftToLoad;
+    }
+    assert(leftToLoad == 0);
+    if (!pointerExp.isTemp) {
+        freeRegister(pointerReg);
+    }
     return expRes;
 }
 
@@ -1639,7 +1593,9 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
     ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
     assert(leftResult.isReg);
     assert(leftResult.isPointerToValue);
-    ExpressionResult leftValue = loadValueFromPointer(leftResult, allocateRegister());
+    const bytecode_t reg = allocateRegister();
+    ExpressionResult leftValue = loadValueFromPointer(leftResult, reg);
+    assert(leftValue.getReg() == reg);
     // registers[leftResult.getReg()].changed = true;
     expressionResWithOp(op, opImm, leftValue, rightResult);
     if (rightResult.isTemp){
@@ -1957,7 +1913,9 @@ ExpressionResult CodeGen::defaultUnOp(const UnOp& unOp, OpCode op) {
 ExpressionResult CodeGen::incrementOrDecrement(const UnOp& unOp, TokenType op) {
     assert(op == TokenType::DECREMENT_PREFIX || op == TokenType::INCREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX);
     ExpressionResult addressExp = getAddressOfExpression(unOp.operand);
-    ExpressionResult dataExp = loadValueFromPointer(addressExp, allocateRegister());
+    const bytecode_t reg = allocateRegister();
+    ExpressionResult dataExp = loadValueFromPointer(addressExp, reg);
+    assert(dataExp.getReg() == reg);
     ExpressionResult incrementExp;
     OpCode opCode;
     if (op == TokenType::DECREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX) {
@@ -2094,10 +2052,6 @@ void CodeGen::endSoftScope() {
 // ========================================
 // FUNCTIONS
 // ========================================
-
-bool CodeGen::sizeRequiresReturnValuePointer(uint32_t typeSize) {
-    return typeSize > SIZE_OF_REGISTER;
-}
 
 void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
     assert(stackItems.empty());
@@ -2313,31 +2267,23 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
         raReg = allocateRegister();
     }
     addBytes({{(bc)OpCode::POP_Q, raReg}});
-    // since we used POP_Q above, we remove 8 (q word size) from the position so that the clear function
-    // adds the right amount to the stack pointer
     if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
         const Token typeToken = getTypeFromTokenList(*returnValueExp.type);
         const uint32_t typeSize = getSizeOfType(typeToken);
-        if (sizeRequiresReturnValuePointer(typeSize)) {
-            assert(stackItems.size() > 0 && stackItems[0].type == StackItemType::RETURN_VALUE_SPACE_POINTER);
-            assert(returnAddressStackIndex > 0);
-            fakeClearStackFromTo(returnAddressStackIndex - 1, 0);
-            // TODO: 
-            assert(false);
+        assert(typeSize <= SIZE_OF_REGISTER);
+        // move value into returnRegisterIndex
+        if (returnAddressStackIndex > 0) {
+            fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
+        }
+        if (returnValueExp.isPointerToValue) {
+            returnValueExp = loadValueFromPointer(returnValueExp, returnRegisterIndex);
+            assert(returnValueExp.getReg() == returnRegisterIndex);
+        } else if (returnValueExp.isReg) {
+            if (returnValueExp.getReg() != returnRegisterIndex) {
+                addBytes({{(bc)OpCode::MOVE, returnRegisterIndex, returnValueExp.getReg()}});
+            }
         } else {
-            // move value into returnRegisterIndex
-            if (returnAddressStackIndex > 0) {
-                fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
-            }
-            if (returnValueExp.isPointerToValue) {
-                returnValueExp = loadValueFromPointer(returnValueExp, returnRegisterIndex);
-            } else if (returnValueExp.isReg) {
-                if (returnValueExp.getReg() != returnRegisterIndex) {
-                    addBytes({{(bc)OpCode::MOVE, returnRegisterIndex, returnValueExp.getReg()}});
-                }
-            } else {
-                moveImmToReg(returnRegisterIndex, returnValueExp);
-            }
+            moveImmToReg(returnRegisterIndex, returnValueExp);
         }
     }
     else if (returnAddressStackIndex > 0) {
@@ -2405,18 +2351,20 @@ uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
  * \param alignTo optionally set the alignment. if left at the default of 0, will use the type's alignment
  * \param virtualOnly if set to true, only adds padding and var dec to virtual stack (does not update bytecode)
  *  otherwise will update the bytecode by padding, and padding only
+ * \returns a pointer to the struct info of the type if the type is a struct, otherwise nullptr
 */
-StackVariable& CodeGen::addVarDecToStack(const VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
+const StructInformation* CodeGen::addVarDecToStack(const VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     uint32_t padding, size;
+    const StructInformation* pStructInfo = nullptr;
     if (typeToken.getType() == TokenType::IDENTIFIER) {
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
-        const StructInformation &structInfo = structLookUp[genDec->structDec];
+        pStructInfo = &structLookUp[genDec->structDec];
         if (!alignTo) {
-            alignTo = structInfo.alignTo;
+            alignTo = pStructInfo->alignTo;
         }
-        size = structInfo.size;
-        padding = getPaddingNeeded(getCurrStackPointerPosition(), structInfo.size, alignTo);
+        size = pStructInfo->size;
+        padding = getPaddingNeeded(getCurrStackPointerPosition(), pStructInfo->size, alignTo);
     } else {
         size = getSizeOfBuiltinType(typeToken.getType());
         if (!alignTo) {
@@ -2431,15 +2379,14 @@ StackVariable& CodeGen::addVarDecToStack(const VariableDec& varDec, uint32_t ali
     StackItem stackItem {
         .variable = {
             .varDec = varDec,
-            .positionOnStack = getCurrStackPointerPosition() + padding + size,
+            .positionOnStack = getCurrStackPointerPosition() + size,
         },
         .type = StackItemType::VARIABLE,
     };
     nameToStackItemIndex[tk->extractToken(varDec.name)] = stackItems.size();
     stackItems.emplace_back(stackItem);
-    return stackItems.back().variable;
+    return pStructInfo;
 }
-
 
 
 uint32_t CodeGen::getCurrStackPointerPosition() {
@@ -2491,6 +2438,7 @@ StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemT
         const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
         const StructInformation& structInfo = structLookUp[genDec->structDec];
         uint32_t size = structInfo.size;
+        assert(size <= SIZE_OF_REGISTER);
         const uint32_t padding = getPaddingNeeded(spPosition, size, alignTo ? alignTo : structInfo.alignTo);
         if (!expRes.isPointerToValue) {
             addPaddingToStack(padding);
@@ -2502,15 +2450,32 @@ StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemT
             addBytes({{(bc)getPushOpForSize(size), miscRegisterIndex}});
         }
         else {
+            // size can be one of 1, 3, 5, 6, 7
+            assert(size == 1 || size == 3 || size == 5 || size == 6 || size == 7);
             addPaddingAndSpaceToStack(padding, size);
-            addBytes({{(bc)OpCode::PUSH_D, stackPointerIndex}}); // add destination
-            addBytes({{(bc)OpCode::PUSH_D, expRes.getReg()}}); // add source
-            ExpressionResult sizeExp;
-            sizeExp.set(size);
-            addExpressionResToStack(sizeExp, StackItemType::ARGUMENT); // add size
-            addBytes({{(bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_COPY}});
-            addBytes({{(bc)OpCode::POP_Q, miscRegisterIndex}}); // pop return value
-            size = 0;
+            const bytecode_t reg = allocateRegister();
+            addBytes({{(bc)OpCode::MOVE, reg, stackPointerIndex}});
+            addBytes({{(bc)OpCode::ADD_I, reg, (bc)(size)}});
+            if (size % 2 == 1) {
+                addBytes({{(bc)OpCode::DEC, reg}});
+                addBytes({{(bc)OpCode::LOAD_B, miscRegisterIndex, reg}});
+                addBytes({{(bc)OpCode::PUSH_B, miscRegisterIndex}});
+                --size;
+            }
+            assert(size % 2 == 0);
+            if (size % 4 == 2) {
+                addBytes({{(bc)OpCode::DEC, reg, (bc)OpCode::DEC, reg}});
+                addBytes({{(bc)OpCode::LOAD_W, miscRegisterIndex, reg}});
+                addBytes({{(bc)OpCode::PUSH_W, miscRegisterIndex}});
+                size -= 2;
+            }
+            if (size == 4) {
+                addBytes({{(bc)OpCode::SUB_I, reg, 4, 0}});
+                addBytes({{(bc)OpCode::LOAD_D, miscRegisterIndex, reg}});
+                addBytes({{(bc)OpCode::PUSH_D, miscRegisterIndex}});
+                size -= 4;
+            }
+            assert(size == 0);
         }
         if (expRes.isTemp) {
             freeRegister(expRes.getReg());
@@ -2527,42 +2492,16 @@ StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemT
   * Memory layout information needs to be standardized per function,
   * but general memory layout for a function call:
   *    HIGH ADDRESS                                              LOW ADDRESS
-  *  *Return Value Pointer | Argument 1 | Argument 2 | ... | Argument N | Return Address
+  *   Argument 1 | Argument 2 | ... | Argument N | Return Address
   * 
   * - Callee unwinds and destructs all variables on return
-  * - *If the return type size cannot fit in a register, an extra parameter is added to the function call,
-  *     this parameter is a pointer to some space reserved for the return value
-  * - If the return type can fit in a register, it is returned using r10
 */
 void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
-    // add return value pointer if return type larger than register size
-    const Token typeToken = getTypeFromTokenList(funcDec.returnType);
-    bool firstItem = true;
-    const uint32_t sizeOfPointer = getSizeOfBuiltinType(TokenType::POINTER);
-    if (sizeRequiresReturnValuePointer(getSizeOfType(typeToken))) {
-        firstItem = false;
-        // add return address
-        const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfPointer, sizeOfPointer);
-        if (padding) {
-            StackItem paddingItem {
-                .positionOnStack = getCurrStackPointerPosition() + padding,
-                .type = StackItemType::PADDING,
-            };
-            stackItems.emplace_back(paddingItem);   
-        }
-        StackItem returnValue {
-            .positionOnStack = getCurrStackPointerPosition() + sizeOfPointer,
-            .type = StackItemType::RETURN_VALUE_SPACE_POINTER,
-        };
-        // nameToStackItemIndex[STACK_RETURN_VALUE_IDENTIFIER] = stackItems.size();
-        stackItems.emplace_back(returnValue);
-    } // else use r10 to return the value, don't need a stack item
-
     // add parameters
     if (funcDec.params.curr.type != StatementType::NONE) {
         const StatementList *parameterList = &funcDec.params;
         // need to align first one to 8 bytes if a return value address has not already been added
-        addVarDecToStack(*parameterList->curr.varDec, firstItem ? 8 : 0, true);
+        addVarDecToStack(*parameterList->curr.varDec, 8, true);
         parameterList = parameterList->next;
         while (parameterList) {
             addVarDecToStack(*parameterList->curr.varDec, 0, true);
@@ -2570,6 +2509,8 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
         }
     }
 
+    assert(getSizeOfType(getTypeFromTokenList(funcDec.returnType)) <= SIZE_OF_REGISTER);
+    const uint32_t sizeOfPointer = getSizeOfBuiltinType(TokenType::POINTER);
     // add return address
     const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfPointer, sizeOfPointer);
     if (padding) {

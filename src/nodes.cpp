@@ -6,12 +6,13 @@ bool notFirstOfExpression(TokenType type) {
         !isBinaryOp(type) &&
         !isUnaryOp(type) &&
         !isLiteral(type) &&
-        type != TokenType::OPEN_PAREN;
+        type != TokenType::OPEN_PAREN &&
+        type != TokenType::OPEN_BRACKET;
 }
 
 Expression::Expression(): binOp{nullptr} {}
 Expression::Expression(const Expression& ref): binOp{ref.binOp} {}
-Expression::Expression(Token tk): value{tk} {}
+Expression::Expression(Token tk) { setToken(tk); }
 Expression& Expression::operator=(const Expression&ref) {
     binOp = ref.binOp;
     return *this;
@@ -25,13 +26,13 @@ Statement& Statement::operator=(const Statement& ref) {
     return *this;
 }
 
-TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
-TokenList::TokenList(const Token& tk, TokenList* next): token{tk}, next{next} {}
+TokenList::TokenList(const Token& tk): exp{tk}, next{nullptr} {}
+TokenList::TokenList(const Token& tk, TokenList* next): exp{tk}, next{next} {}
 std::ostream& operator<<(std::ostream& os, const TokenList& obj) {
     if (obj.next) {
         os << *obj.next << ' ';
     }
-    os << obj.token.getType();
+    os << obj.exp.getToken().getType();
     return os;
 }
 
@@ -84,8 +85,14 @@ bool TokenList::operator==(const TokenList& ref) const {
     const TokenList* refCurr = &ref;
     const TokenList* thisCurr = this;
     while (refCurr && thisCurr) {
-        if (refCurr->token.getType() != thisCurr->token.getType()) {
+        const ExpressionType expType = refCurr->exp.getType();
+        if (expType != thisCurr->exp.getType()) {
             return false;
+        }
+        if (expType == ExpressionType::VALUE) {
+            if (refCurr->exp.getToken().getType() != thisCurr->exp.getToken().getType()) {
+                return false;
+            }
         }
         refCurr = refCurr->next;
         thisCurr = thisCurr->next;
@@ -251,12 +258,11 @@ Expression Expression::deepCopy(NodeMemPool& mem) {
     copy.setType(getType());
     switch (getType()) {
         case ExpressionType::ARRAY_ACCESS: copy.arrAccess = arrAccess->deepCopy(mem); break;
-        // case ExpressionType::ARRAY_LITERAL:
-        // case ExpressionType::STRUCT_LITERAL: copy.arrayOrStruct = arrayOrStruct->deepCopy(mem); break;
         case ExpressionType::BINARY_OP: copy.binOp = binOp->deepCopy(mem); break;
         case ExpressionType::FUNCTION_CALL: copy.funcCall = funcCall->deepCopy(mem); break;
         case ExpressionType::UNARY_OP: copy.unOp = unOp->deepCopy(mem); break;
         case ExpressionType::VALUE: copy.value = value; break;
+        case ExpressionType::CONTAINER_LITERAL: copy.containerLiteral = containerLiteral->deepCopy(mem); break;
         case ExpressionType::NONE: break;
     }
     return copy;
@@ -281,7 +287,7 @@ TokenList TokenList::deepCopy(NodeMemPool& mem) {
     TokenList copy;
     TokenList *copyList = &copy;
     for (TokenList *list = this; list; list = list->next, copyList = copyList->next) {
-        copyList->token = list->token;
+        copyList->exp = list->exp.deepCopy(mem);
         copyList->next = mem.makeTokenList();
     }
     mem.release(copyList);
@@ -306,8 +312,8 @@ FunctionCall* FunctionCall::deepCopy(NodeMemPool& mem) {
     return copy;
 }
 
-ArrayOrStructLiteral* ArrayOrStructLiteral::deepCopy(NodeMemPool& mem) {
-    ArrayOrStructLiteral* copy = mem.makeArrayOrStruct();
+ContainerLiteral* ContainerLiteral::deepCopy(NodeMemPool& mem) {
+    ContainerLiteral* copy = mem.makeContainerLiteral();
     copy->values = values.deepCopy(mem);
     return copy;
 }
