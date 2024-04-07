@@ -24,6 +24,7 @@ add_library(common STATIC
     src/token.cpp
     src/utils.cpp
     src/bytecodeDesign/bytecodeDesign.cpp
+    src/compTime/compTime.cpp
 )
 target_include_directories(common PRIVATE src)
 
@@ -46,7 +47,7 @@ target_link_libraries(main PRIVATE common)
 
 # tests
 if ( UNIX )
-    add_executable(tests src/testingMemPool.cpp src/tokenizer/test_tokenizer.cpp src/parser/test_parser.cpp src/prettyPrint/test_prettyPrint.cpp src/checker/test_checker.cpp src/interpreter/test_interpreter.cpp src/codeGen/interpreter/test_codeGen.cpp src/bytecodeDesign/test_bytecodeDesign.cpp)
+    add_executable(tests src/testingMemPool.cpp src/tokenizer/test_tokenizer.cpp src/parser/test_parser.cpp src/prettyPrint/test_prettyPrint.cpp src/checker/test_checker.cpp src/interpreter/test_interpreter.cpp src/codeGen/interpreter/test_codeGen.cpp src/bytecodeDesign/test_bytecodeDesign.cpp src/compTime/test_compTime.cpp)
     target_include_directories(tests PRIVATE src/)
     target_link_libraries(tests PRIVATE common interpreter Catch2::Catch2WithMain)
     include(CTest)

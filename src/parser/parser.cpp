@@ -75,6 +75,7 @@ void initializeOperatorPrecedence() {
     operatorPrecedence[(uint8_t)TokenType::ADDRESS_OF] = 13;
     operatorPrecedence[(uint8_t)TokenType::DEREFERENCE] = 13;
     operatorPrecedence[(uint8_t)TokenType::NOT] = 13;
+    operatorPrecedence[(uint8_t)TokenType::SIZEOF] = 13;
     operatorPrecedence[(uint8_t)TokenType::NEGATIVE] = 13;
     operatorPrecedence[(uint8_t)TokenType::DECREMENT_PREFIX] = 13;
     operatorPrecedence[(uint8_t)TokenType::INCREMENT_PREFIX] = 13;
@@ -999,7 +1000,7 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
             expression.setToken(token);
         }
     }
-    else if (tokenizer->peeked.getType() == TokenType::OPEN_BRACKET) {
+    else if (token.getType() == TokenType::OPEN_BRACKET) {
         tokenizer->consumePeek();
         expression.setType(ExpressionType::CONTAINER_LITERAL);
         expression.setContainerLiteral(memPool.makeContainerLiteral());

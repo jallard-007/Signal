@@ -395,6 +395,15 @@ Token Tokenizer::tokenizeNext() {
                             }
                         }
                     }
+                    else if (
+                        content[position] == 'i' &&
+                        content[++position] == 'z' &&
+                        content[++position] == 'e' &&
+                        content[++position] == 'o' &&
+                        content[++position] == 'f'
+                    ) {
+                        END_OF_IDENTIFIER(TokenType::SIZEOF)
+                    }
                     movePastIdentifier();
                     break;
                 }

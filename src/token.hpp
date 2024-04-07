@@ -107,6 +107,7 @@ enum class TokenType : uint8_t {
 
     // UNARY
     NOT,
+    SIZEOF,
     ADDRESS_OF,
     DEREFERENCE,
     INCREMENT_POSTFIX,
@@ -127,8 +128,8 @@ enum class TokenType : uint8_t {
     UINT32_TYPE,
     INT64_TYPE,
     UINT64_TYPE,
-    POINTER,
     FILE_TYPE,
+    POINTER,
     DOUBLE_TYPE,
     VOID,
     REFERENCE,

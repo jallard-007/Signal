@@ -152,6 +152,7 @@ const char* tokenTypeToString [] = {
     "GREATER_THAN",
     "GREATER_THAN_EQUAL",
     "NOT",
+    "SIZEOF",
     "ADDRESS_OF",
     "DEREFERENCE",
     "INCREMENT_POSTFIX",
@@ -315,6 +316,7 @@ const TokenType numToType [128] {
 const std::unordered_map<TokenType, std::string> typeToString {
     {TokenType::DEREFERENCE, "*"},
     {TokenType::NOT, "!"},
+    {TokenType::SIZEOF, "sizeof "},
     {TokenType::NOT_EQUAL, " != "},
     {TokenType::ADDRESS_OF, "@"},
     {TokenType::COMMENT, "#"},
@@ -373,6 +375,7 @@ const std::unordered_map<TokenType, std::string> typeToString {
     {TokenType::CREATE, "create "},
     {TokenType::CONTINUE, "continue"},
     {TokenType::DEFAULT, "default"},
+    {TokenType::DEFINE, "define"},
     {TokenType::DOUBLE_TYPE, "double"},
     {TokenType::ELIF, "elif "},
     {TokenType::ELSE, "else "},

@@ -10,7 +10,6 @@
 #define stdinDataIndex (stdoutDataIndex + sizeof (FILE *))
 #define stderrDataIndex (stdinDataIndex + sizeof (FILE *))
 
-#define SIZE_OF_REGISTER 8
 #define NUM_REGISTERS 32
 #define instructionPointerIndex NUM_REGISTERS - 1
 #define stackPointerIndex NUM_REGISTERS - 2

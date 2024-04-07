@@ -5,6 +5,8 @@
 #include <concepts>
 #include "codeGen.hpp"
 #include "utils.hpp"
+#include "compTime/compTime.hpp"
+
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
@@ -16,41 +18,35 @@
 
 void ExpressionResult::set(char c) {
     *(decltype(c) *)data = c;
-    type = &Checker::charValue;
+    type = &TokenListTypes::charValue;
 }
 void ExpressionResult::set(uint32_t val) {
     *(decltype(val) *)data = val;
-    type = &Checker::uint32Value;
+    type = &TokenListTypes::uint32Value;
 }
 void ExpressionResult::set(uint64_t val) {
     *(decltype(val) *)data = val;
-    type = &Checker::uint64Value;
+    type = &TokenListTypes::uint64Value;
 }
 void ExpressionResult::set(int32_t val) {
     *(decltype(val) *)data = val;
-    type = &Checker::int32Value;
+    type = &TokenListTypes::int32Value;
 }
 void ExpressionResult::set(int64_t val) {
     *(decltype(val) *)data = val;
-    type = &Checker::int64Value;
+    type = &TokenListTypes::int64Value;
 }
 void ExpressionResult::set(FILE *val) {
     *(decltype(val) *)data = val;
-    type = &Checker::fileValue;
+    type = &TokenListTypes::fileValue;
 }
 void ExpressionResult::set(double val) {
     *(decltype(val) *)data = val;
-    type = &Checker::doubleValue;
+    type = &TokenListTypes::doubleValue;
 }
 void ExpressionResult::set(bool val) {
     *(decltype(val) *)data = val;
-    type = &Checker::boolValue;
-}
-
-template <class T>
-void ExpressionResult::setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
-    static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
-    *(decltype(t) *)data = t;
+    type = &TokenListTypes::boolValue;
 }
 
 
@@ -442,422 +438,6 @@ void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initia
 
 
 // ========================================
-// COMPILE TIME EVALUATION
-// ========================================
-
-template< class T, class U >
-struct OperatorAdd {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t + u;
-    }
-};
-template< class T, class U >
-struct OperatorSub {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t - u;
-    }
-};
-template< class T, class U >
-struct OperatorMul {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t * u;
-    }
-};
-template< class T, class U >
-struct OperatorDiv {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t / u;
-    }
-};
-template< class T, class U >
-struct OperatorModulo {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t % u;
-    }
-};
-template< class T, class U >
-struct OperatorBitwiseOr {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t | u;
-    }
-};
-template< class T, class U >
-struct OperatorBitwiseAnd {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t & u;
-    }
-};
-template< class T, class U >
-struct OperatorBitwiseXor {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t ^ u;
-    }
-};
-template< class T, class U >
-struct OperatorShiftLeft {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t << u;
-    }
-};
-template< class T, class U >
-struct OperatorShiftRight {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t >> u;
-    }
-};
-template< class T, class U>
-struct OperatorEqual {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_equal(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept {
-        return t == u;
-    }
-};
-template< class T, class U >
-struct OperatorNotEqual {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_not_equal(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept {
-        return t != u;
-    }
-};
-template< class T, class U >
-struct OperatorLogicalAnd {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t && u;
-    }
-};
-template< class T, class U >
-struct OperatorLogicalOr {
-    constexpr auto operator()(T t, U u) noexcept {
-        return t || u;
-    }
-};
-template< class T, class U >
-struct OperatorGreater {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_greater(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept  {
-        return t > u;
-    }
-};
-template< class T, class U >
-struct OperatorGreaterEqual {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_greater_equal(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept {
-        return t >= u;
-    }
-};
-template< class T, class U >
-struct OperatorLess {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_less(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept {
-        return t < u;
-    }
-};
-template< class T, class U >
-struct OperatorLessEqual {
-    constexpr auto operator()(T t, U u) noexcept requires (std::integral<T> && std::integral<U>) {
-        return std::cmp_less_equal(t, u);
-    }
-    constexpr auto operator()(T t, U u) noexcept {
-        return t <= u;
-    }
-};
-
-template<template<typename, typename> class TFunctor>
-void doBinaryEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
-    assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
-    assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE);
-    if (leftSideType == TokenType::DOUBLE_TYPE) {
-        if (rightSideType == TokenType::DOUBLE_TYPE) {
-            auto temp = TFunctor<double, double>()(*(double*)left.getData(), *(double*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::UINT64_TYPE) {
-            auto temp = TFunctor<double, uint64_t>()(*(double*)left.getData(), *(uint64_t*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::INT64_TYPE) {
-            auto temp = TFunctor<double, int64_t>()(*(double*)left.getData(), *(int64_t*)right.getData());
-            res.setUntyped(temp);
-        }
-    } else if (leftSideType == TokenType::UINT64_TYPE) {
-        if (rightSideType == TokenType::DOUBLE_TYPE) {
-            auto temp = TFunctor<uint64_t, double>()(*(uint64_t*)left.getData(), *(double*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::UINT64_TYPE) {
-            auto temp = TFunctor<uint64_t, uint64_t>()(*(uint64_t*)left.getData(), *(uint64_t*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::INT64_TYPE) {
-            auto temp = TFunctor<uint64_t, int64_t>()(*(uint64_t*)left.getData(), *(int64_t*)right.getData());
-            res.setUntyped(temp);
-        }
-    } else if (leftSideType == TokenType::INT64_TYPE) {
-        if (rightSideType == TokenType::DOUBLE_TYPE) {
-            auto temp = TFunctor<int64_t, double>()(*(int64_t*)left.getData(), *(double*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::UINT64_TYPE) {
-            auto temp = TFunctor<int64_t, uint64_t>()(*(int64_t*)left.getData(), *(uint64_t*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::INT64_TYPE) {
-            auto temp = TFunctor<int64_t, int64_t>()(*(int64_t*)left.getData(), *(int64_t*)right.getData());
-            res.setUntyped(temp);
-        }
-    }
-}
-
-template<template<typename, typename> class TFunctor>
-void doBinaryIntegralEvaluate(const ExpressionResult& left, const ExpressionResult& right, ExpressionResult& res) {
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
-    assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
-    assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
-    if (leftSideType == TokenType::UINT64_TYPE) {
-        if (rightSideType == TokenType::UINT64_TYPE) {
-            auto temp = TFunctor<uint64_t, uint64_t>()(*(uint64_t*)left.getData(), *(uint64_t*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::INT64_TYPE) {
-            auto temp = TFunctor<uint64_t, int64_t>()(*(uint64_t*)left.getData(), *(int64_t*)right.getData());
-            res.setUntyped(temp);
-        }
-    } else if (leftSideType == TokenType::INT64_TYPE) {
-        if (rightSideType == TokenType::UINT64_TYPE) {
-            auto temp = TFunctor<int64_t, uint64_t>()(*(int64_t*)left.getData(), *(uint64_t*)right.getData());
-            res.setUntyped(temp);
-        } else if (rightSideType == TokenType::INT64_TYPE) {
-            auto temp = TFunctor<int64_t, int64_t>()(*(int64_t*)left.getData(), *(int64_t*)right.getData());
-            res.setUntyped(temp);
-        }
-    }
-}
-
-ExpressionResult evaluateBinOpImmExpression(TokenType op, ExpressionResult& left, ExpressionResult& right) {
-    assert(!left.isReg && !right.isReg);
-    assert(left.type && right.type);
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
-    assert(isBuiltInType(leftSideType) && leftSideType != TokenType::VOID && leftSideType != TokenType::STRING_TYPE);
-    assert(isBuiltInType(rightSideType) && rightSideType != TokenType::VOID && rightSideType != TokenType::STRING_TYPE);
-    ExpressionResult res;
-    // assign to largest type, minimum of int32
-    res.type = &Checker::int32Value;
-    if (leftSideType > res.type->exp.getToken().getType()) {
-        res.type = left.type;
-    }
-    if (rightSideType > res.type->exp.getToken().getType()) {
-        res.type = right.type;
-    }
-
-    if (isUnsigned(leftSideType) || leftSideType == TokenType::BOOL) {
-        // temporarily mark as uint64_t
-        left.type = &Checker::uint64Value;
-    } else if (isSigned(leftSideType)) {
-        // temporarily mark as int64_t
-        // sign extend
-        switch (leftSideType) {
-            case TokenType::CHAR_TYPE:
-            case TokenType::INT8_TYPE: { left.set(static_cast<int64_t>(*(int8_t*)left.getData())); break; }
-            case TokenType::INT16_TYPE: { left.set(static_cast<int64_t>(*(int16_t*)left.getData())); break; }
-            case TokenType::INT32_TYPE: { left.set(static_cast<int64_t>(*(int32_t*)left.getData())); break; }
-            case TokenType::INT64_TYPE: break;
-            default: {
-                exit(1);
-            }
-        }
-    }
-    if (isUnsigned(rightSideType) || rightSideType == TokenType::BOOL) {
-        // temporarily mark as uint64_t
-        right.type = &Checker::uint64Value;
-    } else if (isSigned(rightSideType)) {
-        // temporarily mark as int64_t
-        // sign extend
-        switch (rightSideType) {
-            case TokenType::CHAR_TYPE:
-            case TokenType::INT8_TYPE: { right.set(static_cast<int64_t>(*(int8_t*)right.getData())); break; }
-            case TokenType::INT16_TYPE: { right.set(static_cast<int64_t>(*(int16_t*)right.getData())); break; }
-            case TokenType::INT32_TYPE: { right.set(static_cast<int64_t>(*(int32_t*)right.getData())); break; }
-            case TokenType::INT64_TYPE: break;
-            default: {
-                exit(1);
-            }
-        }
-    }
-    switch (op) {
-        case TokenType::ADDITION: {
-            doBinaryEvaluate<OperatorAdd>(left, right, res);
-            break;
-        }
-        case TokenType::SUBTRACTION: {
-            doBinaryEvaluate<OperatorSub>(left, right, res);
-            break;
-        }
-        case TokenType::MULTIPLICATION: {
-            doBinaryEvaluate<OperatorMul>(left, right, res);
-            break;
-        }
-        case TokenType::DIVISION: {
-            doBinaryEvaluate<OperatorDiv>(left, right, res);
-            break;
-        }
-        case TokenType::MODULO: {
-            doBinaryIntegralEvaluate<OperatorModulo>(left, right, res);
-            break;
-        }
-        case TokenType::BITWISE_OR: {
-            doBinaryIntegralEvaluate<OperatorBitwiseOr>(left, right, res);
-            break;
-        }
-        case TokenType::BITWISE_AND: {
-            doBinaryIntegralEvaluate<OperatorBitwiseAnd>(left, right, res);
-            break;
-        }
-        case TokenType::BITWISE_XOR: {
-            doBinaryIntegralEvaluate<OperatorBitwiseXor>(left, right, res);
-            break;
-        }
-        case TokenType::SHIFT_LEFT: {
-            doBinaryIntegralEvaluate<OperatorShiftLeft>(left, right, res);
-            break;
-        }
-        case TokenType::SHIFT_RIGHT: {
-            doBinaryIntegralEvaluate<OperatorShiftRight>(left, right, res);
-            break;
-        }
-        case TokenType::EQUAL: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorEqual>(left, right, res);
-            break;
-        }
-        case TokenType::NOT_EQUAL: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorNotEqual>(left, right, res);
-            break;
-        }
-        case TokenType::LOGICAL_AND: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorLogicalAnd>(left, right, res);
-            break;
-        }
-        case TokenType::LOGICAL_OR: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorLogicalOr>(left, right, res);
-            break;
-        }
-        case TokenType::LESS_THAN: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorLess>(left, right, res);
-            break;
-        }
-        case TokenType::LESS_THAN_EQUAL: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorLessEqual>(left, right, res);
-            break;
-        }
-        case TokenType::GREATER_THAN: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorGreater>(left, right, res);
-            break;
-        }
-        case TokenType::GREATER_THAN_EQUAL: {
-            res.type = &Checker::boolValue;
-            doBinaryEvaluate<OperatorGreaterEqual>(left, right, res);
-            break;
-        }
-        default: {
-            std::cerr << "Invalid TokenType in evaluateExpression [" << (uint32_t)op  << "]\n";
-            exit(1);
-        }
-    }
-    return res;
-}
-
-
-template< class T >
-struct OperatorNegate {
-        constexpr auto operator()(T t) noexcept {
-            return -t;
-        }
-};
-
-template< class T >
-struct OperatorNot {
-        constexpr auto operator()(T t) noexcept {
-            return !t;
-        }
-};
-
-template<template<typename> class TFunctor>
-void doUnaryEvaluate(const ExpressionResult& operand, ExpressionResult& res) {
-    TokenType operandType = operand.type->exp.getToken().getType();
-    assert(operandType == TokenType::DOUBLE_TYPE || operandType == TokenType::UINT64_TYPE || operandType == TokenType::INT64_TYPE);
-    if (operandType == TokenType::DOUBLE_TYPE) {
-        auto unaryOpValue = TFunctor<double>()(*(double*)operand.getData());
-        res.setUntyped(unaryOpValue);
-    } else if (operandType == TokenType::UINT64_TYPE) {
-        auto unaryOpValue = TFunctor<uint64_t>()(*(uint64_t*)operand.getData());
-        res.setUntyped(unaryOpValue);
-    } else if (operandType == TokenType::INT64_TYPE) {
-        auto unaryOpValue = TFunctor<int64_t>()(*(int64_t*)operand.getData());
-        res.setUntyped(unaryOpValue);
-    }
-}
-
-ExpressionResult evaluateUnaryOpImmExpression(TokenType op, ExpressionResult& operand) {
-    assert(!operand.isReg && operand.type);
-    ExpressionResult res;
-    const TokenType operandType = operand.type->exp.getToken().getType();
-    assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::STRING_TYPE);
-    
-    // assign to largest type, minimum of int32
-    res.type = &Checker::int32Value;
-    if (operandType > res.type->exp.getToken().getType()) {
-        res.type = operand.type;
-    }
-    if (isUnsigned(operandType) || operandType == TokenType::BOOL) {
-        // temporarily mark as uint64_t
-        operand.type = &Checker::uint64Value;
-    } else if (isSigned(operandType)) {
-        // temporarily mark as int64_t
-        // sign extend
-        switch (operandType) {
-            case TokenType::CHAR_TYPE:
-            case TokenType::INT8_TYPE: { operand.set(static_cast<int64_t>(*(int8_t*)operand.getData())); break; }
-            case TokenType::INT16_TYPE: { operand.set(static_cast<int64_t>(*(int16_t*)operand.getData())); break; }
-            case TokenType::INT32_TYPE: { operand.set(static_cast<int64_t>(*(int32_t*)operand.getData())); break; }
-            case TokenType::INT64_TYPE: break;
-            default: {
-                exit(1);
-            }
-        }
-    }
-    switch (op) {
-        case TokenType::NOT: {
-            res.type = &Checker::boolValue;
-            doUnaryEvaluate<OperatorNot>(operand, res);
-            break;
-        }
-        case TokenType::NEGATIVE: {
-            doUnaryEvaluate<OperatorNegate>(operand, res);
-            break;
-        }
-        default: {
-            std::cerr << "Invalid TokenType in evaluateExpression [" << (uint32_t)op << "]\n";
-            exit(1);
-        }
-    }
-    return res;
-}
-
-
-// ========================================
 // GENERAL EXPRESSIONS
 // ========================================
 
@@ -946,7 +526,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
             }
             ExpressionResult regVal;
             regVal.setReg(reg);
-            regVal.type = &Checker::uint64Value;
+            regVal.type = &TokenListTypes::uint64Value;
             addExpressionResToStack(regVal, StackItemType::SAVED_TEMPORARY);
         }
     }
@@ -1014,7 +594,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
             continue;
         }
         assert(stackItems.back().type == StackItemType::SAVED_TEMPORARY);
-        popValue(Checker::uint64Value, reg);
+        popValue(TokenListTypes::uint64Value, reg);
     }
 
     tk = oldTk;
@@ -1193,28 +773,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
     const Token& token = expression.getToken();
     switch (token.getType()) {
         case TokenType::CHAR_LITERAL: {
-            std::string charLiteral = tk->extractToken(token);
-            // convert charLiteral to its numeric value and return it
-            // might do this during the tokenizer stage...
-            if (charLiteral.size() == 3) {
-                expRes.set(charLiteral[1]);
-                return expRes;
-            } else if (charLiteral.size() == 4) {
-                assert(charLiteral[1] == '\\');
-                switch (charLiteral[2]) {
-                    case '0': expRes.set('\0'); break;
-                    case 'n': expRes.set('\n'); break;
-                    case 't': expRes.set('\t'); break;
-                    default: expRes.set(charLiteral[2]); break;
-                }
-                return expRes;
-            }
-            assert(false);
             return expRes;
         }
         case TokenType::STRING_LITERAL: { 
             // place string literal in data section of bytecode, return offset to start of string
-            expRes.type = &Checker::stringValue;
+            expRes.type = &TokenListTypes::stringValue;
             std::string stringLiteral = tk->extractToken(token);
               // remove quotes around string
             stringLiteral.erase(stringLiteral.end() - 1);
@@ -1255,11 +818,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             uint64_t num = std::stoull(decimalNumber);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &Checker::int32Value;
+                expRes.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &Checker::uint32Value;
+                expRes.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &Checker::int64Value;
+                expRes.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
@@ -1269,11 +832,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             uint64_t num = std::stoull(binaryNumber, nullptr, 2);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &Checker::int32Value;
+                expRes.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &Checker::uint32Value;
+                expRes.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &Checker::int64Value;
+                expRes.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
@@ -1293,11 +856,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             uint64_t num = std::stoull(hexNumber, nullptr, 16);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &Checker::int32Value;
+                expRes.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &Checker::uint32Value;
+                expRes.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &Checker::int64Value;
+                expRes.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
@@ -1315,7 +878,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stdinDataIndex, OpCode::ADD);
-            expRes.type = &Checker::fileValue;
+            expRes.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::STDERR: {
@@ -1324,7 +887,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stderrDataIndex, OpCode::ADD);
-            expRes.type = &Checker::fileValue;
+            expRes.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::STDOUT: {
@@ -1333,11 +896,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stdoutDataIndex, OpCode::ADD);
-            expRes.type = &Checker::fileValue;
+            expRes.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::NULL_PTR: {
-            expRes.type = &Checker::ptrValue;
+            expRes.type = &TokenListTypes::ptrValue;
             return expRes;
         }
         case TokenType::IDENTIFIER: {
@@ -1466,11 +1029,18 @@ void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResul
     const Token nextType = getTypeFromTokenList(*getNextFromTokenList(*pointerExp.type));
     uint32_t sizeOfType = getSizeOfType(nextType);
     if (sizeOfType > 1) {
-        ExpressionResult sizeExp;
-        sizeExp.set(sizeOfType);
         if (!indexExp.isReg) {
-            indexExp = evaluateBinOpImmExpression(TokenType::MULTIPLICATION, indexExp, sizeExp);
+            LiteralValue indexLiteral;
+            LiteralValue sizeLiteral;
+            sizeLiteral.set(sizeOfType);
+            indexLiteral.setUntyped(*(uint64_t *)indexExp.getData());
+            indexLiteral.type = indexExp.type;
+            indexLiteral = evaluateBinOpImmExpression(TokenType::MULTIPLICATION, indexLiteral, sizeLiteral);
+            indexExp.type = indexLiteral.type;
+            indexExp.setUntyped(*(uint64_t *)indexLiteral.getData());
         } else {
+            ExpressionResult sizeExp;
+            sizeExp.set(sizeOfType);
             expressionResWithOp(OpCode::MUL, OpCode::MUL_I, indexExp, sizeExp);
         }
     }
@@ -1513,8 +1083,9 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
 
     // left imm, right imm
     if (leftImm && rightImm) {
+        assert(false); // should be handled by checker
         // both operands are immediate values, return the result
-        return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
+        // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
     }
     // beyond this point, only one of left or right can possibly be an imm
 
@@ -1639,9 +1210,14 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         if (!leftResult.isReg && leftResult.jumpOp == OpCode::NOP) {
             // left side is immediate value
             // essentially run !leftResult.value
-            ExpressionResult zeroExp;
-            zeroExp.type = &Checker::int32Value;
-            leftResult = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftResult, zeroExp);
+            LiteralValue leftLiteral;
+            leftLiteral.type = leftResult.type;
+            leftLiteral.setUntyped(*(uint64_t *)leftResult.getData());
+            LiteralValue zeroExp;
+            zeroExp.set((int64_t)0);
+            leftLiteral = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftLiteral, zeroExp);
+            leftResult.type = leftLiteral.type;
+            leftResult.setUntyped(*(uint64_t *)leftLiteral.getData());
             if (!*(bool*)leftResult.getData()) {
                 // for &&, expression is false, don't generate anymore
                 if (binOp.op.getType() == TokenType::LOGICAL_AND) {
@@ -1687,14 +1263,21 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         if (!rightResult.isReg && rightResult.jumpOp == OpCode::NOP) {
             // right side is immediate value
             if (!leftResult.isReg) {
+                assert(false); // handled by checker
                 // both sides are immediate
-                return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
+                // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
             }
             // left result is not an immediate
             byteCode.resize(shortCircuitIndexStart);
-            ExpressionResult zeroExp;
-            zeroExp.type = &Checker::int32Value;
-            rightResult = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult, zeroExp);
+            LiteralValue rightLiteral;
+            rightLiteral.type = rightResult.type;
+            rightLiteral.setUntyped(*(uint64_t *)rightResult.getData());
+            LiteralValue zeroExp;
+            zeroExp.set((int64_t)0);
+            zeroExp.type = &TokenListTypes::int32Value;
+            rightLiteral = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightLiteral, zeroExp);
+            rightResult.type = rightLiteral.type;
+            rightResult.setUntyped(*(uint64_t *)rightLiteral.getData());
             if (!*(bool*)rightResult.getData()) {
                 // for &&, cond is always false
                 if (binOp.op.getType() == TokenType::LOGICAL_AND) {
@@ -1744,7 +1327,8 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         ExpressionResult rightResult = generateExpression(binOp.rightSide);
         if (!leftResult.isReg) { // immediate value
             if (!rightResult.isReg) {
-                return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
+                assert(false); // handled by checker
+                // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
             }
             const bc reg = allocateRegister();
             moveImmToReg(reg, leftResult);
@@ -1897,8 +1481,9 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 ExpressionResult CodeGen::defaultUnOp(const UnOp& unOp, OpCode op) {
     ExpressionResult expRes = generateExpression(unOp.operand);
     if (!expRes.isReg) {
+        assert(false); // handled by checker
         // evaluate imm
-        return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
+        // return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
     }
     if (!expRes.isTemp) {
         const bc reg = allocateRegister();
@@ -2670,7 +2255,7 @@ void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
         paddingToAdd.set(val);
         ExpressionResult regExp;
         regExp.setReg(reg);
-        regExp.type = &Checker::uint64Value;
+        regExp.type = &TokenListTypes::uint64Value;
         expressionResWithOp(op, imm, regExp, paddingToAdd);
         if (paddingToAdd.isTemp) {
             freeRegister(paddingToAdd.getReg());

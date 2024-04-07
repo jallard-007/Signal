@@ -86,10 +86,35 @@ struct CheckerError {
     std::string getErrorMessage(std::vector<Tokenizer>&) const;
 };
 
+#define SIZE_OF_REGISTER 8
+
 struct ResultingType {
+    private:
+    unsigned char data [SIZE_OF_REGISTER] {0};
+    public:
     TokenList *type{nullptr};
     bool isLValue{false};
+    bool isLiteral{false};
     ResultingType(TokenList*, bool);
+
+    inline const void *getData() const { return (void *)data; }
+
+    template <class T> void set(T) = delete;
+    void set(char);
+    void set(uint32_t);
+    void set(uint64_t);
+    void set(int32_t);
+    void set(int64_t);
+    void set(FILE *);
+    void set(double);
+    void set(bool);
+
+    template <class T>
+    void setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
+        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
+        *(decltype(t) *)data = t;
+        isLiteral = true;
+    }
 };
 
 #define MAX_ERRORS 20
@@ -103,22 +128,6 @@ struct Checker {
     std::vector<Tokenizer>& tokenizers;
     Tokenizer *tk;
     NodeMemPool &memPool;
-
-    static TokenList noneValue;
-    static TokenList badValue;
-    static TokenList boolValue;
-    static TokenList int32Value;
-    static TokenList uint32Value;
-    static TokenList int64Value;
-    static TokenList uint64Value;
-    static TokenList charValue;
-    static TokenList stringValue;
-    // static TokenList floatValue;
-    static TokenList doubleValue;
-    static TokenList fileValue;
-    static TokenList ptrValue;
-    static TokenList nullptrValue;
-    static TokenList voidValue;
 
     Checker(Program&, std::vector<Tokenizer>&, NodeMemPool&);
     bool check(bool = false);

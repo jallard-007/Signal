@@ -30,21 +30,6 @@ Token getTokenOfExpression(Expression& exp) {
     }
 }
 
-TokenList Checker::noneValue {Token{0,0,TokenType::NONE}};
-TokenList Checker::badValue {Token{0,0,TokenType::BAD_VALUE}};
-TokenList Checker::boolValue {Token{0,0,TokenType::BOOL}};
-TokenList Checker::int32Value {Token{0,0,TokenType::INT32_TYPE}};
-TokenList Checker::uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
-TokenList Checker::int64Value {Token{0,0,TokenType::INT64_TYPE}};
-TokenList Checker::uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
-TokenList Checker::charValue {Token{0,0,TokenType::CHAR_TYPE}};
-TokenList Checker::stringValue {Token{0,0,TokenType::STRING_TYPE}};
-TokenList Checker::doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
-TokenList Checker::fileValue {Token{0,0,TokenType::FILE_TYPE}};
-TokenList Checker::voidValue {Token{0,0,TokenType::VOID}};
-TokenList Checker::ptrValue {Token{0,0,TokenType::POINTER}, &Checker::voidValue};
-TokenList Checker::nullptrValue {Token{0,0,TokenType::NULL_PTR}};
-
 CheckerError::CheckerError(CheckerErrorType type): token{}, tkIndex{}, type{type}  {}
 CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Token token): token{token}, tkIndex{tkIndex}, type{type}  {}
 CheckerError::CheckerError(CheckerErrorType type, uint32_t tkIndex, Token token, GeneralDec *decPtr): token{token}, dec{decPtr}, tkIndex{tkIndex}, type{type} {}
@@ -109,6 +94,46 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) co
 }
 
 ResultingType::ResultingType(TokenList* type, bool isLValue): type{type}, isLValue{isLValue} {}
+void ResultingType::set(char c) {
+    *(decltype(c) *)data = c;
+    type = &TokenListTypes::charValue;
+    isLiteral = true;
+}
+void ResultingType::set(uint32_t val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::uint32Value;
+    isLiteral = true;
+}
+void ResultingType::set(uint64_t val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::uint64Value;
+    isLiteral = true;
+}
+void ResultingType::set(int32_t val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::int32Value;
+    isLiteral = true;
+}
+void ResultingType::set(int64_t val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::int64Value;
+    isLiteral = true;
+}
+void ResultingType::set(FILE *val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::fileValue;
+    isLiteral = true;
+}
+void ResultingType::set(double val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::doubleValue;
+    isLiteral = true;
+}
+void ResultingType::set(bool val) {
+    *(decltype(val) *)data = val;
+    type = &TokenListTypes::boolValue;
+    isLiteral = true;
+}
 
 Checker::Checker(Program& prog, std::vector<Tokenizer>& tks, NodeMemPool& mem):
     lookUp{}, structLookUp{}, program{prog}, tokenizers{tks}, memPool{mem} {}
@@ -361,12 +386,12 @@ void Checker::secondTopLevelScan(bool testing) {
             clArgsP1.exp.setToken(TokenType::POINTER);
             TokenList clArgsP2;
             clArgsP2.exp.setToken(TokenType::POINTER);
-            clArgsP2.next = &Checker::charValue;
+            clArgsP2.next = &TokenListTypes::charValue;
             clArgsP1.next = &clArgsP2;
             if (
-                mainFuncDec.returnType != Checker::int32Value ||
+                mainFuncDec.returnType != TokenListTypes::int32Value ||
                 params->curr.type != StatementType::VARIABLE_DEC ||
-                params->curr.varDec->type != Checker::uint32Value ||
+                params->curr.varDec->type != TokenListTypes::uint32Value ||
                 !params->next || params->next->curr.type != StatementType::VARIABLE_DEC ||
                 params->next->curr.varDec->type != clArgsP1
             ) {
@@ -632,7 +657,7 @@ bool Checker::checkStatement(Statement& statement, const TokenList& returnType, 
                     if (res.type->exp.getToken().getType() == TokenType::NONE && returnType.exp.getToken().getType() == TokenType::VOID) {
                         break; // ok
                     }
-                    if (!checkAssignment(&int64Value, res.type, false)) {
+                    if (!checkAssignment(&TokenListTypes::int64Value, res.type, false)) {
                         addError({CheckerErrorType::INVALID_EXIT_TYPE, tk->tokenizerIndex, &statement.controlFlow->returnStatement->returnValue});
                     }
                     return true;
@@ -767,7 +792,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 if (!canBeConvertedToBool(rightSide.type)) {
                     addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &expression.getBinOp()->rightSide});
                 }
-                return {&boolValue, false};
+                return {&TokenListTypes::boolValue, false};
             }
             
             if (isLogicalOp(expression.getBinOp()->op.getType())) {
@@ -786,7 +811,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 ) {
                     addError({CheckerErrorType::CANNOT_COMPARE_TYPE, tk->tokenizerIndex, &expression.getBinOp()->rightSide});
                 }
-                return {&boolValue, false};
+                return {&TokenListTypes::boolValue, false};
             }
 
             // member access or number with decimal
@@ -802,10 +827,10 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                             addError({CheckerErrorType::EXPECTING_NUMBER, tk->tokenizerIndex, &expression.getBinOp()->rightSide});
                         }
                     }
-                    return {&doubleValue, false};
+                    return {&TokenListTypes::doubleValue, false};
                 } else {
                     if (leftSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
-                        return {&badValue, false};
+                        return {&TokenListTypes::badValue, false};
                     }
                     return checkMemberAccess(leftSide, expression);
                 }
@@ -814,11 +839,11 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
             // pointer member access
             if (expression.getBinOp()->op.getType() == TokenType::PTR_MEMBER_ACCESS) {
                 if (leftSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 if (leftSide.type->exp.getToken().getType() != TokenType::POINTER) {
                     addError({CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, tk->tokenizerIndex, expression.getBinOp()->op});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 leftSide.type = leftSide.type->next;
                 return checkMemberAccess(leftSide, expression);
@@ -827,7 +852,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
             ResultingType rightSide = checkExpression(expression.getBinOp()->rightSide);
             if (isAssignment(expression.getBinOp()->op.getType())) {
                 if (leftSide.type->exp.getToken().getType() == TokenType::BAD_VALUE || rightSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 if (!leftSide.isLValue) {
                     addError({CheckerErrorType::CANNOT_ASSIGN_TO_TEMPORARY, tk->tokenizerIndex, &expression.getBinOp()->leftSide});
@@ -839,7 +864,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
             }
 
             if (leftSide.type->exp.getToken().getType() == TokenType::BAD_VALUE && rightSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
-                return {&badValue, false};
+                return {&TokenListTypes::badValue, false};
             } else if (leftSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
                 return {rightSide.type, false};
             } else if (rightSide.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
@@ -851,15 +876,15 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 leftSide.type->exp.getToken().getType() == TokenType::STRING_TYPE || rightSide.type->exp.getToken().getType() == TokenType::STRING_TYPE
             ) {
                 addError({CheckerErrorType::OPERATION_NOT_DEFINED, tk->tokenizerIndex, &expression});
-                return {&badValue, false};
+                return {&TokenListTypes::badValue, false};
             }
             if (leftSide.type->exp.getToken().getType() == TokenType::VOID || rightSide.type->exp.getToken().getType() == TokenType::VOID) {
                 addError({CheckerErrorType::OPERATION_ON_VOID, tk->tokenizerIndex, &expression});
-                return {&badValue, false};
+                return {&TokenListTypes::badValue, false};
             }
             TokenList& largest = largestType(*leftSide.type, *rightSide.type);
             if (largest.exp.getToken().getType() < TokenType::INT32_TYPE) {
-                return {&int32Value, false};
+                return {&TokenListTypes::int32Value, false};
             }
             return {&largest, false};
         }
@@ -869,7 +894,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 ResultingType res = checkExpression(expression.getUnOp()->operand);
                 if (res.type->exp.getToken().getType() != TokenType::POINTER) {
                     addError({CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, tk->tokenizerIndex, expression.getUnOp()->op});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 return {res.type->next, true};
             }
@@ -878,7 +903,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 if (!canBeConvertedToBool(res.type)) {
                     addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, expression.getUnOp()->op});
                 }
-                return {&boolValue, false};
+                return {&TokenListTypes::boolValue, false};
             }
             if (expression.getUnOp()->op.getType() == TokenType::ADDRESS_OF || expression.getUnOp()->op.getType() == TokenType::INCREMENT_POSTFIX || expression.getUnOp()->op.getType() == TokenType::INCREMENT_PREFIX || expression.getUnOp()->op.getType() == TokenType::DECREMENT_PREFIX || expression.getUnOp()->op.getType() == TokenType::DECREMENT_POSTFIX) {
                 ResultingType res = checkExpression(expression.getUnOp()->operand);
@@ -899,7 +924,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 // nothing for now
                 return {checkExpression(expression.getUnOp()->operand).type, false};
             }
-            return {&badValue, false};
+            return {&TokenListTypes::badValue, false};
         }
         
         case ExpressionType::VALUE: {
@@ -909,12 +934,12 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                     const auto& structMapIter = (*structMap).find(tk->extractToken(expression.getToken()));
                     if (structMapIter == structMap->end()) {
                         addError({CheckerErrorType::NO_SUCH_MEMBER_VARIABLE, tk->tokenizerIndex, expression.getToken()});
-                        return {&badValue, false};
+                        return {&TokenListTypes::badValue, false};
                     }
                     const StructMemberInformation& structMemberInfo = (*structMapIter).second;
                     if (structMemberInfo.memberDec->type != StructDecType::VAR) {
                         addError({CheckerErrorType::NOT_A_VARIABLE, tk->tokenizerIndex, expression.getToken()});
-                        return {&badValue, false};
+                        return {&TokenListTypes::badValue, false};
                     }
                     decPtr = memPool.makeGeneralDec();
                     decPtr->type = GeneralDecType::VARIABLE;
@@ -923,11 +948,11 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                     decPtr = lookUp[tk->extractToken(expression.getToken())];
                     if (!decPtr) {
                         addError({CheckerErrorType::NO_SUCH_VARIABLE, tk->tokenizerIndex, expression.getToken()});
-                        return {&badValue, false};
+                        return {&TokenListTypes::badValue, false};
                     }
                     if (decPtr->type != GeneralDecType::VARIABLE) {
                         addError({CheckerErrorType::NOT_A_VARIABLE, tk->tokenizerIndex, expression.getToken(), decPtr});
-                        return {&badValue, false};
+                        return {&TokenListTypes::badValue, false};
                     }
                 }
                 if (decPtr->varDec->type.exp.getToken().getType() == TokenType::REFERENCE) {
@@ -938,24 +963,24 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
             if (expression.getToken().getType() == TokenType::DECIMAL_NUMBER) {
                 // need to get the actual number and see if it fits in a 32bit int, if not, unsigned, if not, 64bit
                 // for now, just dump all numbers as ints
-                return {&int32Value, false};
+                return {&TokenListTypes::int32Value, false};
             }
             if (expression.getToken().getType() == TokenType::NULL_PTR) {
-                return {&nullptrValue, false};
+                return {&TokenListTypes::nullptrValue, false};
             }
             if (expression.getToken().getType() == TokenType::FALSE || expression.getToken().getType() == TokenType::TRUE) {
-                return {&boolValue, false};
+                return {&TokenListTypes::boolValue, false};
             }
             if (expression.getToken().getType() == TokenType::STRING_LITERAL) {
-                return {&stringValue, false};
+                return {&TokenListTypes::stringValue, false};
             }
             if (expression.getToken().getType() == TokenType::STDIN || expression.getToken().getType() == TokenType::STDERR || expression.getToken().getType() == TokenType::STDOUT) {
-                return {&fileValue, false};
+                return {&TokenListTypes::fileValue, false};
             }
             if (expression.getToken().getType() == TokenType::STRING_LITERAL) {
-                return {&stringValue, false};
+                return {&TokenListTypes::stringValue, false};
             }
-            return {&charValue, false};
+            return {&TokenListTypes::charValue, false};
         }
         
         case ExpressionType::FUNCTION_CALL: {
@@ -967,12 +992,12 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 const auto& structMapIter = (*structMap).find(tk->extractToken(expression.getToken()));
                 if (structMapIter == structMap->end()) {
                     addError({CheckerErrorType::NO_SUCH_MEMBER_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 const StructMemberInformation& structMemberInfo = (*structMapIter).second;
                 if (structMemberInfo.memberDec->type != StructDecType::FUNC) {
                     addError({CheckerErrorType::NOT_A_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 decPtr = memPool.makeGeneralDec();
                 decPtr->type = GeneralDecType::FUNCTION;
@@ -986,7 +1011,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 if (!decPtr) {
                     // dec does not exist
                     addError({CheckerErrorType::NO_SUCH_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
                 if (decPtr->type == GeneralDecType::BUILTIN_FUNCTION) {
                     paramList = &decPtr->builtinFunc->funcDec.params;
@@ -998,7 +1023,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
                 else {
                     // not a function
                     addError({CheckerErrorType::NOT_A_FUNCTION, tk->tokenizerIndex, expression.getFunctionCall()->name, decPtr});
-                    return {&badValue, false};
+                    return {&TokenListTypes::badValue, false};
                 }
             }
             // valid function, now check parameters
@@ -1037,10 +1062,10 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
             ResultingType arrayType = checkExpression(expression.getArrayAccess()->array);
             if (arrayType.type->exp.getToken().getType() != TokenType::POINTER) {
                 addError({CheckerErrorType::CANNOT_DEREFERENCE_NON_POINTER_TYPE, tk->tokenizerIndex, &expression});
-                return {&badValue, false};
+                return {&TokenListTypes::badValue, false};
             }
             if (!arrayType.type->next) {
-                return {&badValue, false};
+                return {&TokenListTypes::badValue, false};
             }
             return {arrayType.type->next, true};
         }
@@ -1051,7 +1076,7 @@ ResultingType Checker::checkExpression(Expression& expression, std::unordered_ma
         // }
 
         case ExpressionType::NONE: {
-            return {&noneValue, false};
+            return {&TokenListTypes::noneValue, false};
         }
         
         default: {
@@ -1173,17 +1198,17 @@ ResultingType Checker::checkMemberAccess(ResultingType& leftSide, Expression& ex
     if (expression.getBinOp()->rightSide.getType() == ExpressionType::VALUE) {
         if (expression.getBinOp()->rightSide.getToken().getType() != TokenType::IDENTIFIER) {
             addError({CheckerErrorType::EXPECTED_IDENTIFIER, tk->tokenizerIndex, expression.getBinOp()->rightSide.getToken()});
-            return {&badValue, false};
+            return {&TokenListTypes::badValue, false};
         }
     }
     else if (expression.getBinOp()->rightSide.getType() != ExpressionType::FUNCTION_CALL && expression.getBinOp()->rightSide.getType() != ExpressionType::ARRAY_ACCESS) {
         addError({CheckerErrorType::EXPECTED_IDENTIFIER, tk->tokenizerIndex, expression.getBinOp()->rightSide.getToken()});
-        return {&badValue, false};
+        return {&TokenListTypes::badValue, false};
     }
     auto dec = lookUp[tk->extractToken(leftSide.type->exp.getToken())];
     if (!dec || dec->type != GeneralDecType::STRUCT)  {
         addError({CheckerErrorType::NOT_A_STRUCT, tk->tokenizerIndex, &expression.getBinOp()->leftSide});
-        return {&badValue, false};
+        return {&TokenListTypes::badValue, false};
     }
     auto& structMap = structLookUp[dec->structDec];
     return checkExpression(expression.getBinOp()->rightSide, &structMap.memberLookup);
@@ -1307,9 +1332,9 @@ bool canBeConvertedToBool(const TokenList* type) {
 }
 
 TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {
-    if (typeA.exp.getToken().getType() == TokenType::POINTER || typeB.exp.getToken().getType() == TokenType::POINTER) {
-        return ptrValue;
-    }
+    // if (typeA.exp.getToken().getType() == TokenType::POINTER || typeB.exp.getToken().getType() == TokenType::POINTER) {
+    //     return TokenListTypes::ptrValue;
+    // }
     if (typeA.exp.getToken().getType() > typeB.exp.getToken().getType()) {
         return typeA;
     }

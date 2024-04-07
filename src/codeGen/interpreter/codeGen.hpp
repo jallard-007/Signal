@@ -16,6 +16,7 @@ struct RegisterInfo {
     bool changed {false};
 };
 
+#define SIZE_OF_REGISTER 8
 
 struct ExpressionResult {
     private:
@@ -38,7 +39,11 @@ struct ExpressionResult {
     void set(double);
     void set(bool);
 
-    template <class T> void setUntyped(T) requires (std::integral<T> || std::floating_point<T>);
+    template <class T>
+    void setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
+        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
+        *(decltype(t) *)data = t;
+    }
 
     inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true;  /* setting all values as temporary for now to force reloading */ isTemp = true; }
     inline bytecode_t getReg() const { assert(isReg); return data[0]; }

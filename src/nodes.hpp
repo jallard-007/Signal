@@ -21,6 +21,7 @@ enum class ExpressionType: uint8_t {
     FUNCTION_CALL,
     ARRAY_ACCESS,
     CONTAINER_LITERAL,
+    // VALUE_LITERAL,
 };
 
 struct Expression {
@@ -491,3 +492,20 @@ struct Program {
     void prettyPrint(std::vector<Tokenizer>&, std::string&);
 };
 
+namespace TokenListTypes { 
+    extern TokenList noneValue;
+    extern TokenList badValue;
+    extern TokenList boolValue;
+    extern TokenList int32Value;
+    extern TokenList uint32Value;
+    extern TokenList int64Value;
+    extern TokenList uint64Value;
+    extern TokenList charValue;
+    extern TokenList stringValue;
+    // extern TokenList floatValue;
+    extern TokenList doubleValue;
+    extern TokenList fileValue;
+    extern TokenList ptrValue;
+    extern TokenList nullptrValue;
+    extern TokenList voidValue;
+};

@@ -232,6 +232,23 @@ TEST_CASE("Expressions", "[parser]") {
         CHECK(parser.expected.empty());
         CHECK(expression.getType() == ExpressionType::UNARY_OP);
         REQUIRE(expression.getUnOp());
+        CHECK(expression.getUnOp()->op.getType() == TokenType::NOT);
+        CHECK(expression.getUnOp()->operand.getType() == ExpressionType::VALUE);
+        CHECK(expression.getUnOp()->operand.getToken().getType() == TokenType::IDENTIFIER);
+    }
+
+    { // sizeof
+        const std::string str = "sizeof content";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Expression expression;
+        ParseExpressionErrorType errorType = parser.parseExpression(expression);
+        REQUIRE(errorType == ParseExpressionErrorType::NONE);
+        CHECK(parser.unexpected.empty());
+        CHECK(parser.expected.empty());
+        CHECK(expression.getType() == ExpressionType::UNARY_OP);
+        REQUIRE(expression.getUnOp());
+        CHECK(expression.getUnOp()->op.getType() == TokenType::SIZEOF);
         CHECK(expression.getUnOp()->operand.getType() == ExpressionType::VALUE);
         CHECK(expression.getUnOp()->operand.getToken().getType() == TokenType::IDENTIFIER);
     }
@@ -859,6 +876,24 @@ TEST_CASE("Container literal", "[parser]") {
     }
     SECTION("8") {
         const std::string str = "[0 = 1, 10 = 2]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("9") {
+        const std::string str = "[[1, 2], [3, 4]]; ";
+        Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
+        Parser parser{tokenizer, memPool};
+        Statement statement;
+        parser.parseStatement(statement);
+        CHECK(parser.expected.empty());
+        CHECK(parser.unexpected.empty());
+    }
+    SECTION("10") {
+        const std::string str = "[x = [1, 2], y = [3, 4]]; ";
         Tokenizer tokenizer{"./src/parser/test_parser.cpp", str};
         Parser parser{tokenizer, memPool};
         Statement statement;

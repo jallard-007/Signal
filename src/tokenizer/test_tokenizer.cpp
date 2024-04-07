@@ -16,7 +16,6 @@ TokenType tokenAtN(const std::string& str, uint32_t n) {
 
 TEST_CASE("Unit Test - Special", "[tokenizer][tokenType]") {
     CHECK(firstToken("") == TokenType::END_OF_FILE);
-    CHECK(firstToken("__builtin") == TokenType::BUILTIN);
 }
 
 TEST_CASE("Unit Test - Literals", "[tokenizer][tokenType]") {
@@ -32,6 +31,7 @@ TEST_CASE("Unit Test - Literals", "[tokenizer][tokenType]") {
 }
 
 TEST_CASE("Unit Test - Keywords", "[tokenizer][tokenType]") {
+    CHECK(firstToken("__builtin") == TokenType::BUILTIN);
     CHECK(firstToken("as") == TokenType::AS);
     CHECK(firstToken("break") == TokenType::BREAK);
     CHECK(firstToken("case") == TokenType::CASE);
@@ -92,6 +92,7 @@ TEST_CASE("Unit Test - Operations", "[tokenizer][tokenType]") {
     CHECK(tokenAtN("identifier--", 1) == TokenType::DECREMENT_POSTFIX);
     CHECK(firstToken(" - ") == TokenType::NEGATIVE);
     CHECK(tokenAtN("return - ", 1) == TokenType::NEGATIVE);
+    CHECK(firstToken("sizeof") == TokenType::SIZEOF);
 
     // BINARY
     CHECK(firstToken(" + ") == TokenType::ADDITION);

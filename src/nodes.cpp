@@ -1,6 +1,25 @@
 #include "nodes.hpp"
 #include "nodeMemPool.hpp"
 
+
+namespace TokenListTypes { 
+    TokenList noneValue {Token{0,0,TokenType::NONE}};
+    TokenList badValue {Token{0,0,TokenType::BAD_VALUE}};
+    TokenList boolValue {Token{0,0,TokenType::BOOL}};
+    TokenList int32Value {Token{0,0,TokenType::INT32_TYPE}};
+    TokenList uint32Value {Token{0,0,TokenType::UINT32_TYPE}};
+    TokenList int64Value {Token{0,0,TokenType::INT64_TYPE}};
+    TokenList uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
+    TokenList charValue {Token{0,0,TokenType::CHAR_TYPE}};
+    TokenList stringValue {Token{0,0,TokenType::STRING_TYPE}};
+    TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
+    TokenList fileValue {Token{0,0,TokenType::FILE_TYPE}};
+    TokenList voidValue {Token{0,0,TokenType::VOID}};
+    TokenList ptrValue {Token{0,0,TokenType::POINTER}, &voidValue};
+    TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
+};
+
+
 bool notFirstOfExpression(TokenType type) {
     return type != TokenType::IDENTIFIER &&
         !isBinaryOp(type) &&
