@@ -143,6 +143,7 @@ enum class TokenType : uint8_t {
 
     // extra types used by checker
     DEC_PTR,
+    ARRAY_TYPE, // when the type is array type, the size of the array is stored in the position part of the token
 
     // special tokens that are not directly parsed
     THIS,

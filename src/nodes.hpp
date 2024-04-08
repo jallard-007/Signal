@@ -3,6 +3,8 @@
 #include <cassert>
 #include "tokenizer/tokenizer.hpp"
 
+#define SIZE_OF_REGISTER 8
+
 typedef class NodeMemPool NodeMemPool;
 
 bool notFirstOfExpression(TokenType);
@@ -53,7 +55,7 @@ struct Expression {
 
     #define SET_EXP(expType) binOp = (BinOp *)(((uint8_t)expType & EXPRESSION_MASK) | ((uint64_t)ref & ~EXPRESSION_MASK))
     inline void setBinOp(BinOp *ref) { SET_EXP(ExpressionType::BINARY_OP); }
-    inline void setUnOp(UnOp *ref) { SET_EXP(ExpressionType::BINARY_OP); }
+    inline void setUnOp(UnOp *ref) { SET_EXP(ExpressionType::UNARY_OP); }
     inline void setToken(Token ref) { value = ref; setType(ExpressionType::VALUE); }
     inline void setToken(TokenType ref) { value.setType(ref); setType(ExpressionType::VALUE); }
     inline void setFunctionCall(FunctionCall *ref) { SET_EXP(ExpressionType::FUNCTION_CALL); }

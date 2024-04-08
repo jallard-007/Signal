@@ -5,8 +5,6 @@
 #include <concepts>
 #include "codeGen.hpp"
 #include "utils.hpp"
-#include "compTime/compTime.hpp"
-
 
 #define sp registers[stackPointerIndex]
 #define ip registers[instructionPointerIndex]
@@ -14,41 +12,6 @@
 #define miscReg registers[miscRegisterIndex] // used for temporary/intermediate values
 
 #define bc bytecode_t
-
-
-void ExpressionResult::set(char c) {
-    *(decltype(c) *)data = c;
-    type = &TokenListTypes::charValue;
-}
-void ExpressionResult::set(uint32_t val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::uint32Value;
-}
-void ExpressionResult::set(uint64_t val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::uint64Value;
-}
-void ExpressionResult::set(int32_t val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::int32Value;
-}
-void ExpressionResult::set(int64_t val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::int64Value;
-}
-void ExpressionResult::set(FILE *val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::fileValue;
-}
-void ExpressionResult::set(double val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::doubleValue;
-}
-void ExpressionResult::set(bool val) {
-    *(decltype(val) *)data = val;
-    type = &TokenListTypes::boolValue;
-}
-
 
 JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
     start{start}, type{type} {}
@@ -161,7 +124,7 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
 void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     assert(!exp.isReg);
     exp.isTemp = true;
-    TokenType rightSideExpType = exp.type->exp.getToken().getType();
+    TokenType rightSideExpType = exp.value.type->exp.getToken().getType();
     if (rightSideExpType == TokenType::POINTER) {
         rightSideExpType = TokenType::UINT64_TYPE;
     }
@@ -179,9 +142,9 @@ void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     else if (rightSideExpType == TokenType::INT64_TYPE || rightSideExpType == TokenType::INT32_TYPE) {
         int64_t val;
         if (rightSideExpType == TokenType::INT32_TYPE) {
-            val = *(int32_t*)exp.getData();
+            val = *(int32_t*)exp.value.getData();
         } else {
-            val = *(int64_t*)exp.getData();
+            val = *(int64_t*)exp.value.getData();
         }
         if (val <= INT8_MAX && val >= INT8_MIN) {
             addBytes({{(bc)OpCode::MOVE_SI, reg, (bc)val}});
@@ -193,9 +156,9 @@ void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     else {
         uint64_t val;
         if (rightSideExpType == TokenType::UINT32_TYPE) {
-            val = *(uint32_t*)exp.getData();
+            val = *(uint32_t*)exp.value.getData();
         } else {
-            val = *(uint64_t*)exp.getData();
+            val = *(uint64_t*)exp.value.getData();
         }
         if (val <= UINT8_MAX) {
             addBytes({{(bc)OpCode::MOVE_SI, reg, (bc)val}});
@@ -208,11 +171,11 @@ void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
         // have to use full 8 byte
         alignForImm(2, 8);
         addBytes({{(bc)OpCode::MOVE_LI, reg}});
-        add8ByteNum(*(uint64_t *)exp.getData());
+        add8ByteNum(*(uint64_t *)exp.value.getData());
     } else {
         alignForImm(2, 4);
         addBytes({{(bc)OpCode::MOVE_I, reg}});
-        add4ByteNum(*(uint32_t *)exp.getData());
+        add4ByteNum(*(uint32_t *)exp.value.getData());
     }
     exp.setReg(reg);
 }
@@ -392,7 +355,7 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
  * Have to figure out stack alignment
  * \returns the size of the type
 */
-void CodeGen::generateVariableDeclaration(const VariableDec& varDec, bool initialize) {
+void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     if (typeToken.getType() == TokenType::REFERENCE) {
         // TODO: implement as pointer to result? 
@@ -507,7 +470,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     GeneralDec const *const &generalDec = lookUp[functionName];
     Tokenizer* oldTk = tk;
     tk = &tokenizers[generalDec->tokenizerIndex];
-    const FunctionDec* p_funcDec;
+    FunctionDec* p_funcDec;
     if (generalDec->type == GeneralDecType::BUILTIN_FUNCTION) {
         p_funcDec = &generalDec->builtinFunc->funcDec;
     } else {
@@ -526,7 +489,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
             }
             ExpressionResult regVal;
             regVal.setReg(reg);
-            regVal.type = &TokenListTypes::uint64Value;
+            regVal.value.type = &TokenListTypes::uint64Value;
             addExpressionResToStack(regVal, StackItemType::SAVED_TEMPORARY);
         }
     }
@@ -586,7 +549,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     } else {
         returnValueExpression.setReg(returnRegisterIndex);
     }
-    returnValueExpression.type = &p_funcDec->returnType;
+    returnValueExpression.value.type = &p_funcDec->returnType;
 
     // put saved values back into their expected registers (reverse of pushed)
     for (int16_t reg = NUM_REGISTERS - 1; reg >= 0; --reg) {
@@ -616,7 +579,7 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
     }
     assert(immOp != OpCode::NOP);
     bool large;
-    TokenType rightSideExpType = right.type->exp.getToken().getType();
+    TokenType rightSideExpType = right.value.type->exp.getToken().getType();
     assert(isBuiltInType(rightSideExpType));
     // need to covert types to their highest level (uint64_t, int64_t, or double)
 
@@ -629,9 +592,9 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
     if (rightSideExpType == TokenType::INT64_TYPE || rightSideExpType == TokenType::INT32_TYPE) {
         int64_t val;
         if (rightSideExpType == TokenType::INT32_TYPE) {
-            val = *(int32_t*)right.getData();
+            val = *(int32_t*)right.value.getData();
         } else {
-            val = *(int64_t*)right.getData();
+            val = *(int64_t*)right.value.getData();
         }
         if (val <= INT16_MAX && val >= INT16_MIN) {
             alignForImm(2, 2);
@@ -643,9 +606,9 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
     } else {
         uint64_t val;
         if (rightSideExpType == TokenType::UINT32_TYPE) {
-            val = *(uint32_t*)right.getData();
+            val = *(uint32_t*)right.value.getData();
         } else {
-            val = *(uint64_t*)right.getData();
+            val = *(uint64_t*)right.value.getData();
         }
         if (val <= UINT16_MAX) {
             alignForImm(2, 2);
@@ -659,11 +622,11 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
         // have to use full 8 byte
         alignForImm(2, 8);
         addBytes({{(bc)OpCode::MOVE_LI, miscRegisterIndex}});
-        add8ByteNum(*(uint64_t *)right.getData());
+        add8ByteNum(*(uint64_t *)right.value.getData());
     } else {
         alignForImm(2, 4);
         addBytes({{(bc)OpCode::MOVE_I, miscRegisterIndex}});
-        add4ByteNum(*(uint32_t *)right.getData());
+        add4ByteNum(*(uint32_t *)right.value.getData());
     }
     assert(op != OpCode::NOP);
     addBytes({{(bc)op, resReg, miscRegisterIndex}});
@@ -704,9 +667,9 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
             Token type;
             if (op == TokenType::PTR_MEMBER_ACCESS) {
                 // pointer to type, get type after the pointer
-                type = getTypeFromTokenList(*getNextFromTokenList(*expRes.type));
+                type = getTypeFromTokenList(*getNextFromTokenList(*expRes.value.type));
             } else {
-                type = getTypeFromTokenList(*expRes.type);
+                type = getTypeFromTokenList(*expRes.value.type);
             }
             const std::string& structName = tk->extractToken(type);
             const GeneralDec* genDec = lookUp[structName];
@@ -740,10 +703,10 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
                 expRes.setReg(stackPointerIndex);
                 expRes.isTemp = false;
             }
-            expRes.type = &stackVar.varDec.type;
-            if (expRes.type->exp.getToken().getType() == TokenType::REFERENCE) {
+            expRes.value.type = &stackVar.varDec.type;
+            if (expRes.value.type->exp.getToken().getType() == TokenType::REFERENCE) {
                 // always move past references
-                expRes.type = expRes.type->next;
+                expRes.value.type = expRes.value.type->next;
             }
             return expRes;
         }
@@ -777,7 +740,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
         }
         case TokenType::STRING_LITERAL: { 
             // place string literal in data section of bytecode, return offset to start of string
-            expRes.type = &TokenListTypes::stringValue;
+            expRes.value.type = &TokenListTypes::stringValue;
             std::string stringLiteral = tk->extractToken(token);
               // remove quotes around string
             stringLiteral.erase(stringLiteral.end() - 1);
@@ -791,7 +754,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
                 const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
                 uint64_t stringLength = strlen(pString);
                 if (stringLiteral.length() == stringLength && stringLiteral == pString) {
-                    expRes.set(i);
+                    expRes.value.set(i);
                     return expRes;
                 }
                 i += stringLength;
@@ -816,13 +779,13 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
         case TokenType::DECIMAL_NUMBER: {
             std::string decimalNumber = tk->extractToken(token);
             uint64_t num = std::stoull(decimalNumber);
-            expRes.set(num);
+            expRes.value.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32Value;
+                expRes.value.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32Value;
+                expRes.value.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64Value;
+                expRes.value.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
@@ -830,20 +793,20 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             assert(token.getLength() > 2);
             std::string binaryNumber = tk->extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::BINARY_NUMBER});
             uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-            expRes.set(num);
+            expRes.value.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32Value;
+                expRes.value.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32Value;
+                expRes.value.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64Value;
+                expRes.value.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
         case TokenType::FLOAT_NUMBER: {
             std::string binaryNumber = tk->extractToken(token);
             double num = std::stod(binaryNumber);
-            expRes.set(num);
+            expRes.value.set(num);
             return expRes;
         }
         case TokenType::HEX_NUMBER: { 
@@ -854,22 +817,22 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             std::out_of_range
             */
             uint64_t num = std::stoull(hexNumber, nullptr, 16);
-            expRes.set(num);
+            expRes.value.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32Value;
+                expRes.value.type = &TokenListTypes::int32Value;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32Value;
+                expRes.value.type = &TokenListTypes::uint32Value;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64Value;
+                expRes.value.type = &TokenListTypes::int64Value;
             } // already set to uint64_t
             return expRes;
         }
         case TokenType::FALSE: {
-            expRes.set(false);
+            expRes.value.set(false);
             return expRes;
         }
         case TokenType::TRUE: {
-            expRes.set(true);
+            expRes.value.set(true);
             return expRes;
         }
         case TokenType::STDIN: {
@@ -878,7 +841,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stdinDataIndex, OpCode::ADD);
-            expRes.type = &TokenListTypes::fileValue;
+            expRes.value.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::STDERR: {
@@ -887,7 +850,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stderrDataIndex, OpCode::ADD);
-            expRes.type = &TokenListTypes::fileValue;
+            expRes.value.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::STDOUT: {
@@ -896,11 +859,11 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             expRes.isTemp = true;
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stdoutDataIndex, OpCode::ADD);
-            expRes.type = &TokenListTypes::fileValue;
+            expRes.value.type = &TokenListTypes::fileValue;
             return expRes;
         }
         case TokenType::NULL_PTR: {
-            expRes.type = &TokenListTypes::ptrValue;
+            expRes.value.type = &TokenListTypes::ptrValue;
             return expRes;
         }
         case TokenType::IDENTIFIER: {
@@ -910,7 +873,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             const bytecode_t resReg = allocateRegister();
             ExpressionResult pointerExp;
             pointerExp.isPointerToValue = true;
-            pointerExp.type = &variableInfo.varDec.type;
+            pointerExp.value.type = &variableInfo.varDec.type;
             const uint32_t varOffset = getVarOffsetFromSP(variableInfo);
             if (varOffset) {
                 pointerExp.setReg(allocateRegister());
@@ -941,7 +904,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
 ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp, bytecode_t reg) {
     assert(pointerExp.isReg);
     assert(pointerExp.isPointerToValue);
-    const TokenList* type = pointerExp.type;
+    TokenList* type = pointerExp.value.type;
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t sizeOfType = getSizeOfType(typeToken);
     if (sizeOfType > 8) {
@@ -950,7 +913,7 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
     }
     ExpressionResult expRes;
     expRes.setReg(reg);
-    expRes.type = type;
+    expRes.value.type = type;
     const OpCode loadOp = getLoadOpForSize(sizeOfType);
     if (loadOp != OpCode::NOP) {
         addBytes({{(bc)loadOp, expRes.getReg(), pointerExp.getReg()}});
@@ -1004,7 +967,7 @@ void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, Expression
     if (!valueExp.isReg) {
         moveImmToReg(allocateRegister(), valueExp);
     }
-    const TokenList* type = pointerExp.type;
+    const TokenList* type = pointerExp.value.type;
     const Token typeToken = getTypeFromTokenList(*type);
     const uint32_t sizeOfType = getSizeOfType(typeToken);
     const OpCode storeOp = getStoreOpForSize(sizeOfType);
@@ -1024,23 +987,18 @@ void CodeGen::copyValue(ExpressionResult &pointerExp, ExpressionResult &valueExp
  * \param indexExp the index expression, can be any integral value
 */
 void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResult &indexExp) {
-    assert(isSigned(getTypeFromTokenList(*indexExp.type).getType()) || isUnsigned(getTypeFromTokenList(*indexExp.type).getType()));
-    assert(getTypeFromTokenList(*pointerExp.type).getType() == TokenType::POINTER);
-    const Token nextType = getTypeFromTokenList(*getNextFromTokenList(*pointerExp.type));
+    assert(isSigned(getTypeFromTokenList(*indexExp.value.type).getType()) || isUnsigned(getTypeFromTokenList(*indexExp.value.type).getType()));
+    assert(getTypeFromTokenList(*pointerExp.value.type).getType() == TokenType::POINTER);
+    const Token nextType = getTypeFromTokenList(*getNextFromTokenList(*pointerExp.value.type));
     uint32_t sizeOfType = getSizeOfType(nextType);
     if (sizeOfType > 1) {
         if (!indexExp.isReg) {
-            LiteralValue indexLiteral;
             LiteralValue sizeLiteral;
             sizeLiteral.set(sizeOfType);
-            indexLiteral.setUntyped(*(uint64_t *)indexExp.getData());
-            indexLiteral.type = indexExp.type;
-            indexLiteral = evaluateBinOpImmExpression(TokenType::MULTIPLICATION, indexLiteral, sizeLiteral);
-            indexExp.type = indexLiteral.type;
-            indexExp.setUntyped(*(uint64_t *)indexLiteral.getData());
+            indexExp.value = evaluateBinOpImmExpression(TokenType::MULTIPLICATION, indexExp.value, sizeLiteral);
         } else {
             ExpressionResult sizeExp;
-            sizeExp.set(sizeOfType);
+            sizeExp.value.set(sizeOfType);
             expressionResWithOp(OpCode::MUL, OpCode::MUL_I, indexExp, sizeExp);
         }
     }
@@ -1210,15 +1168,10 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         if (!leftResult.isReg && leftResult.jumpOp == OpCode::NOP) {
             // left side is immediate value
             // essentially run !leftResult.value
-            LiteralValue leftLiteral;
-            leftLiteral.type = leftResult.type;
-            leftLiteral.setUntyped(*(uint64_t *)leftResult.getData());
             LiteralValue zeroExp;
             zeroExp.set((int64_t)0);
-            leftLiteral = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftLiteral, zeroExp);
-            leftResult.type = leftLiteral.type;
-            leftResult.setUntyped(*(uint64_t *)leftLiteral.getData());
-            if (!*(bool*)leftResult.getData()) {
+            leftResult.value = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftResult.value, zeroExp);
+            if (!*(bool*)leftResult.value.getData()) {
                 // for &&, expression is false, don't generate anymore
                 if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                     return leftResult;
@@ -1269,16 +1222,11 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             }
             // left result is not an immediate
             byteCode.resize(shortCircuitIndexStart);
-            LiteralValue rightLiteral;
-            rightLiteral.type = rightResult.type;
-            rightLiteral.setUntyped(*(uint64_t *)rightResult.getData());
             LiteralValue zeroExp;
             zeroExp.set((int64_t)0);
             zeroExp.type = &TokenListTypes::int32Value;
-            rightLiteral = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightLiteral, zeroExp);
-            rightResult.type = rightLiteral.type;
-            rightResult.setUntyped(*(uint64_t *)rightLiteral.getData());
-            if (!*(bool*)rightResult.getData()) {
+            rightResult.value = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult.value, zeroExp);
+            if (!*(bool*)rightResult.value.getData()) {
                 // for &&, cond is always false
                 if (binOp.op.getType() == TokenType::LOGICAL_AND) {
                     return rightResult;
@@ -1505,12 +1453,12 @@ ExpressionResult CodeGen::incrementOrDecrement(const UnOp& unOp, TokenType op) {
     OpCode opCode;
     if (op == TokenType::DECREMENT_PREFIX || op == TokenType::DECREMENT_POSTFIX) {
         opCode = OpCode::DEC;
-        incrementExp.set(-1);
+        incrementExp.value.set(-1);
     } else {
         opCode = OpCode::INC;
-        incrementExp.set(1);
+        incrementExp.value.set(1);
     }
-    const Token typeToken = getTypeFromTokenList(*dataExp.type);
+    const Token typeToken = getTypeFromTokenList(*dataExp.value.type);
     if (op == TokenType::DECREMENT_POSTFIX || op == TokenType::INCREMENT_POSTFIX) {
         bytecode_t currReg = dataExp.getReg();
         dataExp.setReg(allocateRegister());
@@ -1544,8 +1492,8 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
         }
         case TokenType::DEREFERENCE: {
             ExpressionResult expRes = generateExpression(unOp.operand);
-            assert(getTypeFromTokenList(*expRes.type).getType() == TokenType::POINTER);
-            expRes.type = getNextFromTokenList(*expRes.type);
+            assert(getTypeFromTokenList(*expRes.value.type).getType() == TokenType::POINTER);
+            expRes.value.type = getNextFromTokenList(*expRes.value.type);
             expRes.isPointerToValue = true;
             return expRes;
         }
@@ -1821,7 +1769,7 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
         if (!expRes.isReg) {
             // condition is a constant value, can test at compile time
             // TODO: have to evaluate this based on type
-            if (*(uint32_t *)expRes.getData()) {
+            if (*(uint32_t *)expRes.value.getData()) {
                 // condition always true
                 generateScope(ifStatement.body);
                 return BranchStatementResult::ALWAYS_TRUE;
@@ -1853,7 +1801,7 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
     }
     addBytes({{(bc)OpCode::POP_Q, raReg}});
     if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
-        const Token typeToken = getTypeFromTokenList(*returnValueExp.type);
+        const Token typeToken = getTypeFromTokenList(*returnValueExp.value.type);
         const uint32_t typeSize = getSizeOfType(typeToken);
         assert(typeSize <= SIZE_OF_REGISTER);
         // move value into returnRegisterIndex
@@ -1938,7 +1886,7 @@ uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
  *  otherwise will update the bytecode by padding, and padding only
  * \returns a pointer to the struct info of the type if the type is a struct, otherwise nullptr
 */
-const StructInformation* CodeGen::addVarDecToStack(const VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
+const StructInformation* CodeGen::addVarDecToStack(VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     uint32_t padding, size;
     const StructInformation* pStructInfo = nullptr;
@@ -1991,7 +1939,7 @@ uint32_t CodeGen::getCurrStackPointerPosition() {
  * 
 */
 StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemType stackItemType, uint32_t alignTo) {
-    const TokenList* type = expRes.type;
+    const TokenList* type = expRes.value.type;
     assert(type);
     if (!expRes.isReg) {
         moveImmToReg(allocateRegister(), expRes);
@@ -2252,10 +2200,10 @@ void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
         addBytes({{(bc)small, reg}});
     } else if (val) {
         ExpressionResult paddingToAdd;
-        paddingToAdd.set(val);
+        paddingToAdd.value.set(val);
         ExpressionResult regExp;
         regExp.setReg(reg);
-        regExp.type = &TokenListTypes::uint64Value;
+        regExp.value.type = &TokenListTypes::uint64Value;
         expressionResWithOp(op, imm, regExp, paddingToAdd);
         if (paddingToAdd.isTemp) {
             freeRegister(paddingToAdd.getReg());

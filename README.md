@@ -24,3 +24,6 @@ create raw string parser
 
 Potential future tasks:
 - Parser error recovery. Currently, simply fails after a single syntax error (only 1 error reported at a time). So allow for all (or at least more) syntax errors to be reported.
+
+IDEAS:
+- change function call to unary op. would then need a tuple expression type as the operand

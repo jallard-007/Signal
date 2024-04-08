@@ -205,3 +205,80 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
         CHECK(structInfo.memberLookup["j"].position == 16);
     }
 }
+
+TEST_CASE("array types", "[checker]") {
+    SECTION("1") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "var: int32 [10]; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement; 
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        TokenList retType = TokenListTypes::voidValue;
+        CHECK(tc.checkStatement(statement, retType, false, false));
+        CHECK(tc.errors.empty());
+    }
+    SECTION("size too small") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "var: int32 [0]; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement; 
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        TokenList retType = TokenListTypes::voidValue;
+        CHECK_FALSE(tc.checkStatement(statement, retType, false, false));
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
+    }
+    SECTION("size too small again") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "var: int32 [-1]; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement; 
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        TokenList retType = TokenListTypes::voidValue;
+        CHECK_FALSE(tc.checkStatement(statement, retType, false, false));
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
+    }
+    SECTION("size too large") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "var: int32 [0xffffffffff]; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement; 
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        TokenList retType = TokenListTypes::voidValue;
+        CHECK_FALSE(tc.checkStatement(statement, retType, false, false));
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
+    }
+    SECTION("missing size") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "var: int32 []; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement; 
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        TokenList retType = TokenListTypes::voidValue;
+        CHECK_FALSE(tc.checkStatement(statement, retType, false, false));
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::EXPECTED_SIZE);
+    }
+}

@@ -4,6 +4,7 @@
 #include "nodeMemPool.hpp"
 #include <map>
 #include <unordered_map>
+#include "compTime/compTime.hpp"
 
 enum class CheckerErrorType: uint8_t {
     NONE,
@@ -15,7 +16,6 @@ enum class CheckerErrorType: uint8_t {
     UNEXPECTED_TYPE,
     EXPECTED_IDENTIFIER,
     EXPECTING_TYPE,
-    EXPECTING_NUMBER,
     INCORRECT_RETURN_TYPE,
     INVALID_EXIT_TYPE,
     NOT_ALL_CODE_PATHS_RETURN,
@@ -25,6 +25,12 @@ enum class CheckerErrorType: uint8_t {
     INVALID_MAIN_FUNCTION_SIGNATURE,
     TYPE_TOO_LARGE_TO_RETURN,
     TYPE_TOO_LARGE_TO_BE_AN_ARGUMENT,
+
+    // array size
+    NOT_A_SIZE,
+    NON_CONSTANT_SIZE_ARRAY,
+    INVALID_ARRAY_SIZE,
+    EXPECTED_SIZE,
 
     // no such
     NO_SUCH_FUNCTION,
@@ -80,41 +86,20 @@ struct CheckerError {
     CheckerError() = delete;
     CheckerError(CheckerErrorType);
     CheckerError(CheckerErrorType, uint32_t, Token);
-    CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
+    CheckerError(CheckerErrorType, uint32_t, GeneralDec*);
     CheckerError(CheckerErrorType, uint32_t, Expression*);
+    CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
     CheckerError(CheckerErrorType, uint32_t, Expression*, GeneralDec*);
     std::string getErrorMessage(std::vector<Tokenizer>&) const;
 };
 
-#define SIZE_OF_REGISTER 8
-
 struct ResultingType {
-    private:
-    unsigned char data [SIZE_OF_REGISTER] {0};
-    public:
-    TokenList *type{nullptr};
-    bool isLValue{false};
-    bool isLiteral{false};
+    LiteralValue value;
+    bool isLValue;
+    bool isLiteral;
     ResultingType(TokenList*, bool);
-
-    inline const void *getData() const { return (void *)data; }
-
-    template <class T> void set(T) = delete;
-    void set(char);
-    void set(uint32_t);
-    void set(uint64_t);
-    void set(int32_t);
-    void set(int64_t);
-    void set(FILE *);
-    void set(double);
-    void set(bool);
-
-    template <class T>
-    void setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
-        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
-        *(decltype(t) *)data = t;
-        isLiteral = true;
-    }
+    ResultingType(TokenList*, bool, bool);
+    ResultingType(const LiteralValue&);
 };
 
 #define MAX_ERRORS 20
@@ -139,13 +124,13 @@ struct Checker {
     void validateStructTopLevel(StructDec&);
     StructInformation& getStructInfo(const StructDec&);
     void checkForStructCycles(GeneralDec&, std::vector<StructDec *>&);
-    bool checkStatement(Statement&, const TokenList&, bool, bool);
-    bool checkScope(Scope&, const TokenList&, bool, bool);
+    bool checkStatement(Statement&, TokenList&, bool, bool);
+    bool checkScope(Scope&, TokenList&, bool, bool);
     bool checkLocalVarDec(VariableDec&);
     ResultingType checkExpression(Expression&, std::unordered_map<std::string, StructMemberInformation> *structMap = nullptr);
     ResultingType checkMemberAccess(ResultingType&, Expression&);
     bool checkType(TokenList&);
-    bool checkAssignment(const TokenList*, const TokenList*, bool);
+    bool checkAssignment(TokenList*, TokenList*, bool);
 
     void addError(const CheckerError&);
     void removeLastError();
@@ -154,7 +139,7 @@ struct Checker {
 
 bool canBeConvertedToBool(const TokenList*);
 Token getTypeFromTokenList(const TokenList&);
-const TokenList* getNextFromTokenList(const TokenList&);
-const TokenList* getTypeQualifier(const TokenList&);
+TokenList* getNextFromTokenList(TokenList&);
+TokenList* getTypeQualifier(TokenList&);
 uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
 uint32_t getSizeOfBuiltinType(TokenType);

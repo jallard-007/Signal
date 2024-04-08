@@ -4,13 +4,13 @@
 #include <cstdio>
 #include "nodes.hpp"
 
-#define SIZE_OF_REGISTER 8
+typedef struct ExpressionResult ExpressionResult;
 
 struct LiteralValue {
     private:
     unsigned char data [SIZE_OF_REGISTER] {0};
     public:
-    const TokenList *type {nullptr};
+    TokenList *type {nullptr};
     inline const void *getData() const { return (void *)data; }
 
     template <class T> void set(T) = delete;
@@ -28,10 +28,8 @@ struct LiteralValue {
         static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
         *(decltype(t) *)data = t;
     }
+    friend ExpressionResult;
 };
-
-
-
 
 
 // ========================================

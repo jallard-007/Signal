@@ -749,12 +749,12 @@ TEST_CASE("get address of expression", "[codeGen]") {
         CHECK(res_x.isPointerToValue);
         CHECK(res_x.isReg);
         CHECK(res_x.getReg() == 1);
-        CHECK(res_x.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
+        CHECK(res_x.value.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
         CHECK(res_y.isPointerToValue);
         CHECK(res_y.isReg);
         CHECK(res_y.getReg() == 30);
         CHECK_FALSE(res_y.isTemp);
-        CHECK(res_y.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(res_y.value.type->exp.getToken().getType() == TokenType::INT32_TYPE);
     }
 }
 

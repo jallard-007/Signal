@@ -912,7 +912,6 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
             binOp->leftSide = *curr;
             // change curr to point to the new binary op
             curr->setBinOp(binOp);
-            curr->setType(expressionType);
         } else {
             UnOp *unOp = memPool.makeUnOp(UnOp{token});
             // set bottom to next empty expression
@@ -923,7 +922,6 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
                 unOp->operand = *curr;
                 // change curr to point to the new unary op
                 curr->setUnOp(unOp);
-                curr->setType(expressionType);
                 token = tokenizer->peekNext();
                 /* have to do a jump since postfix operators
                 are followed by an operator or end the expression.
@@ -933,7 +931,6 @@ ParseExpressionErrorType Parser::parseExpression(Expression& rootExpression) {
                 // we dont need to copy curr since curr is empty
                 // change curr to point to the new unary op
                 curr->setUnOp(unOp);
-                curr->setType(expressionType);
             }
         }
         token = tokenizer->peekNext();
@@ -945,7 +942,6 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
     const Token token = tokenizer->peekNext();
     if (isLiteral(token.getType())) {
         tokenizer->consumePeek();
-        expression.setType(ExpressionType::VALUE);
         expression.setToken(token);
     }
     else if (token.getType() == TokenType::OPEN_PAREN) {
@@ -965,7 +961,6 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
         Token next = tokenizer->peekNext();
         if (next.getType() == TokenType::OPEN_PAREN) {
             tokenizer->consumePeek();
-            expression.setType(ExpressionType::FUNCTION_CALL);
             expression.setFunctionCall(memPool.makeFunctionCall(FunctionCall{token}));
             ParseExpressionErrorType errorType = getExpressions(expression.getFunctionCall()->args, TokenType::CLOSE_PAREN);
             if (errorType != ParseExpressionErrorType::NONE) {
@@ -983,7 +978,6 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
         }
         else if (next.getType() == TokenType::OPEN_BRACKET) {
             tokenizer->consumePeek();
-            expression.setType(ExpressionType::ARRAY_ACCESS);
             expression.setArrayAccess(memPool.makeArrayAccess(ArrayAccess{token}));
             ParseExpressionErrorType errorType = parseExpression(expression.getArrayAccess()->offset);
             if (errorType != ParseExpressionErrorType::NONE) {
@@ -996,16 +990,16 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
             tokenizer->consumePeek();
         }
         else {
-            expression.setType(ExpressionType::VALUE);
             expression.setToken(token);
         }
     }
     else if (token.getType() == TokenType::OPEN_BRACKET) {
         tokenizer->consumePeek();
-        expression.setType(ExpressionType::CONTAINER_LITERAL);
         expression.setContainerLiteral(memPool.makeContainerLiteral());
         if (tokenizer->peekNext().getType() == TokenType::CLOSE_BRACKET) {
             tokenizer->consumePeek();
+            expression.getContainerLiteral()->values.curr.setToken(token);
+            expression.getContainerLiteral()->values.curr.setType(ExpressionType::NONE);
             return ParseExpressionErrorType::NONE;
         }
         ExpressionList *list = &expression.getContainerLiteral()->values;

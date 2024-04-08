@@ -10,43 +10,22 @@
 #include "tokenizer/tokenizer.hpp"
 #include "bytecodeDesign/bytecodeDesign.hpp"
 #include "checker/checker.hpp"
+#include "compTime/compTime.hpp"
 
 struct RegisterInfo {
     bool inUse {false};
     bool changed {false};
 };
 
-#define SIZE_OF_REGISTER 8
-
 struct ExpressionResult {
-    private:
-    bytecode_t data [SIZE_OF_REGISTER] {0};
-    public:
-    const TokenList *type {nullptr};
+    LiteralValue value;
     OpCode jumpOp {OpCode::NOP};
     bool isReg {false};
     bool isTemp {false};
     bool isPointerToValue {false};
-    inline const void *getData() const { return (void *)data; }
 
-    template <class T> void set(T) = delete;
-    void set(char);
-    void set(uint32_t);
-    void set(uint64_t);
-    void set(int32_t);
-    void set(int64_t);
-    void set(FILE *);
-    void set(double);
-    void set(bool);
-
-    template <class T>
-    void setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
-        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
-        *(decltype(t) *)data = t;
-    }
-
-    inline void setReg(bytecode_t reg) { data[0] = reg; isReg = true;  /* setting all values as temporary for now to force reloading */ isTemp = true; }
-    inline bytecode_t getReg() const { assert(isReg); return data[0]; }
+    inline void setReg(bytecode_t reg) { value.data[0] = reg; isReg = true;  /* setting all values as temporary for now to force reloading */ isTemp = true; }
+    inline bytecode_t getReg() const { assert(isReg); return value.data[0]; }
 };
 
 enum class JumpMarkerType: uint8_t {
@@ -85,7 +64,7 @@ enum class StackMarkerType: uint8_t {
 };
 
 struct StackVariable {
-    const VariableDec &varDec;
+    VariableDec &varDec;
     uint32_t positionOnStack = 0;
     // bytecode_t reg = 0;
 };
@@ -190,7 +169,7 @@ struct CodeGen {
 
 // DECLARATIONS
     void generateGeneralDeclaration(const GeneralDec&);
-    void generateVariableDeclaration(const VariableDec&, bool = true);
+    void generateVariableDeclaration(VariableDec&, bool = true);
 
 // GENERAL EXPRESSIONS
     [[nodiscard]] ExpressionResult generateExpression(const Expression&, bool = false);
@@ -240,7 +219,7 @@ struct CodeGen {
     void addSpaceToStack(uint32_t);
     void addPaddingToStack(uint32_t, bool = false);
     uint32_t addPaddingAndSpaceToStack(uint32_t, uint32_t);
-    const StructInformation* addVarDecToStack(const VariableDec&, uint32_t = 0, bool = false);
+    const StructInformation* addVarDecToStack(VariableDec&, uint32_t = 0, bool = false);
     StackVariable& addItemToStack(uint32_t, uint32_t, bool = false);
 
     uint32_t getCurrStackPointerPosition();
