@@ -38,10 +38,11 @@ void fn(void); static Construct constructor_##fn(fn);
 __attribute__((constructor))
 #endif
 
-// TokenType::NEGATIVE is the "largest" operator token type with an enum value of 83, hence size 84
-uint8_t operatorPrecedence [84]{};
+// TokenType::NEGATIVE is the "largest" operator token type with an enum value of 90, hence size 91
+uint8_t operatorPrecedence [91]{};
 constructor(initializeOperatorPrecedence)
 void initializeOperatorPrecedence() {
+    static_assert((uint32_t)TokenType::NEGATIVE + 1 == sizeof (operatorPrecedence));
     operatorPrecedence[(uint8_t)TokenType::ASSIGNMENT] = 1;
     operatorPrecedence[(uint8_t)TokenType::MODULO_ASSIGNMENT] = 1;
     operatorPrecedence[(uint8_t)TokenType::ADDITION_ASSIGNMENT] = 1;

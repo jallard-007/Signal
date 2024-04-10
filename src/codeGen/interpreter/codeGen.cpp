@@ -1789,9 +1789,7 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
     }
     addBytes({{(bc)OpCode::POP_Q, raReg}});
     if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
-        const Token typeToken = getTypeFromTokenList(*returnValueExp.value.type);
-        const uint32_t typeSize = getSizeOfType(typeToken);
-        assert(typeSize <= SIZE_OF_REGISTER);
+        assert(getSizeOfType(getTypeFromTokenList(*returnValueExp.value.type)) <= SIZE_OF_REGISTER);
         // move value into returnRegisterIndex
         if (returnAddressStackIndex > 0) {
             fakeClearStackFromTo(returnAddressStackIndex - 1, -1);

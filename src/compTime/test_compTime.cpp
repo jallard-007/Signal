@@ -34,6 +34,7 @@ LiteralValue evaluate(Tokenizer& tk, const Expression& exp) {
         }
         default: {
             assert(false);
+            exit(1);
         }
     }
 }
