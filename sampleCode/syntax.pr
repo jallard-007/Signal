@@ -73,7 +73,7 @@ postFixUnaryOpOperator:= defined in token.hpp
 identifier:= not a keyword, can start with a letter or underscore, can have letters underscores and numbers following
 keywords:= defined in token.hpp
 
-expression:= identifier | number | stringLiteral | charLiteral | binOp | unaryOp | functionCall | arrayAccess | (expression) | memberAccess | containerLiteral
+expression:= identifier | number | stringLiteral | charLiteral | binOp | unaryOp | functionCall | arrayAccess | (expression) | memberAccess
 expressionList:= expression expressionTail
 expressionTail:= , expression expressionTail | nothing
 
@@ -95,7 +95,7 @@ typeList: typeQualifier identifier indirectionTypeList
 
 indirectionTypeList:= nothing
                     | typeQualifier ptr indirectionTypeList
-                    | typeQualifier containerLiteral indirectionTypeList ignore arrays for now
+                    | typeQualifier containerLiteral indirectionTypeList
                     | typeQualifier ref
 
 simpleVarDec:= identifier : typeList
@@ -133,11 +133,11 @@ structDec:= struct identifier { structDecList }
 
 structDecList:= varDec ; decList | functionDec decList | nothing
 
-enumDec:= enum identifier { expressionList }
+enumDec:= enum identifier { identifierList }
 
 identifierList:= identifier identifierTail
-identifierTail:= , identifier identifierTail
                 | nothing
+identifierTail:= , identifier identifierTail
 
 templateDec:= template [ identifierList ] structDec
                                          | functionDec

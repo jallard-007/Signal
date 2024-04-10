@@ -8,9 +8,9 @@ Uses CMake as a build tool and Catch2 for testing
 
 TODO:
 
-add array support
-add named arguments
-create raw string parser
+- add array support
+- add named arguments
+- create raw string parser (partially done)
 
 - Parser
     - change array access expression type to binary op
