@@ -17,10 +17,18 @@
 JumpMarker::JumpMarker(uint64_t start, JumpMarkerType type):
     start{start}, type{type} {}
 
+TokenList* getNextFromTokenList(TokenList& tokenList) {
+    TokenList* next = tokenList.next;
+    while (next && (next->exp.getType() == ExpressionType::VALUE && isTypeQualifier(next->exp.getToken().getType()))) {
+        next = next->next;
+    }
+    return next;
+}
+
 CodeGen::CodeGen(
     Program& program,
     std::vector<Tokenizer>& tokenizers,
-    std::unordered_map<std::string, GeneralDec *>& lookUp,
+    std::unordered_map<std::string, const GeneralDec *>& lookUp,
     std::unordered_map<const StructDec *, StructInformation>& structLookup
 ): program{program}, tokenizers{tokenizers}, lookUp{lookUp}, structLookUp{structLookup} {
     sp.inUse = true;

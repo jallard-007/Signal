@@ -3,12 +3,12 @@
 
 const uint8_t indentationSize = 4;
 
-void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
+void TokenList::prettyPrint(Tokenizer& tk, std::string& str) const {
     if (exp.getType() == ExpressionType::NONE) {
         return;
     }
-    std::vector<TokenList *> r;
-    for (TokenList *iter = this; iter; iter = iter->next) {
+    std::vector<const TokenList *> r;
+    for (const TokenList *iter = this; iter; iter = iter->next) {
         if (iter->exp.getType() == ExpressionType::VALUE && iter->exp.getToken().getType() == TokenType::DEC_PTR) {
             break;
         }
@@ -23,12 +23,12 @@ void TokenList::prettyPrint(Tokenizer& tk, std::string& str) {
     }
 }
 
-void VariableDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+void VariableDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) const {
     str += tk.extractToken(name) + ": ";
     type.prettyPrint(tk, str);
 }
 
-void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
+void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += tk.extractToken(name) + ": ";
     type.prettyPrint(tk, str);
     if (initialAssignment) {
@@ -37,7 +37,7 @@ void VariableDec::prettyPrint(Tokenizer& tk, std::string& str) {
     }
 }
 
-void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     if (!expression) {
         return;
     }
@@ -56,7 +56,7 @@ void Statement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     }
 }
 
-void UnOp::prettyPrint(Tokenizer& tk, std::string& str) {
+void UnOp::prettyPrint(Tokenizer& tk, std::string& str) const {
     bool wrap = false;
     if (operand.getType() == ExpressionType::BINARY_OP || operand.getType() == ExpressionType::UNARY_OP) {
         if (operatorPrecedence[(uint8_t)operand.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
@@ -84,7 +84,7 @@ void UnOp::prettyPrint(Tokenizer& tk, std::string& str) {
     }
 }
 
-void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) {
+void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) const {
     bool wrap = false;
     if (leftSide.getType() == ExpressionType::BINARY_OP || leftSide.getType() == ExpressionType::UNARY_OP) {
         if (operatorPrecedence[(uint8_t)leftSide.getBinOp()->op.getType()] < operatorPrecedence[(uint8_t)op.getType()]) {
@@ -110,10 +110,10 @@ void BinOp::prettyPrint(Tokenizer& tk, std::string& str ) {
     }
 }
 
-void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {
+void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += tk.extractToken(name) + '(';
     if (args.curr.getType() != ExpressionType::NONE) {
-        ExpressionList * iter = &args;
+        const ExpressionList * iter = &args;
         for (; iter->next; iter = iter->next) {
             iter->curr.prettyPrint(tk, str);
             str += ", ";
@@ -123,17 +123,17 @@ void FunctionCall::prettyPrint(Tokenizer& tk, std::string& str) {
     str += ')';
 }
 
-void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str) {
+void ArrayAccess::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += tk.extractToken(array.getToken()) + '[';
     offset.prettyPrint(tk, str);
     str += ']';
 }
 
-void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += "{\n";
     if (scopeStatements.curr.type != StatementType::NONE) {
         indentation += indentationSize;
-        for (StatementList *iter = &scopeStatements; iter; iter = iter->next) {
+        for (const StatementList *iter = &scopeStatements; iter; iter = iter->next) {
             if (iter->curr.type != StatementType::NONE) {
                 str += std::string(indentation, ' ');
                 iter->curr.prettyPrint(tk, str, indentation);
@@ -147,11 +147,11 @@ void Scope::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
     str += std::string(indentation, ' ') + "}\n";
 }
 
-void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::FUNC);
     str += tk.extractToken(name) + '(';
     if (params.curr.type != StatementType::NONE) {
-        StatementList * iter = &params;
+        const StatementList * iter = &params;
         for (; iter->next; iter = iter->next) {
             iter->curr.prettyPrint(tk, str, indentationSize);
             str += ", ";
@@ -162,12 +162,12 @@ void FunctionDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
     returnType.prettyPrint(tk, str);
 }
 
-void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::FUNC);
     str += tk.extractToken(name) + '(';
     if (params.curr.type != StatementType::NONE) {
         indentation += indentationSize;
-        StatementList * iter = &params;
+        const StatementList * iter = &params;
         for (; iter->next; iter = iter->next) {
             iter->curr.prettyPrint(tk, str, indentation);
             str += ", ";
@@ -181,10 +181,10 @@ void FunctionDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
     body.prettyPrint(tk, str, indentation);
 }
 
-void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::ENUM) + tk.extractToken(name) + "{\n";
     indentation += indentationSize;
-    for (TokenList *iter = &members; iter; iter = iter->next) {
+    for (const TokenList *iter = &members; iter; iter = iter->next) {
         str += std::string(indentation, ' ');
         iter->exp.prettyPrint(tk, str);
         str += ",\n";
@@ -193,7 +193,7 @@ void EnumDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
     str += std::string(indentation, ' ') + "}\n";
 }
 
-void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string& str) {
+void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string& str) const {
     if (type == GeneralDecType::NONE) {
         return;
     }
@@ -218,7 +218,7 @@ void GeneralDec::prettyPrintDefinition(std::vector<Tokenizer>& tks, std::string&
     }
 }
 
-void GeneralDec::prettyPrint(std::vector<Tokenizer>& tks, std::string& str) {
+void GeneralDec::prettyPrint(std::vector<Tokenizer>& tks, std::string& str) const {
     if (type == GeneralDecType::NONE) {
         return;
     }
@@ -238,8 +238,8 @@ void GeneralDec::prettyPrint(std::vector<Tokenizer>& tks, std::string& str) {
     }
 }
 
-void GeneralDecList::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
-    GeneralDecList*list = this;
+void GeneralDecList::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) const {
+    const GeneralDecList*list = this;
     for (; list->next; list = list->next) {
         list->curr.prettyPrint(tk, str);
         str += '\n';
@@ -247,14 +247,14 @@ void GeneralDecList::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
     list->curr.prettyPrint(tk, str);
 }
 
-void StructDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+void StructDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::STRUCT) + tk.extractToken(name);
 }
 
-void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::STRUCT) + tk.extractToken(name) + " {\n";
     indentation += indentationSize;
-    for (StructDecList* list = &decs; list; list = list->next) {
+    for (const StructDecList* list = &decs; list; list = list->next) {
         str += std::string(indentation, ' ');
         if (list->type == StructDecType::FUNC) {
             list->funcDec->prettyPrint(tk, str, indentation);
@@ -267,10 +267,10 @@ void StructDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentatio
     str += std::string(indentation, ' ') + "}\n";
 }
 
-void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
+void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
     if (templateTypes.exp.getType() != ExpressionType::NONE) {
-        TokenList * iter = &templateTypes;
+        const TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
             iter->exp.prettyPrint(tk, str);
             str += ", ";
@@ -285,10 +285,10 @@ void TemplateDec::prettyPrintDefinition(Tokenizer& tk, std::string& str) {
     }
 }
 
-void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::TEMPLATE) + '[';
     if (templateTypes.exp.getType() != ExpressionType::NONE) {
-        TokenList * iter = &templateTypes;
+        const TokenList * iter = &templateTypes;
         for (; iter->next; iter = iter->next) {
             iter->exp.prettyPrint(tk, str);
             str += ", ";
@@ -303,11 +303,11 @@ void TemplateDec::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentat
     }
 }
 
-void Program::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) {
+void Program::prettyPrint(std::vector<Tokenizer>& tk, std::string& str) const {
     decs.prettyPrint(tk, str);
 }
 
-void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
+void Expression::prettyPrint(Tokenizer& tk, std::string& str) const {
     if (getType() == ExpressionType::NONE) {
         return;
     }
@@ -323,9 +323,9 @@ void Expression::prettyPrint(Tokenizer& tk, std::string& str) {
     }
 }
 
-void ContainerLiteral::prettyPrint(Tokenizer& tk, std::string& str) {
+void ContainerLiteral::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += '[';
-    ExpressionList*list = &values;
+   const ExpressionList*list = &values;
     for (; list->next; list = list->next) {
         list->curr.prettyPrint(tk ,str);
         str += ", ";
@@ -334,7 +334,7 @@ void ContainerLiteral::prettyPrint(Tokenizer& tk, std::string& str) {
     str += ']';
 }
 
-void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     if (type == ControlFlowStatementType::NONE) {
         return;
     }
@@ -349,7 +349,7 @@ void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
     }
 }
 
-void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::FOR) + '(';
     initialize.prettyPrint(tk, str, indentation);
     if (statement.condition.getType() == ExpressionType::NONE) {
@@ -368,7 +368,7 @@ void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
     statement.body.prettyPrint(tk, str, indentation);
 }
 
-void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
+void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::RETURN);
     if (returnValue.getType() != ExpressionType::NONE) {
         str += ' ';
@@ -376,17 +376,17 @@ void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) {
     }
 }
 
-void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void SwitchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::SWITCH);
     switched.prettyPrint(tk, str);
     str += ' ';
     body.prettyPrint(tk, str, indentation);
 }
 
-void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += "{\n";
     indentation += indentationSize;
-    for (SwitchScopeStatementList *list = this; list; list = list->next) {
+    for (const SwitchScopeStatementList *list = this; list; list = list->next) {
         str += std::string(indentation, ' ');
         if (list->caseExpression) {
             str += typeToString.at(TokenType::CASE);
@@ -405,18 +405,18 @@ void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint
     str += std::string(indentation, ' ') + "}\n";
 }
 
-void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::WHILE);
     statement.prettyPrint(tk ,str, indentation);
 }
 
-void BranchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void BranchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     condition.prettyPrint(tk, str);
     str += ' ';
     body.prettyPrint(tk, str, indentation);
 }
 
-void ConditionalStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) {
+void ConditionalStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::IF);
     ifStatement.prettyPrint(tk, str, indentation);
     for (ElifStatementList*list = elifStatement; list; list = list->next) {
@@ -429,11 +429,11 @@ void ConditionalStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
     }
 }
 
-void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) {
+void IncludeDec::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::INCLUDE) + ' ' + tk.extractToken(file);
 }
 
-void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) {
+void TemplateCreation::prettyPrint(Tokenizer& tk, std::string& str) const {
     str += typeToString.at(TokenType::CREATE) + " [";
     if (templateTypes.exp.getType() != ExpressionType::NONE) {
         templateTypes.exp.prettyPrint(tk, str);

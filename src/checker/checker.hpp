@@ -80,24 +80,27 @@ struct StructMemberInformation {
 };
 
 struct StructInformation {
-    std::unordered_map<std::string, StructMemberInformation> memberLookup;
+    std::unordered_map<std::string, StructMemberInformation> memberLookup{};
+    const GeneralDec *const decPtr;
+    TokenList *const type;
     uint32_t size = 0;
     uint32_t alignTo = 0;
-    StructInformation() = default;
+    StructInformation();
+    StructInformation(NodeMemPool&, const GeneralDec*);
 };
 
 struct CheckerError {
     Token token;
-    GeneralDec *dec{nullptr};
+    const GeneralDec *dec{nullptr};
     uint32_t tkIndex{0};
     CheckerErrorType type{CheckerErrorType::NONE};
     CheckerError() = delete;
     CheckerError(CheckerErrorType);
     CheckerError(CheckerErrorType, uint32_t, Token);
-    CheckerError(CheckerErrorType, uint32_t, GeneralDec*);
+    CheckerError(CheckerErrorType, uint32_t, const GeneralDec*);
     CheckerError(CheckerErrorType, uint32_t, Expression*);
-    CheckerError(CheckerErrorType, uint32_t, Token, GeneralDec*);
-    CheckerError(CheckerErrorType, uint32_t, Expression*, GeneralDec*);
+    CheckerError(CheckerErrorType, uint32_t, Token, const GeneralDec*);
+    CheckerError(CheckerErrorType, uint32_t, Expression*, const GeneralDec*);
     std::string getErrorMessage(std::vector<Tokenizer>&) const;
 };
 
@@ -113,7 +116,7 @@ struct ResultingType {
 #define MAX_ERRORS 20
 
 struct Checker {
-    std::unordered_map<std::string, GeneralDec *> lookUp;
+    std::unordered_map<std::string, const GeneralDec *> lookUp;
     std::unordered_map<const StructDec *, StructInformation> structLookUp;
     std::vector<CheckerError> errors;
     std::vector<std::string> locals;
@@ -131,19 +134,19 @@ struct Checker {
     bool validateFunctionHeader(FunctionDec&);
     void validateStructTopLevel(StructDec&);
     StructInformation& getStructInfo(const StructDec&);
-    void checkForStructCycles(GeneralDec&, std::vector<StructDec *>&);
+    void checkForStructCycles(const GeneralDec&, std::vector<StructDec *>&);
     bool checkStatement(Statement&, TokenList&, bool, bool);
     bool checkScope(Scope&, TokenList&, bool, bool);
     bool checkLocalVarDec(VariableDec&);
     ResultingType checkExpression(
         Expression&,
-        std::unordered_map<std::string,
-        StructMemberInformation> * = nullptr
+        const StructInformation* = nullptr
     );
+    bool checkContainerLiteralStruct(ContainerLiteral&, const StructInformation&);
     ResultingType checkContainerLiteralArray(ContainerLiteral&);
     ResultingType checkMemberAccess(ResultingType&, Expression&);
     bool checkType(TokenList&, bool = false);
-    bool checkAssignment(TokenList*, TokenList*, bool, bool = false);
+    bool checkAssignment(const TokenList*, const TokenList*, bool, bool = false);
 
     void addError(const CheckerError&);
     void removeLastError();
@@ -152,7 +155,6 @@ struct Checker {
 
 bool canBeConvertedToBool(const TokenList*);
 Token getTypeFromTokenList(const TokenList&);
-TokenList* getNextFromTokenList(TokenList&);
-TokenType getTypeQualifier(TokenList&);
+TokenType getTypeQualifier(const TokenList&);
 uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
 uint32_t getSizeOfBuiltinType(TokenType);

@@ -64,7 +64,7 @@ struct MemPool {
         list[arraySize - 1].next = nullptr;
     }
 
-    void release(T *obj) {
+    void release(const T *obj) {
         ((Obj*)obj)->next = freeObj;
         freeObj = (Obj *)obj;
     }

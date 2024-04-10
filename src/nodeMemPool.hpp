@@ -100,33 +100,33 @@ public:
     TemplateCreation* makeTemplateCreation() {return templateCreations.get();}
     IncludeDec* makeIncludeDec() {return includeDecs.get();}
 
-    void release(UnOp* ptr) { unOps.release(ptr);}
-    void release(BinOp* ptr) { binOps.release(ptr);}
-    void release(BuiltinFunc* ptr) { builtinFuncs.release(ptr);}
-    void release(BuiltinType* ptr) { builtinTypes.release(ptr);}
-    void release(GeneralDec* ptr) { decs.release(ptr);}
-    void release(GeneralDecList* ptr) { decLists.release(ptr);}
-    void release(VariableDec* ptr) { varDecs.release(ptr);}
-    void release(FunctionCall* ptr) { funcCalls.release(ptr);}
-    void release(ElifStatementList* ptr) { elifs.release(ptr);}
-    void release(ControlFlowStatement* ptr) { controlFlows.release(ptr);}
-    void release(ArrayAccess* ptr) { arrayAccesses.release(ptr);}
-    void release(TokenList* ptr) { tokenLists.release(ptr);}
-    void release(Expression* ptr) { expressions.release(ptr);}
-    void release(ExpressionList* ptr) { expressionLists.release(ptr);}
-    void release(Scope* ptr) { scopes.release(ptr);}
-    void release(StatementList* ptr) { statementLists.release(ptr);}
-    void release(StructDecList* ptr) { structDecLists.release(ptr);}
-    void release(ContainerLiteral* ptr) { containerLiterals.release(ptr);}
-    void release(FunctionDec* ptr) { functionDecs.release(ptr);}
-    void release(StructDec* ptr) { structDecs.release(ptr);}
-    void release(TemplateDec* ptr) { templateDecs.release(ptr);}
-    void release(ConditionalStatement* ptr) { conditionalStatements.release(ptr);}
-    void release(ReturnStatement* ptr) { returnStatements.release(ptr);}
-    void release(ForLoop* ptr) {forLoops.release(ptr);}
-    void release(WhileLoop* ptr) { whileLoops.release(ptr);}
-    void release(SwitchStatement* ptr) { switchStatements.release(ptr);}
-    void release(SwitchScopeStatementList* ptr) { switchScopeStatementLists.release(ptr);}
-    void release(TemplateCreation* ptr) { templateCreations.release(ptr);}
-    void release(IncludeDec* ptr) { includeDecs.release(ptr);}
+    void release(const UnOp* ptr) { unOps.release(ptr);}
+    void release(const BinOp* ptr) { binOps.release(ptr);}
+    void release(const BuiltinFunc* ptr) { builtinFuncs.release(ptr);}
+    void release(const BuiltinType* ptr) { builtinTypes.release(ptr);}
+    void release(const GeneralDec* ptr) { decs.release(ptr);}
+    void release(const GeneralDecList* ptr) { decLists.release(ptr);}
+    void release(const VariableDec* ptr) { varDecs.release(ptr);}
+    void release(const FunctionCall* ptr) { funcCalls.release(ptr);}
+    void release(const ElifStatementList* ptr) { elifs.release(ptr);}
+    void release(const ControlFlowStatement* ptr) { controlFlows.release(ptr);}
+    void release(const ArrayAccess* ptr) { arrayAccesses.release(ptr);}
+    void release(const TokenList* ptr) { tokenLists.release(ptr);}
+    void release(const Expression* ptr) { expressions.release(ptr);}
+    void release(const ExpressionList* ptr) { expressionLists.release(ptr);}
+    void release(const Scope* ptr) { scopes.release(ptr);}
+    void release(const StatementList* ptr) { statementLists.release(ptr);}
+    void release(const StructDecList* ptr) { structDecLists.release(ptr);}
+    void release(const ContainerLiteral* ptr) { containerLiterals.release(ptr);}
+    void release(const FunctionDec* ptr) { functionDecs.release(ptr);}
+    void release(const StructDec* ptr) { structDecs.release(ptr);}
+    void release(const TemplateDec* ptr) { templateDecs.release(ptr);}
+    void release(const ConditionalStatement* ptr) { conditionalStatements.release(ptr);}
+    void release(const ReturnStatement* ptr) { returnStatements.release(ptr);}
+    void release(const ForLoop* ptr) {forLoops.release(ptr);}
+    void release(const WhileLoop* ptr) { whileLoops.release(ptr);}
+    void release(const SwitchStatement* ptr) { switchStatements.release(ptr);}
+    void release(const SwitchScopeStatementList* ptr) { switchScopeStatementLists.release(ptr);}
+    void release(const TemplateCreation* ptr) { templateCreations.release(ptr);}
+    void release(const IncludeDec* ptr) { includeDecs.release(ptr);}
 };

@@ -133,13 +133,13 @@ struct CodeGen {
     Tokenizer *tk{nullptr};
     Program &program;
     std::vector<Tokenizer> &tokenizers;
-    std::unordered_map<std::string, GeneralDec *>& lookUp;
+    std::unordered_map<std::string, const GeneralDec *>& lookUp;
     std::unordered_map<const StructDec *, StructInformation>& structLookUp;
 
     CodeGen(
         Program&,
         std::vector<Tokenizer>&,
-        std::unordered_map<std::string, GeneralDec *>&,
+        std::unordered_map<std::string, const GeneralDec *>&,
         std::unordered_map<const StructDec *, StructInformation>&
     );
 

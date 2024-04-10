@@ -42,7 +42,7 @@ struct Expression {
     explicit Expression(Token);
     Expression(const Expression&);
     Expression& operator=(const Expression&);
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     Expression deepCopy(NodeMemPool&);
     #define EXPRESSION_MASK 0x7
     inline BinOp* getBinOp() const { /* assert(getType() == ExpressionType::BINARY_OP); */ return (BinOp *)((uint64_t)binOp & ~EXPRESSION_MASK); } 
@@ -101,7 +101,7 @@ struct Statement {
     Statement();
     Statement(const Statement&);
     Statement& operator=(const Statement&);
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     Statement deepCopy(NodeMemPool&);
 
 };
@@ -120,7 +120,7 @@ struct TokenList {
     TokenList(const Token&, TokenList*);
     TokenList(const TokenList&) = default;
     TokenList& operator=(const TokenList&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     bool operator==(const TokenList&) const;
     TokenList deepCopy(NodeMemPool&);
 };
@@ -135,8 +135,8 @@ struct VariableDec {
     explicit VariableDec(const Token&);
     VariableDec(const VariableDec&) = default;
     VariableDec& operator=(const VariableDec&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
-    void prettyPrintDefinition(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
+    void prettyPrintDefinition(Tokenizer&, std::string&) const;
     VariableDec deepCopy(NodeMemPool&);
 };
 std::ostream& operator<<(std::ostream& os, const VariableDec& obj);
@@ -158,7 +158,7 @@ struct Scope {
     Scope() = default;
     Scope(const Scope &) = default;
     Scope& operator=(const Scope &) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     Scope deepCopy(NodeMemPool&);
 };
 
@@ -171,7 +171,7 @@ struct ArrayAccess {
     ArrayAccess() = delete;
     explicit ArrayAccess(const Token&);
     ArrayAccess(const ArrayAccess&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     ArrayAccess *deepCopy(NodeMemPool&);
 };
 
@@ -183,7 +183,7 @@ struct BinOp {
     BinOp() = delete;
     explicit BinOp(const Token&);
     BinOp(const BinOp&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     BinOp *deepCopy(NodeMemPool&);
 };
 
@@ -198,7 +198,7 @@ struct UnOp {
     UnOp() = delete;
     explicit UnOp(const Token&);
     UnOp(const UnOp&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     UnOp *deepCopy(NodeMemPool&);
 };
 
@@ -209,7 +209,7 @@ struct FunctionCall {
     FunctionCall() = delete;
     explicit FunctionCall(const Token &);
     FunctionCall(const FunctionCall&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     FunctionCall *deepCopy(NodeMemPool&);
 };
 
@@ -219,7 +219,7 @@ struct ContainerLiteral {
     uint32_t pos;
     ContainerLiteral() = default;
     ContainerLiteral(const ContainerLiteral&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     ContainerLiteral *deepCopy(NodeMemPool&);
 };
 
@@ -232,7 +232,7 @@ struct BranchStatement {
     BranchStatement() = default;
     BranchStatement(const BranchStatement&) = default;
     BranchStatement& operator=(const BranchStatement&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     BranchStatement deepCopy(NodeMemPool&);
 };
 
@@ -254,7 +254,7 @@ struct ConditionalStatement {
     Scope *elseStatement{nullptr};
     ConditionalStatement() = default;
     ConditionalStatement(const ConditionalStatement&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     ConditionalStatement *deepCopy(NodeMemPool&);
 };
 
@@ -264,7 +264,7 @@ struct ReturnStatement {
     Token token;
     ReturnStatement() = default;
     explicit ReturnStatement(const Token&);
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
     ReturnStatement *deepCopy(NodeMemPool&);
 };
 
@@ -273,7 +273,7 @@ struct SwitchScopeStatementList {
     Scope *caseBody{nullptr};
     SwitchScopeStatementList *next{nullptr};
     SwitchScopeStatementList() = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     SwitchScopeStatementList deepCopy(NodeMemPool&);
 };
 
@@ -282,7 +282,7 @@ struct SwitchStatement {
     SwitchScopeStatementList body;
     Expression switched;
     SwitchStatement() = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     SwitchStatement *deepCopy(NodeMemPool&);
 };
 
@@ -293,7 +293,7 @@ struct WhileLoop {
     BranchStatement statement;
     WhileLoop() = default;
     WhileLoop(const WhileLoop&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     WhileLoop *deepCopy(NodeMemPool&);
 };
 
@@ -304,7 +304,7 @@ struct ForLoop {
     Expression iteration;
     ForLoop() = default;
     ForLoop(const ForLoop &) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     ForLoop *deepCopy(NodeMemPool&);
 };
 
@@ -330,7 +330,7 @@ struct ControlFlowStatement {
     ControlFlowStatementType type;
     ControlFlowStatement();
 
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
     ControlFlowStatement *deepCopy(NodeMemPool&);
 };
 
@@ -348,8 +348,8 @@ struct FunctionDec {
     explicit FunctionDec(const Token&);
     FunctionDec(const FunctionDec&) = default;
     FunctionDec& operator=(const FunctionDec&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
-    void prettyPrintDefinition(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
+    void prettyPrintDefinition(Tokenizer&, std::string&) const;
     FunctionDec *deepCopy(NodeMemPool&);
 };
 
@@ -382,8 +382,8 @@ struct StructDec {
     StructDec() = default;
     explicit StructDec(const Token&);
     StructDec(const StructDec&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
-    void prettyPrintDefinition(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
+    void prettyPrintDefinition(Tokenizer&, std::string&) const;
     StructDec *deepCopy(NodeMemPool&);
 };
 
@@ -394,7 +394,7 @@ struct EnumDec {
     EnumDec() = delete;
     explicit EnumDec(const Token&);
     EnumDec(const EnumDec&) = default;
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
 };
 
 
@@ -411,8 +411,8 @@ struct TemplateDec {
     Token token;
     bool isStruct{false};
     TemplateDec();
-    void prettyPrint(Tokenizer&, std::string&, uint32_t);
-    void prettyPrintDefinition(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
+    void prettyPrintDefinition(Tokenizer&, std::string&) const;
     GeneralDec *deepCopy(NodeMemPool&, Token);
 };
 
@@ -424,13 +424,13 @@ struct TemplateCreation {
     Token typeName;
     TemplateCreation() = default;
     TemplateCreation(const TemplateCreation&) = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
 };
 
 struct IncludeDec {
     Token file;
     IncludeDec() = default;
-    void prettyPrint(Tokenizer&, std::string&);
+    void prettyPrint(Tokenizer&, std::string&) const;
 };
 
 struct BuiltinType {
@@ -475,8 +475,8 @@ struct GeneralDec {
     uint32_t tokenizerIndex{0};
     GeneralDecType type{GeneralDecType::NONE};
     GeneralDec();
-    void prettyPrint(std::vector<Tokenizer>&, std::string&);
-    void prettyPrintDefinition(std::vector<Tokenizer>&, std::string&);
+    void prettyPrint(std::vector<Tokenizer>&, std::string&) const;
+    void prettyPrintDefinition(std::vector<Tokenizer>&, std::string&) const;
     GeneralDec *deepCopy(NodeMemPool&);
 };
 
@@ -485,7 +485,7 @@ struct GeneralDecList {
     GeneralDec curr;
     GeneralDecList *next{nullptr};
     GeneralDecList() = default;
-    void prettyPrint(std::vector<Tokenizer>&, std::string&);
+    void prettyPrint(std::vector<Tokenizer>&, std::string&) const;
     GeneralDec *deepCopy(NodeMemPool&);
 };
 
@@ -493,7 +493,7 @@ struct GeneralDecList {
 struct Program {
     GeneralDecList decs;
     Program() = default;
-    void prettyPrint(std::vector<Tokenizer>&, std::string&);
+    void prettyPrint(std::vector<Tokenizer>&, std::string&) const;
 };
 
 namespace TokenListTypes { 

@@ -144,36 +144,30 @@ struct customType {
     CHECK(tc.errors.empty());
 }
 
+#define SET_UP(str) \
+    std::vector<Tokenizer> tokenizers; \
+    Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str); \
+    Parser parser{tokenizer, memPool}; \
+    Checker checker{parser.program, tokenizers, memPool}; \
+    checker.tk = &tokenizer; \
+    REQUIRE(parser.parse()); \
+    REQUIRE(checker.check(true)); \
+    const GeneralDec* genDec = checker.lookUp["StructName"]; \
+    REQUIRE(genDec); \
+    REQUIRE(genDec->structDec); \
+    auto& structInfo = checker.getStructInfo(*genDec->structDec)
 
-class TestFixture_GetStructInfo {
-    public:
-    StructInformation structInfo;
-    void setUp(const std::string &str) {
-        std::vector<Tokenizer> tokenizers;
-        Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str);
-        Parser parser{tokenizer, memPool};
-        Checker checker{parser.program, tokenizers, memPool};
-        checker.tk = &tokenizer;
-        REQUIRE(parser.parse());
-        REQUIRE(checker.check(true));
-        GeneralDec* genDec = checker.lookUp["StructName"];
-        REQUIRE(genDec);
-        REQUIRE(genDec->structDec);
-        structInfo = checker.getStructInfo(*genDec->structDec);
-    }
-};
-
-TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
+TEST_CASE("getStructInfo", "[codeGen]") {
     SECTION("one") {
         const std::string str = "struct StructName { x: uint32; }";
-        setUp(str);
+        SET_UP(str);
         CHECK(structInfo.size == 4);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["x"].position == 0);
     }
     SECTION("two") {
         const std::string str = "struct StructName { y:bool; x: uint32; }";
-        setUp(str);
+        SET_UP(str);
         CHECK(structInfo.size == 8);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -181,7 +175,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     }
     SECTION("three") {
         const std::string str = "struct StructName { x: uint32; y:bool; }";
-        setUp(str);
+        SET_UP(str);
         CHECK(structInfo.size == 8);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 4);
@@ -189,7 +183,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     }
     SECTION("four") {
         const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
-        setUp(str);
+        SET_UP(str);
         CHECK(structInfo.size == 12);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -198,7 +192,7 @@ TEST_CASE_METHOD(TestFixture_GetStructInfo, "getStructInfo", "[codeGen]") {
     }
     SECTION("five") {
         const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
-        setUp(str);
+        SET_UP(str);
         CHECK(structInfo.size == 24);
         CHECK(structInfo.alignTo == 8);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -367,6 +361,65 @@ TEST_CASE("array types", "[checker]") {
         REQUIRE(tc.errors.empty());
     }
 }
+
+TEST_CASE("struct types", "[checker]") {
+    SECTION("1") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("2") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = []; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("3") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0]; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("4") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0, other = 0]; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.size() == 1);
+    }
+    SECTION("5") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [0]; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.size() == 1);
+    }
+}
+
 
 TokenList* makeTypeList(const std::span<const TokenType> types) {
     TokenList *base = memPool.makeTokenList();
