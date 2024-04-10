@@ -101,390 +101,280 @@ Token Tokenizer::tokenizeNext() {
     TokenType type = numToType[(uint8_t)c];
     switch (type) {
         case TokenType::IDENTIFIER: {
-            switch (c) {
-                case '_': {
-                    if (
-                        content[++position] == '_' &&
-                        content[++position] == 'b' &&
-                        content[++position] == 'u' &&
-                        content[++position] == 'i' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 't' &&
-                        content[++position] == 'i' &&
-                        content[++position] == 'n'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::BUILTIN)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'a': {
-                    // as
-                    if (content[++position] == 's') {
-                        END_OF_IDENTIFIER(TokenType::AS)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'b': {
-                    // break bool
-                    if (content[++position] == 'r') {
-                        if (
-                            content[++position] == 'e' &&
-                            content[++position] == 'a' &&
-                            content[++position] == 'k'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::BREAK)
-                        }
-                    }
-                    else if (
-                        content[position] == 'o' &&
-                        content[++position] == 'o' &&
-                        content[++position] == 'l'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::BOOL)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'c': {
-                    // case create continue char
-                    if (content[++position] == 'a') {
-                        if (content[++position] == 's' && content[++position] == 'e') {
-                            END_OF_IDENTIFIER(TokenType::CASE)
-                        }
-                    }
-                    else if (content[position] == 'r') {
-                        if (
-                            content[++position] == 'e' &&
-                            content[++position] == 'a' &&
-                            content[++position] == 't' &&
-                            content[++position] == 'e'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::CREATE)
-                        }
-                    }
-                    else if (content[position] == 'o') {
-                        if (content[++position] == 'n') {
-                            if (content[++position] == 't') {
-                                if (
-                                    content[++position] == 'i' &&
-                                    content[++position] == 'n' &&
-                                    content[++position] == 'u' &&
-                                    content[++position] == 'e'
-                                ) {
-                                    END_OF_IDENTIFIER(TokenType::CONTINUE)
-                                } 
-                            } else if (content[position] == 's' && content[++position] == 't') {
-                                END_OF_IDENTIFIER(TokenType::CONST)
+            movePastIdentifier();
+            const uint32_t length = position - tokenStartPos;
+            switch (length) {
+                case 2: {
+                    switch (c) {
+                        case 'a': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "s", sizeof("s") - 1) == 0) {
+                                type = TokenType::AS; break;
                             }
+                            break;
                         }
-                    }
-                    else if (content[position] == 'h') {
-                        if (content[++position] == 'a' && content[++position] == 'r') {
-                            END_OF_IDENTIFIER(TokenType::CHAR_TYPE)
-                        }
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'd': {
-                    // default double 
-                    if (content[++position] == 'e') {
-                        if (content[++position] == 'f') {
-                            if (content[++position] == 'a') {
-                                if (
-                                    content[++position] == 'u' &&
-                                    content[++position] == 'l' &&
-                                    content[++position] == 't'
-                                ) {
-                                    END_OF_IDENTIFIER(TokenType::DEFAULT)
-                                }
-                            } else if (
-                                content[position] == 'i' &&
-                                content[++position] == 'n' &&
-                                content[++position] == 'e'
-                            ) {
-                                END_OF_IDENTIFIER(TokenType::DEFINE)
+                        case 'i': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "f", sizeof("f") - 1) == 0) {
+                                type = TokenType::IF; break;
                             }
+                            break;
                         }
+                        default: break;
                     }
-                    else if (
-                        content[position] == 'o' &&
-                        content[++position] == 'u' &&
-                        content[++position] == 'b' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 'e'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::DOUBLE_TYPE)
-                    }
-                    movePastIdentifier();
                     break;
                 }
-                case 'e': {
-                    // elif else enum extern
-                    if (content[++position] == 'l') {
-                        if (content[++position] == 'i') {
-                            if (content[++position] == 'f') {
-                                END_OF_IDENTIFIER(TokenType::ELIF)
+                case 3: {
+                    switch (c) {
+                        case 'f': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "or", sizeof("or") - 1) == 0) {
+                                type = TokenType::FOR; break;
                             }
-                        } else if (content[position] == 's' && content[++position] == 'e') {
-                            END_OF_IDENTIFIER(TokenType::ELSE)
+                            break;
                         }
-                    }
-                    else if (content[position] == 'n') {
-                        if (content[++position] == 'u' && content[++position] == 'm') {
-                            END_OF_IDENTIFIER(TokenType::ENUM)
-                        }
-                    }
-                    else if (content[position] == 'x') {
-                        if (content[++position] == 't') {
-                            if (
-                                content[++position] == 'e' &&
-                                content[++position] == 'r' &&
-                                content[++position] == 'n'
-                            ) {
-                                END_OF_IDENTIFIER(TokenType::EXTERN)
+                        case 'p': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "tr", sizeof("tr") - 1) == 0) {
+                                type = TokenType::POINTER; break;
                             }
-                        } else if (content[position] == 'i' && content[++position] == 't') {
-                                END_OF_IDENTIFIER(TokenType::EXIT)
+                            break;
                         }
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'f': {
-                    // false for func float
-                    if (content[++position] == 'a') {
-                        if (
-                            content[++position] == 'l' &&
-                            content[++position] == 's' &&
-                            content[++position] == 'e'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::FALSE)
-                        }
-                    }
-                    else if (content[position] == 'o') {
-                        if (content[++position] == 'r') {
-                            END_OF_IDENTIFIER(TokenType::FOR)
-                        }
-                    }
-                    else if (content[position] == 'u') {
-                        if (content[++position] == 'n' && content[++position] == 'c') {
-                            END_OF_IDENTIFIER(TokenType::FUNC)
-                        }
-                    } else if (content[position] == 'i') {
-                        if (
-                            content[++position] == 'l' &&
-                            content[++position] == 'e' &&
-                            content[++position] == '_' &&
-                            content[++position] == 't'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::FILE_TYPE)
-                        }
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'i': {
-                    // if include int8 int16 int32 int64
-                    if (content[++position] == 'f') {
-                        END_OF_IDENTIFIER(TokenType::IF)
-                    }
-                    else if (content[position] == 'n') {
-                        if (content[++position] == 't') {
-                            if (content[++position] == '8') {
-                                END_OF_IDENTIFIER(TokenType::INT8_TYPE)
-                            } else if (content[position] == '1') {
-                                if (content[++position] == '6') {
-                                    END_OF_IDENTIFIER(TokenType::INT16_TYPE)
-                                }
-                            } else if (content[position] == '3') {
-                                if (content[++position] == '2') {
-                                    END_OF_IDENTIFIER(TokenType::INT32_TYPE)
-                                }
-                            } else if (content[position] == '6') {
-                                if (content[++position] == '4') {
-                                    END_OF_IDENTIFIER(TokenType::INT64_TYPE)
-                                }
+                        case 'r': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ef", sizeof("ef") - 1) == 0) {
+                                type = TokenType::REFERENCE; break;
                             }
-                        } else if (
-                            content[position] == 'c' &&
-                            content[++position] == 'l' &&
-                            content[++position] == 'u' &&
-                            content[++position] == 'd' &&
-                            content[++position] == 'e'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::INCLUDE)
+                            break;
                         }
+                        default: break;
                     }
-                    movePastIdentifier();
                     break;
                 }
-                case 'n': {
-                    // nullptr 
-                    if (
-                        content[++position] == 'u' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 'p' &&
-                        content[++position] == 't' &&
-                        content[++position] == 'r'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::NULL_PTR)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'p': {
-                    // ptr 
-                    if (content[++position] == 't' && content[++position] == 'r') {
-                        END_OF_IDENTIFIER(TokenType::POINTER)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'r': {
-                    // ref return
-                    if (content[++position] == 'e') {
-                        if (content[++position] == 't') {
-                            if (
-                                content[++position] == 'u' &&
-                                content[++position] == 'r' && 
-                                content[++position] == 'n'
-                            ) {
-                                END_OF_IDENTIFIER(TokenType::RETURN)
+                case 4: {
+                    switch (c) {
+                        case 'b': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ool", sizeof("ool") - 1) == 0) {
+                                type = TokenType::BOOL; break;
                             }
-                        } else if (content[position] == 'f') {
-                            END_OF_IDENTIFIER(TokenType::REFERENCE)
+                            break;
                         }
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 's': {
-                    // switch struct
-                    if (content[++position] == 'w') {
-                        if (
-                            content[++position] == 'i' &&
-                            content[++position] == 't' &&
-                            content[++position] == 'c' &&
-                            content[++position] == 'h'
-                        ) {
-                            END_OF_IDENTIFIER(TokenType::SWITCH)
-                        }
-                    }
-                    else if (content[position] == 't') {
-                        if (content[++position] == 'r') {
-                            if (
-                                content[++position] == 'u' &&
-                                content[++position] == 'c' &&
-                                content[++position] == 't'
-                            ) {
-                                END_OF_IDENTIFIER(TokenType::STRUCT)
-                            } 
-                        } else if (content[position] == 'd') {
-                            //stdout, stderr, stdin
-                            if (content[++position] == 'e') {
-                                if (content[++position] == 'r' && content[++position == 'r']) {
-                                    END_OF_IDENTIFIER(TokenType::STDERR)
-                                }
-                            } else if (content[position] == 'o') {
-                                if (content[++position] == 'u' && content[++position == 't']) {
-                                    END_OF_IDENTIFIER(TokenType::STDOUT)
-                                }
-                            } else if (content[position] == 'i' && content[++position == 'n']) {
-                                END_OF_IDENTIFIER(TokenType::STDIN)
+                        case 'c': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ase", sizeof("ase") - 1) == 0) {
+                                type = TokenType::CASE; break;
                             }
-                        }
-                    }
-                    else if (
-                        content[position] == 'i' &&
-                        content[++position] == 'z' &&
-                        content[++position] == 'e' &&
-                        content[++position] == 'o' &&
-                        content[++position] == 'f'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::SIZEOF)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 't': {
-                    // true template
-                    if (content[++position] == 'r') {
-                        if (content[++position] == 'u' && content[++position] == 'e') {
-                            END_OF_IDENTIFIER(TokenType::TRUE)
-                        }
-                    } else if (
-                        content[position] == 'e' &&
-                        content[++position] == 'm' &&
-                        content[++position] == 'p' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 'a' &&
-                        content[++position] == 't' &&
-                        content[++position] == 'e'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::TEMPLATE)
-                    }
-                    movePastIdentifier();
-                    break;
-                }
-                case 'u': {
-                    // uint8 uint16 uint32 uint64
-                    if (
-                        content[++position] == 'i' &&
-                        content[++position] == 'n' &&
-                        content[++position] == 't'
-                    ) {
-                        if (content[++position] == '8') {
-                            END_OF_IDENTIFIER(TokenType::UINT8_TYPE)
-                        } else if (content[position] == '1') {
-                            if (content[++position] == '6') {
-                                END_OF_IDENTIFIER(TokenType::UINT16_TYPE)
+                            if (strncmp((const char *)&content[tokenStartPos +1], "har", sizeof("har") - 1) == 0) {
+                                type = TokenType::CHAR_TYPE; break;
                             }
-                        } else if (content[position] == '3') {
-                            if (content[++position] == '2') {
-                                END_OF_IDENTIFIER(TokenType::UINT32_TYPE)
-                            }
-                        } else if (content[position] == '6') {
-                            if (content[++position] == '4') {
-                                END_OF_IDENTIFIER(TokenType::UINT64_TYPE)
-                            }
+                            break;
                         }
+                        case 'e': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "lif", sizeof("lif") - 1) == 0) {
+                                type = TokenType::ELIF; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "lse", sizeof("lse") - 1) == 0) {
+                                type = TokenType::ELSE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "num", sizeof("num") - 1) == 0) {
+                                type = TokenType::ENUM; break;
+                            }
+                            break;
+                        }
+                        case 'f': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "unc", sizeof("unc") - 1) == 0) {
+                                type = TokenType::FUNC; break;
+                            }
+                            break;
+                        }
+                        case 'i': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "nt8", sizeof("nt8") - 1) == 0) {
+                                type = TokenType::INT8_TYPE; break;
+                            }
+                            break;
+                        }
+                        case 't': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "rue", sizeof("rue") - 1) == 0) {
+                                type = TokenType::TRUE; break;
+                            }
+                            break;
+                        }
+                        case 'v': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "oid", sizeof("oid") - 1) == 0) {
+                                type = TokenType::VOID; break;
+                            }
+                            break;
+                        }
+                        default: break;
                     }
-                    movePastIdentifier();
                     break;
                 }
-                case 'v': {
-                    // void
-                    if (
-                        content[++position] == 'o' &&
-                        content[++position] == 'i' &&
-                        content[++position] == 'd'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::VOID)
+                case 5: {
+                    switch (c) {
+                        case 'b': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "reak", sizeof("reak") - 1) == 0) {
+                                type = TokenType::BREAK; break;
+                            }
+                            break;
+                        }
+                        case 'c': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "onst", sizeof("onst") - 1) == 0) {
+                                type = TokenType::CONST; break;
+                            }
+                            break;
+                        }
+                        case 'f': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "alse", sizeof("alse") - 1) == 0) {
+                                type = TokenType::FALSE; break;
+                            }
+                            break;
+                        }
+                        case 'i': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "nt16", sizeof("nt16") - 1) == 0) {
+                                type = TokenType::INT16_TYPE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "nt32", sizeof("nt32") - 1) == 0) {
+                                type = TokenType::INT32_TYPE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "nt64", sizeof("nt64") - 1) == 0) {
+                                type = TokenType::INT64_TYPE; break;
+                            }
+                            break;
+                        }
+                        case 's': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "tdin", sizeof("tdin") - 1) == 0) {
+                                type = TokenType::STDIN; break;
+                            }
+                            break;
+                        }
+                        case 'u': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "int8", sizeof("int8") - 1) == 0) {
+                                type = TokenType::UINT8_TYPE; break;
+                            }
+                            break;
+                        }
+                        case 'w': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "hile", sizeof("hile") - 1) == 0) {
+                                type = TokenType::WHILE; break;
+                            }
+                            break;
+                        }
+                        default: break;
                     }
-                    movePastIdentifier();
                     break;
                 }
-                case 'w': {
-                    // while
-                    if (
-                        content[++position] == 'h' &&
-                        content[++position] == 'i' &&
-                        content[++position] == 'l' &&
-                        content[++position] == 'e'
-                    ) {
-                        END_OF_IDENTIFIER(TokenType::WHILE)
+                case 6: {
+                    switch (c) {
+                        case 'c': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "reate", sizeof("reate") - 1) == 0) {
+                                type = TokenType::CREATE; break;
+                            }
+                            break;
+                        }
+                        case 'd': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "efine", sizeof("efine") - 1) == 0) {
+                                type = TokenType::DEFINE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ouble", sizeof("ouble") - 1) == 0) {
+                                type = TokenType::DOUBLE_TYPE; break;
+                            }
+                            break;
+                        }
+                        case 'f': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ile_t", sizeof("ile_t") - 1) == 0) {
+                                type = TokenType::FILE_TYPE; break;
+                            }
+                            break;
+                        }
+                        case 'r': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "eturn", sizeof("eturn") - 1) == 0) {
+                                type = TokenType::RETURN; break;
+                            }
+                            break;
+                        }
+                        case 's': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "izeof", sizeof("izeof") - 1) == 0) {
+                                type = TokenType::SIZEOF; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "tderr", sizeof("tderr") - 1) == 0) {
+                                type = TokenType::STDERR; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "tdout", sizeof("tdout") - 1) == 0) {
+                                type = TokenType::STDOUT; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "truct", sizeof("truct") - 1) == 0) {
+                                type = TokenType::STRUCT; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "witch", sizeof("witch") - 1) == 0) {
+                                type = TokenType::SWITCH; break;
+                            }
+                            break;
+                        }
+                        case 'u': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "int16", sizeof("int16") - 1) == 0) {
+                                type = TokenType::UINT16_TYPE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "int32", sizeof("int32") - 1) == 0) {
+                                type = TokenType::UINT32_TYPE; break;
+                            }
+                            if (strncmp((const char *)&content[tokenStartPos +1], "int64", sizeof("int64") - 1) == 0) {
+                                type = TokenType::UINT64_TYPE; break;
+                            }
+                            break;
+                        }
+                        default: break;
                     }
-                    movePastIdentifier();
                     break;
                 }
-                default: {
-                    movePastIdentifier();
+                case 7: {
+                    switch (c) {
+                        case 'd': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "efault", sizeof("efault") - 1) == 0) {
+                                type = TokenType::DEFAULT; break;
+                            }
+                            break;
+                        }
+                        case 'i': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "nclude", sizeof("nclude") - 1) == 0) {
+                                type = TokenType::INCLUDE; break;
+                            }
+                            break;
+                        }
+                        case 'n': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ullptr", sizeof("ullptr") - 1) == 0) {
+                                type = TokenType::NULL_PTR; break;
+                            }
+                            break;
+                        }
+                        default: break;
+                    }
                     break;
                 }
+                case 8: {
+                    switch (c) {
+                        case 'c': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "ontinue", sizeof("ontinue") - 1) == 0) {
+                                type = TokenType::CONTINUE; break;
+                            }
+                            break;
+                        }
+                        case 't': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "emplate", sizeof("emplate") - 1) == 0) {
+                                type = TokenType::TEMPLATE; break;
+                            }
+                            break;
+                        }
+                        default: break;
+                    }
+                    break;
+                }
+                case 9: {
+                    switch (c) {
+                        case '_': {
+                            if (strncmp((const char *)&content[tokenStartPos +1], "_builtin", sizeof("_builtin") - 1) == 0) {
+                                type = TokenType::BUILTIN; break;
+                            }
+                            break;
+                        }
+                        default: break;
+                    }
+                    break;
+                }
+                default: break;
             }
             break;
         }
@@ -724,7 +614,7 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
 
 void Tokenizer::movePastIdentifier() {
     for (; position < content.size(); ++position) {
-        TokenType type = numToType[(uint8_t)content[position]];
+        const TokenType type = numToType[(uint8_t)content[position]];
         if (type != TokenType::IDENTIFIER && type != TokenType::DECIMAL_NUMBER) {
             return;
         }

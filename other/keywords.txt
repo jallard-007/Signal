@@ -3,6 +3,7 @@ TokenType::BUILTIN | __builtin
 TokenType::BREAK | break
 TokenType::CASE | case 
 TokenType::DEFINE | define
+TokenType::SIZEOF | sizeof
 TokenType::CREATE | create 
 TokenType::CONTINUE | continue
 TokenType::DEFAULT | default
@@ -18,7 +19,7 @@ TokenType::IF | if
 TokenType::STDIN | stdin
 TokenType::STDERR | stderr
 TokenType::STDOUT | stdout
-TokenType::CHAR | char
+TokenType::CHAR_TYPE | char
 TokenType::INT8_TYPE | int8
 TokenType::INT16_TYPE | int16
 TokenType::INT32_TYPE | int32
