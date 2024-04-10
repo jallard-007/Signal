@@ -25,6 +25,14 @@ enum class CheckerErrorType: uint8_t {
     INVALID_MAIN_FUNCTION_SIGNATURE,
     TYPE_TOO_LARGE_TO_RETURN,
     TYPE_TOO_LARGE_TO_BE_AN_ARGUMENT,
+    CANNOT_USE_AS_PARAMETER_TYPE,
+    CANNOT_USE_AS_RETURN_TYPE,
+    EXPECTING_NAMED_INDEX,
+    VARIABLE_INDEX_IN_CONTAINER_LITERAL,
+    CONTAINER_LITERAL_TOO_LARGE,
+    ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE,
+    INVALID_STRING_LITERAL,
+    USELESS_CONTAINER_LITERAL,
 
     // array size
     NOT_A_SIZE,
@@ -127,10 +135,15 @@ struct Checker {
     bool checkStatement(Statement&, TokenList&, bool, bool);
     bool checkScope(Scope&, TokenList&, bool, bool);
     bool checkLocalVarDec(VariableDec&);
-    ResultingType checkExpression(Expression&, std::unordered_map<std::string, StructMemberInformation> *structMap = nullptr);
+    ResultingType checkExpression(
+        Expression&,
+        std::unordered_map<std::string,
+        StructMemberInformation> * = nullptr
+    );
+    ResultingType checkContainerLiteralArray(ContainerLiteral&);
     ResultingType checkMemberAccess(ResultingType&, Expression&);
-    bool checkType(TokenList&);
-    bool checkAssignment(TokenList*, TokenList*, bool);
+    bool checkType(TokenList&, bool = false);
+    bool checkAssignment(TokenList*, TokenList*, bool, bool = false);
 
     void addError(const CheckerError&);
     void removeLastError();
@@ -140,6 +153,6 @@ struct Checker {
 bool canBeConvertedToBool(const TokenList*);
 Token getTypeFromTokenList(const TokenList&);
 TokenList* getNextFromTokenList(TokenList&);
-TokenList* getTypeQualifier(TokenList&);
+TokenType getTypeQualifier(TokenList&);
 uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
 uint32_t getSizeOfBuiltinType(TokenType);

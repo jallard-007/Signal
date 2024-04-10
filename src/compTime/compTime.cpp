@@ -27,6 +27,12 @@ void LiteralValue::set(FILE *val) {
     *(decltype(val) *)data = val;
     type = &TokenListTypes::fileValue;
 }
+void LiteralValue::set(std::string *val, TokenList* type) {
+    *(decltype(val) *)data = val;
+    this->type = type;
+    *this->type = TokenListTypes::stringValue;
+    this->type->exp.getTokenRef().setLength((uint16_t)(val->size() + 1));
+}
 void LiteralValue::set(double val) {
     *(decltype(val) *)data = val;
     type = &TokenListTypes::doubleValue;
@@ -59,9 +65,19 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
             assert(false);
             return expRes;
         }
-        // case TokenType::STRING_LITERAL: {
-        //     // could maybe do something here
-        // }
+        case TokenType::STRING_LITERAL: {
+            std::string stringLiteral = tk.extractToken(token);
+            if (!stringLiteralParser(stringLiteral)) {
+                // what to do here?
+                // maybe just print a warning, invalid string literal
+                assert(false);
+            }
+            // oh no, not new
+            // this is a little bit naughty, but might just leak this memory, (just the TokenList, the string will get freed)
+            // could consider making a static TokenList, would have to ensure that the data is not being used twice
+            expRes.set(new std::string{std::move(stringLiteral)}, new TokenList);
+            return expRes;
+        }
         case TokenType::DECIMAL_NUMBER: {
             std::string decimalNumber = tk.extractToken(token);
             uint64_t num = std::stoull(decimalNumber);
@@ -122,7 +138,7 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
             return expRes;
         }
         case TokenType::NULL_PTR: {
-            expRes.type = &TokenListTypes::ptrValue;
+            expRes.type = &TokenListTypes::nullptrValue;
             return expRes;
         }
         default: {
@@ -136,8 +152,8 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
     assert(left.type && right.type);
     const TokenType leftSideType = left.type->exp.getToken().getType();
     const TokenType rightSideType = right.type->exp.getToken().getType();
-    assert(isBuiltInType(leftSideType) && leftSideType != TokenType::VOID && leftSideType != TokenType::STRING_TYPE);
-    assert(isBuiltInType(rightSideType) && rightSideType != TokenType::VOID && rightSideType != TokenType::STRING_TYPE);
+    assert(isConcreteBuiltInType(leftSideType) && leftSideType != TokenType::VOID);
+    assert(isConcreteBuiltInType(rightSideType) && rightSideType != TokenType::VOID);
     LiteralValue res;
     // assign to largest type, minimum of int32
     res.type = &TokenListTypes::int32Value;
@@ -161,6 +177,7 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
             case TokenType::INT32_TYPE: { left.set(static_cast<int64_t>(*(int32_t*)left.getData())); break; }
             case TokenType::INT64_TYPE: break;
             default: {
+                assert(false);
                 exit(1);
             }
         }
@@ -178,6 +195,7 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
             case TokenType::INT32_TYPE: { right.set(static_cast<int64_t>(*(int32_t*)right.getData())); break; }
             case TokenType::INT64_TYPE: break;
             default: {
+                assert(false);
                 exit(1);
             }
         }
@@ -276,7 +294,7 @@ LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand) {
     assert(operand.type);
     LiteralValue res;
     const TokenType operandType = operand.type->exp.getToken().getType();
-    assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::STRING_TYPE);
+    assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::REFERENCE);
     
     // assign to largest type, minimum of int32
     res.type = &TokenListTypes::int32Value;
@@ -296,6 +314,7 @@ LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand) {
             case TokenType::INT32_TYPE: { operand.set(static_cast<int64_t>(*(int32_t*)operand.getData())); break; }
             case TokenType::INT64_TYPE: break;
             default: {
+                assert(false);
                 exit(1);
             }
         }
@@ -316,4 +335,42 @@ LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand) {
         }
     }
     return res;
+}
+
+bool stringLiteralParser(std::string& str) {
+    assert(str.size() > 1);
+    assert(str.front() == '\"');
+    assert(str.back() == '\"');
+    str.pop_back();
+    str.erase(0, 1);
+    bool valid = true;
+    for (uint32_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\') {
+            const char next = str[i + 1];
+            if (next == 'n') {
+                str.erase(i, 1);
+                str[i] = '\n';
+            } else if (next == 't') {
+                str.erase(i, 1);
+                str[i] = '\t';
+            } else if (next == 'b') {
+                str.erase(i, 1);
+                str[i] = '\b';
+            } else if (next == 'r') {
+                str.erase(i, 1);
+                str[i] = '\r';
+            } else if (next == '\\') {
+                str.erase(i, 1);
+            } else if (next == '\'') {
+                str.erase(i, 1);
+            } else if (next == '0') {
+                str.erase(i, 1);
+                str[i] = '\0';
+            } else {
+                ++i;
+                valid = false;
+            }
+        }
+    }
+    return valid;
 }

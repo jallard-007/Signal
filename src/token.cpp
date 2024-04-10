@@ -1,7 +1,21 @@
 #include "token.hpp"
+#include <cassert>
 
 bool isBuiltInType(TokenType type) {
-    return type >= TokenType::BOOL && type <= TokenType::VOID;
+    return type >= TokenType::VOID && type <= TokenType::REFERENCE;
+}
+
+bool isStrictType(TokenType type) {
+    assert(isConcreteBuiltInType(type));
+    return type == TokenType::FILE_TYPE || type == TokenType::DOUBLE_TYPE;
+}
+
+bool isConcreteBuiltInType(TokenType type) {
+    return type >= TokenType::BOOL && type <= TokenType::DOUBLE_TYPE;
+}
+
+bool isIndirectionType(TokenType type) {
+    return type == TokenType::REFERENCE || type == TokenType::POINTER || type == TokenType::ARRAY_TYPE;
 }
 
 bool isTypeQualifier(TokenType type) {
@@ -17,7 +31,7 @@ bool isUnaryOp(TokenType type) {
 }
 
 bool isConcreteType(TokenType type) {
-    return type == TokenType::IDENTIFIER || (isBuiltInType(type));
+    return type == TokenType::IDENTIFIER || isConcreteBuiltInType(type);
 }
 
 bool isLogicalOp(TokenType type) {
@@ -36,8 +50,12 @@ bool isAssignment(TokenType type) {
     return type >= TokenType::ASSIGNMENT && type <= TokenType::SHIFT_RIGHT_ASSIGNMENT;
 }
 
-bool isFloat(TokenType type) {
-    return type == TokenType::DOUBLE_TYPE; // || type == TokenType::FLOAT
+bool isFloatingPoint(TokenType type) {
+    return type == TokenType::DOUBLE_TYPE;
+}
+
+bool isIntegral(TokenType type) {
+    return isUnsigned(type) || isSigned(type);
 }
 
 bool isUnsigned(TokenType type) {
@@ -160,9 +178,9 @@ const char* tokenTypeToString [] = {
     "DECREMENT_POSTFIX",
     "DECREMENT_PREFIX",
     "NEGATIVE",
+    "VOID",
     "BOOL",
     "CHAR_TYPE",
-    "STRING_TYPE",
     "INT8_TYPE",
     "UINT8_TYPE",
     "INT16_TYPE",
@@ -171,15 +189,17 @@ const char* tokenTypeToString [] = {
     "UINT32_TYPE",
     "INT64_TYPE",
     "UINT64_TYPE",
-    "POINTER",
     "FILE_TYPE",
     "DOUBLE_TYPE",
-    "VOID",
+    "POINTER",
+    "ARRAY_TYPE",
     "REFERENCE",
     "CONST",
     "TYPE",
     "OPERATOR",
     "DEC_PTR",
+    "CONTAINER_LITERAL",
+    "THIS"
 };
 
 const TokenType numToType [128] {

@@ -11,11 +11,10 @@ namespace TokenListTypes {
     TokenList int64Value {Token{0,0,TokenType::INT64_TYPE}};
     TokenList uint64Value {Token{0,0,TokenType::UINT64_TYPE}};
     TokenList charValue {Token{0,0,TokenType::CHAR_TYPE}};
-    TokenList stringValue {Token{0,0,TokenType::STRING_TYPE}};
+    TokenList stringValue {Token{0,0,TokenType::STRING_LITERAL}};
     TokenList doubleValue {Token{0,0,TokenType::DOUBLE_TYPE}};
     TokenList fileValue {Token{0,0,TokenType::FILE_TYPE}};
     TokenList voidValue {Token{0,0,TokenType::VOID}};
-    TokenList ptrValue {Token{0,0,TokenType::POINTER}, &voidValue};
     TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
 };
 

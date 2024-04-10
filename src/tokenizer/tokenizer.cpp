@@ -8,6 +8,7 @@ Tokenizer::Tokenizer(std::string&& filePath, std::vector<unsigned char>&& fileCo
     filePath{std::move(filePath)}, content{std::move(fileContent)}
 {
     if (fileContent.size() > UINT32_MAX) {
+        std::cerr << "File too large\n";
         exit(1);
     }
     newlinePositions.reserve(fileContent.size() / 40);
@@ -17,6 +18,7 @@ Tokenizer::Tokenizer(std::string&& filePath, const std::vector<unsigned char>& f
     filePath{std::move(filePath)}, content{fileContent}
 {
     if (fileContent.size() > UINT32_MAX) {
+        std::cerr << "File too large\n";
         exit(1);
     }
     newlinePositions.reserve(fileContent.size() / 40);
@@ -26,6 +28,7 @@ Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
     filePath{std::move(filePath)}, content{fileContent.begin(), fileContent.end() + 1}
 {
     if (fileContent.size() > UINT32_MAX) {
+        std::cerr << "File too large\n";
         exit(1);
     }
     newlinePositions.reserve(fileContent.size() / 40);
@@ -703,6 +706,7 @@ Token Tokenizer::tokenizeNext() {
 
     if (position - tokenStartPos > UINT16_MAX) {
         // error
+        std::cerr << "Token too long\n";
         exit(1);
     }
     prevType = type;

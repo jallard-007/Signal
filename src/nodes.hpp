@@ -48,10 +48,12 @@ struct Expression {
     inline BinOp* getBinOp() const { /* assert(getType() == ExpressionType::BINARY_OP); */ return (BinOp *)((uint64_t)binOp & ~EXPRESSION_MASK); } 
     inline UnOp* getUnOp() const { assert(getType() == ExpressionType::UNARY_OP); return (UnOp *)((uint64_t)unOp & ~EXPRESSION_MASK); }
     inline Token getToken() const { assert(getType() == ExpressionType::VALUE); return value; }
+    inline Token& getTokenRef() { assert(getType() == ExpressionType::VALUE); return value; }
     inline FunctionCall* getFunctionCall() const { assert(getType() == ExpressionType::FUNCTION_CALL); return (FunctionCall *)((uint64_t)funcCall & ~EXPRESSION_MASK); }
     inline ArrayAccess* getArrayAccess() const { assert(getType() == ExpressionType::ARRAY_ACCESS); return (ArrayAccess *)((uint64_t)arrAccess & ~EXPRESSION_MASK); }
     inline ContainerLiteral* getContainerLiteral() const { assert(getType() == ExpressionType::CONTAINER_LITERAL); return (ContainerLiteral *)((uint64_t)containerLiteral & ~EXPRESSION_MASK); }
     inline ExpressionType getType() const { return (ExpressionType)(type & EXPRESSION_MASK); }
+    inline const void *getRawPointer() const { return (const void *)((uint64_t)binOp & ~EXPRESSION_MASK); }
 
     #define SET_EXP(expType) binOp = (BinOp *)(((uint8_t)expType & EXPRESSION_MASK) | ((uint64_t)ref & ~EXPRESSION_MASK))
     inline void setBinOp(BinOp *ref) { SET_EXP(ExpressionType::BINARY_OP); }
@@ -212,9 +214,9 @@ struct FunctionCall {
 };
 
 // arrayLiteral:= [ expressionList ]
-// structLiteral:= { expressionList }
 struct ContainerLiteral {
     ExpressionList values;
+    uint32_t pos;
     ContainerLiteral() = default;
     ContainerLiteral(const ContainerLiteral&) = default;
     void prettyPrint(Tokenizer&, std::string&);
@@ -503,11 +505,9 @@ namespace TokenListTypes {
     extern TokenList int64Value;
     extern TokenList uint64Value;
     extern TokenList charValue;
-    extern TokenList stringValue;
-    // extern TokenList floatValue;
     extern TokenList doubleValue;
     extern TokenList fileValue;
-    extern TokenList ptrValue;
     extern TokenList nullptrValue;
+    extern TokenList stringValue;
     extern TokenList voidValue;
 };

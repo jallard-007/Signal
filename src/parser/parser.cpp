@@ -1030,7 +1030,10 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
 }
 
 /**
- * Returns the next token after the type list, adding tokens to type as it goes. tokens are in reverse order
+ * Parses a type, tokens are stored in reverse order
+ * Ex:
+ *  var : int32 ptr
+ *  would be stored with first being ptr, and next being int32
  * Does NOT consume the final token
 */
 ParseTypeErrorType Parser::getType(TokenList& type) {

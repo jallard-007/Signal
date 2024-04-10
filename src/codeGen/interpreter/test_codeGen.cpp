@@ -316,6 +316,7 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
 TEST_CASE("placing literal in data section", "[codeGen]") {
     SECTION("1") {
         const std::string stringLiteral = R"(Hello World!\n)";
+        const std::string stringLiteralExpected = "Hello World!\n";
         const std::string str = "str: const char ptr = \"" + stringLiteral + "\";";
         testBoilerPlate(str);
         Statement statement;
@@ -333,7 +334,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
         CHECK(codeGen.byteCode == expected.byteCode);
         REQUIRE(codeGen.dataSectionEntries.size() == 4);
         DataSectionEntry& entry = codeGen.dataSectionEntries[3];
-        CHECK(stringLiteral == (char *)(codeGen.dataSection.data() + entry.indexInDataSection) );
+        CHECK(stringLiteralExpected == (char *)(codeGen.dataSection.data() + entry.indexInDataSection) );
     }
     SECTION("2") {
         const std::string str = "file: file_t = stdin;";

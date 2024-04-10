@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstring>
 #include <utility>
+#include <memory>
 #include <concepts>
 #include "codeGen.hpp"
 #include "utils.hpp"
@@ -404,6 +405,11 @@ void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) 
 // GENERAL EXPRESSIONS
 // ========================================
 
+/**
+ * 
+ * \note if the expression is a string literal, the returned object has
+ * memory allocated using new within the field value.type (TokenList)
+*/
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
     switch (currExp.getType()) {
         case ExpressionType::ARRAY_ACCESS: {
@@ -562,7 +568,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
 
     tk = oldTk;
 
-    return returnValueExpression;
+    return { std::move(returnValueExpression) };
 }
 
 
@@ -735,17 +741,10 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
     ExpressionResult expRes;
     const Token& token = expression.getToken();
     switch (token.getType()) {
-        case TokenType::CHAR_LITERAL: {
-            return expRes;
-        }
-        case TokenType::STRING_LITERAL: { 
-            // place string literal in data section of bytecode, return offset to start of string
-            expRes.value.type = &TokenListTypes::stringValue;
-            std::string stringLiteral = tk->extractToken(token);
-              // remove quotes around string
-            stringLiteral.erase(stringLiteral.end() - 1);
-            stringLiteral.erase(stringLiteral.begin());
-            // TODO: need to replace escaped characters with actual value
+        case TokenType::STRING_LITERAL: {
+            // expRes.value.type points to memory allocated with new
+            expRes.value = loadLiteralValue(*tk, expression);
+            std::unique_ptr<std::string> stringLiteral {*(std::string **)expRes.value.getData()};
             // check if string is already in data section
             for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
                 if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
@@ -753,13 +752,14 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
                 }
                 const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
                 uint64_t stringLength = strlen(pString);
-                if (stringLiteral.length() == stringLength && stringLiteral == pString) {
+                if (stringLiteral->length() == stringLength && *stringLiteral == pString) {
                     expRes.value.set(i);
                     return expRes;
                 }
                 i += stringLength;
             }
-            const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, stringLiteral.data(), stringLiteral.length() + 1);
+            // place string literal in data section of bytecode, return offset to start of string
+            const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, (void *)stringLiteral->data(), stringLiteral->length() + 1);
             if (dataSectionEntry.indexInDataSection) {
                 {
                     ExpressionResult stringExp;
@@ -772,7 +772,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
                 efficientImmAddOrSub(expRes.getReg(), dataSectionEntry.indexInDataSection, OpCode::ADD);
             } else {
                 expRes.setReg(dataPointerIndex);
-                expRes.isTemp = true;
+                expRes.isTemp = false;
             }
             return expRes;
         }
@@ -827,14 +827,6 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             } // already set to uint64_t
             return expRes;
         }
-        case TokenType::FALSE: {
-            expRes.value.set(false);
-            return expRes;
-        }
-        case TokenType::TRUE: {
-            expRes.value.set(true);
-            return expRes;
-        }
         case TokenType::STDIN: {
             expRes.isPointerToValue = true;
             expRes.setReg(allocateRegister());
@@ -860,10 +852,6 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             addBytes({{(bc)OpCode::MOVE, expRes.getReg(), dataPointerIndex}});
             efficientImmAddOrSub(expRes.getReg(), stdoutDataIndex, OpCode::ADD);
             expRes.value.type = &TokenListTypes::fileValue;
-            return expRes;
-        }
-        case TokenType::NULL_PTR: {
-            expRes.value.type = &TokenListTypes::ptrValue;
             return expRes;
         }
         case TokenType::IDENTIFIER: {
@@ -892,7 +880,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             return expRes;
         }
         default: {
-            assert(false);
+            expRes.value = loadLiteralValue(*tk, expression);
             return expRes;
         }
     }
@@ -2106,6 +2094,7 @@ uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
         case StackItemType::RETURNED_VALUE_SPACE: { return stackItem.positionOnStack; }
         case StackItemType::SAVED_TEMPORARY: { return stackItem.savedTempValue.positionOnStack; }
     }
+    assert(false);
     exit(1);
 }
 

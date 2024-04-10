@@ -2,17 +2,17 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <string>
 #include "nodes.hpp"
 
 typedef struct ExpressionResult ExpressionResult;
 
 struct LiteralValue {
+    TokenList *type;
     private:
     unsigned char data [SIZE_OF_REGISTER] {0};
     public:
-    TokenList *type {nullptr};
     inline const void *getData() const { return (void *)data; }
-
     template <class T> void set(T) = delete;
     void set(char);
     void set(uint32_t);
@@ -22,9 +22,10 @@ struct LiteralValue {
     void set(FILE *);
     void set(double);
     void set(bool);
+    void set(std::string *, TokenList*);
 
     template <class T>
-    void setUntyped(T t) requires (std::integral<T> || std::floating_point<T>) {
+    void setUntyped(T t) {
         static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
         *(decltype(t) *)data = t;
     }
@@ -267,3 +268,4 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
 
 LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand);
 
+bool stringLiteralParser(std::string&);

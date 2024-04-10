@@ -117,9 +117,9 @@ enum class TokenType : uint8_t {
     NEGATIVE,
 
     // types
+    VOID,
     BOOL,
     CHAR_TYPE,
-    STRING_TYPE,
     INT8_TYPE,
     UINT8_TYPE,
     INT16_TYPE,
@@ -129,9 +129,9 @@ enum class TokenType : uint8_t {
     INT64_TYPE,
     UINT64_TYPE,
     FILE_TYPE,
-    POINTER,
     DOUBLE_TYPE,
-    VOID,
+    POINTER,
+    ARRAY_TYPE,
     REFERENCE,
 
     // type modifiers
@@ -143,7 +143,21 @@ enum class TokenType : uint8_t {
 
     // extra types used by checker
     DEC_PTR,
-    ARRAY_TYPE, // when the type is array type, the size of the array is stored in the position part of the token
+    /* container literal is different from array literal in that container literal is a temporary,
+     whereas array literals have space allocated for them.
+     can assign container literals to array type
+     can assign array type to ptr type
+     can assign ptr to ptr
+     string literal falls under both container literal and array type
+     you can do both char [] = "hello", and const char ptr = "hello"
+     Ex:
+     string literals are array literals
+     variables defined as : int32 [] are array literals
+     initializer lists are container literals
+     {'a', 'b'} is a container literal. string literals fall under the array literal section
+     since they are placed in the data section of the bytecode file, so have space allocated for them
+    */
+    CONTAINER_LITERAL,
 
     // special tokens that are not directly parsed
     THIS,
@@ -176,6 +190,9 @@ struct Token {
 
 
 bool isBuiltInType(TokenType);
+bool isStrictType(TokenType);
+bool isIndirectionType(TokenType);
+bool isConcreteBuiltInType(TokenType);
 bool isTypeQualifier(TokenType);
 bool isConcreteType(TokenType);
 bool isBinaryOp(TokenType);
@@ -184,6 +201,8 @@ bool isControlFlow(TokenType);
 bool isLiteral(TokenType);
 bool isLogicalOp(TokenType);
 bool isAssignment(TokenType);
+bool isFloatingPoint(TokenType);
+bool isIntegral(TokenType);
 bool isUnsigned(TokenType);
 bool isSigned(TokenType);
 
