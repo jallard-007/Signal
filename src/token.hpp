@@ -176,10 +176,6 @@ struct Token {
         token = ((uint64_t)t << 8) | ((uint64_t)len << 16) | ((uint64_t)pos << 32);
     }
     bool operator==(const Token&) const;
-    inline Token& operator=(const Token& tk) {
-        token = (token & 0xff) | (tk.token & ~0xff);
-        return *this;
-    };
     inline TokenType getType() const { return (TokenType)((token & 0xff00) >> 8); };
     inline void setType(TokenType type) { token = (token & ~0xff00ul) | ((uint64_t)type << 8); };
     inline uint16_t getLength() const { return (uint16_t)((token & 0xffff0000) >> 16); };
