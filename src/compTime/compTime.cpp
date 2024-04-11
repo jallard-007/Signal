@@ -47,7 +47,7 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
     const Token token = expression.getToken();
     switch (token.getType()) {
         case TokenType::CHAR_LITERAL: {
-            std::string charLiteral = tk.extractToken(token);
+            const std::string& charLiteral = tk.extractToken(token);
             // convert charLiteral to its numeric value and return it
             if (charLiteral.size() == 3) {
                 expRes.set(charLiteral[1]);
@@ -79,7 +79,7 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
             return expRes;
         }
         case TokenType::DECIMAL_NUMBER: {
-            std::string decimalNumber = tk.extractToken(token);
+            const std::string& decimalNumber = tk.extractToken(token);
             uint64_t num = std::stoull(decimalNumber);
             expRes.set(num);
             if (num <= INT32_MAX) {
@@ -93,7 +93,7 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
         }
         case TokenType::BINARY_NUMBER: {
             assert(token.getLength() > 2);
-            std::string binaryNumber = tk.extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::BINARY_NUMBER});
+            const std::string& binaryNumber = tk.extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::BINARY_NUMBER});
             uint64_t num = std::stoull(binaryNumber, nullptr, 2);
             expRes.set(num);
             if (num <= INT32_MAX) {
@@ -106,14 +106,14 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
             return expRes;
         }
         case TokenType::FLOAT_NUMBER: {
-            std::string binaryNumber = tk.extractToken(token);
+            const std::string& binaryNumber = tk.extractToken(token);
             double num = std::stod(binaryNumber);
             expRes.set(num);
             return expRes;
         }
         case TokenType::HEX_NUMBER: { 
             assert(token.getLength() > 2);
-            std::string hexNumber = tk.extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::HEX_NUMBER});
+            const std::string& hexNumber = tk.extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::HEX_NUMBER});
             /*
             std::invalid_argument
             std::out_of_range

@@ -158,3 +158,4 @@ Token getTypeFromTokenList(const TokenList&);
 TokenType getTypeQualifier(const TokenList&);
 uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
 uint32_t getSizeOfBuiltinType(TokenType);
+const GeneralDec *getDecPtr(const TokenList *);

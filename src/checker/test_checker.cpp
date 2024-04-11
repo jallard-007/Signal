@@ -138,9 +138,7 @@ struct customType {
     REQUIRE(pr.expected.empty());
     REQUIRE(pr.unexpected.empty());
     Checker tc{pr.program, tks, memPool};
-    tc.firstTopLevelScan();
-    tc.secondTopLevelScan(true);
-    tc.fullScan();
+    tc.check(true);
     CHECK(tc.errors.empty());
 }
 
@@ -404,8 +402,9 @@ TEST_CASE("struct types", "[checker]") {
         REQUIRE(pr.parse());
         Checker tc{pr.program, tks, memPool};
         tc.tk = &tks.back();
-        tc.check(true);
-        CHECK(tc.errors.size() == 1);
+        CHECK_FALSE(tc.check(true));
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::NO_SUCH_MEMBER_VARIABLE);
     }
     SECTION("5") {
         std::vector<Tokenizer> tks;
@@ -416,7 +415,8 @@ TEST_CASE("struct types", "[checker]") {
         Checker tc{pr.program, tks, memPool};
         tc.tk = &tks.back();
         tc.check(true);
-        CHECK(tc.errors.size() == 1);
+        REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::EXPECTING_NAMED_INDEX);
     }
 }
 
