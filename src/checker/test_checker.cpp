@@ -418,6 +418,17 @@ TEST_CASE("struct types", "[checker]") {
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::EXPECTING_NAMED_INDEX);
     }
+    SECTION("6") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; var: double; } func main(): void { var: MyType = [var = 1.0]; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        CHECK(tc.errors.empty());
+    }
 }
 
 

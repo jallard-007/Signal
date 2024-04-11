@@ -30,7 +30,7 @@ LiteralValue evaluate(Tokenizer& tk, const Expression& exp) {
             return evaluateUnaryOpImmExpression(exp.getUnOp()->op.getType(), operandValue);
         }
         case ExpressionType::VALUE: {
-            return loadLiteralValue(tk, exp);
+            return loadLiteralValue(tk, exp.getToken());
         }
         default: {
             assert(false);

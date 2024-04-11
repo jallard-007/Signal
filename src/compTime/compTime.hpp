@@ -262,7 +262,7 @@ void doUnaryEvaluate(const LiteralValue& operand, LiteralValue& res) {
     }
 }
 
-LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression);
+LiteralValue loadLiteralValue(Tokenizer& tk, Token);
 
 LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, LiteralValue& right);
 

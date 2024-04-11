@@ -98,9 +98,9 @@ struct CheckerError {
     CheckerError(CheckerErrorType);
     CheckerError(CheckerErrorType, uint32_t, Token);
     CheckerError(CheckerErrorType, uint32_t, const GeneralDec*);
-    CheckerError(CheckerErrorType, uint32_t, Expression*);
+    CheckerError(CheckerErrorType, uint32_t, const Expression*);
     CheckerError(CheckerErrorType, uint32_t, Token, const GeneralDec*);
-    CheckerError(CheckerErrorType, uint32_t, Expression*, const GeneralDec*);
+    CheckerError(CheckerErrorType, uint32_t, const Expression*, const GeneralDec*);
     std::string getErrorMessage(std::vector<Tokenizer>&) const;
 };
 
@@ -138,13 +138,14 @@ struct Checker {
     bool checkStatement(Statement&, TokenList&, bool, bool);
     bool checkScope(Scope&, TokenList&, bool, bool);
     bool checkLocalVarDec(VariableDec&);
-    ResultingType checkExpression(
-        Expression&,
-        const StructInformation* = nullptr
-    );
+    ResultingType checkExpression(const Expression&,const StructInformation* = nullptr);
+    ResultingType checkBinOpExpression(const BinOp&);
+    ResultingType checkUnOpExpression(const UnOp&);
+    ResultingType checkTokenExpression(Token,const StructInformation* = nullptr);
+    ResultingType checkFunctionCallExpression(const FunctionCall&,const StructInformation* = nullptr);
     bool checkContainerLiteralStruct(ContainerLiteral&, const StructInformation&);
     ResultingType checkContainerLiteralArray(ContainerLiteral&);
-    ResultingType checkMemberAccess(ResultingType&, Expression&);
+    ResultingType checkMemberAccess(ResultingType&, const BinOp&);
     bool checkType(TokenList&, bool = false);
     bool checkAssignment(const TokenList*, const TokenList*, bool, bool = false);
 

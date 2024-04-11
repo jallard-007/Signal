@@ -751,7 +751,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
     switch (token.getType()) {
         case TokenType::STRING_LITERAL: {
             // expRes.value.type points to memory allocated with new
-            expRes.value = loadLiteralValue(*tk, expression);
+            expRes.value = loadLiteralValue(*tk, token);
             std::unique_ptr<std::string> stringLiteral {*(std::string **)expRes.value.getData()};
             // check if string is already in data section
             for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
@@ -888,7 +888,7 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             return expRes;
         }
         default: {
-            expRes.value = loadLiteralValue(*tk, expression);
+            expRes.value = loadLiteralValue(*tk, token);
             return expRes;
         }
     }
@@ -2123,6 +2123,7 @@ void CodeGen::popValue(const TokenList& type, const bytecode_t reg) {
     const OpCode popOp = getPopOpForSize(size);
     if (popOp == OpCode::NOP) {
         // TODO:
+        assert(false);
     }
     addBytes({{(bc)popOp, reg}});
     stackItems.pop_back();

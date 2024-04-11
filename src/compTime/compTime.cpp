@@ -42,9 +42,8 @@ void LiteralValue::set(bool val) {
     type = &TokenListTypes::boolValue;
 }
 
-LiteralValue loadLiteralValue(Tokenizer& tk, const Expression &expression) {
+LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
     LiteralValue expRes;
-    const Token token = expression.getToken();
     switch (token.getType()) {
         case TokenType::CHAR_LITERAL: {
             const std::string& charLiteral = tk.extractToken(token);
