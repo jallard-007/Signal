@@ -61,8 +61,19 @@ struct Parser {
     Parser() = delete;
     ~Parser();
     explicit Parser(Tokenizer&, NodeMemPool&);
+
+    /**
+     * Parses the entire tokenizer ouput
+     * \returns false if some parse error was encountered, true on success
+    */
     bool parse();
+
+    /**
+     * Parses the next general declaration
+     * \returns a pointer to the parsed declaration
+    */
     GeneralDec *parseNext();
+
     bool parseBuiltin(GeneralDec&);
     bool parseFunctionHeader(FunctionDec&);
     bool parseFunction(FunctionDec&);
@@ -77,7 +88,6 @@ struct Parser {
     ParseStatementErrorType parseVariableDec(VariableDec&);
     ParseExpressionErrorType parseExpression(Expression&);
     ParseExpressionErrorType parseLeaf(Expression&);
-    ParseExpressionErrorType parseContainerLiteral(ContainerLiteral&, TokenType);
     ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
     ParseTypeErrorType getType(TokenList&);
 };

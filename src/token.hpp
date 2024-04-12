@@ -202,9 +202,22 @@ bool isIntegral(TokenType);
 bool isUnsigned(TokenType);
 bool isSigned(TokenType);
 
-extern const TokenType numToType [128];
+/**
+ * Maps single character to (potential) token type
+*/
+extern const TokenType charToType [128];
+
+/**
+ * Maps token type to it's string representation as it would look in source
+*/
 extern const std::unordered_map<TokenType, std::string> typeToString;
 
+/**
+ * print function for a token type
+*/
 std::ostream& operator<<(std::ostream& os, const TokenType& obj);
 
-extern const char * tokenTypeToString [];
+/**
+ * Maps token type to a string representation
+*/
+extern const char * tokenTypeToTypeString [];

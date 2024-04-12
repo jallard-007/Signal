@@ -81,7 +81,7 @@ void CodeGen::addBytes(const std::span<const bc> bytes) {
 
 void CodeGen::addNumBytes(const void *data, const uint64_t n) {
     byteCode.resize(byteCode.size() + n);
-    memcpy(byteCode.end().base() - n, data, n);
+    memcpy(&*byteCode.end() - n, data, n);
 }
 
 void CodeGen::add2ByteNum(const uint16_t num) {
@@ -101,21 +101,12 @@ void CodeGen::addPointer() {
     addNumBytes(&p, sizeof p);
 }
 
-/**
- * Used to add a jump op
-*/
 void CodeGen::addJumpOp(OpCode jumpOp) {
     assert(jumpOp >= OpCode::RS_JUMP && jumpOp <= OpCode::RS_JUMP_LE);
     addByteOp(jumpOp);
     addByte(0);
 }
 
-/**
- * Align for size byte immediate with offset
- * Use before any instruction that has an immediate value
- * Param offset: number of bytes before immediate
- * Param size: size in bytes of immediate
-*/
 void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
     uint32_t mod = (byteCode.size() + offset) % size;
     if (mod == 0) {
@@ -126,10 +117,6 @@ void CodeGen::alignForImm(const uint32_t offset, const uint32_t size) {
     }
 }
 
-/**
- * Moves an immediate value within an ExpressionResult into a register
- * Updates exp by setting isReg and isTemp to true, as well as setting the register to the register parameter
-*/
 void CodeGen::moveImmToReg(const bytecode_t reg, ExpressionResult& exp) {
     assert(!exp.isReg);
     exp.isTemp = true;
@@ -198,19 +185,10 @@ bool jumpMarkerTypeHasJump(JumpMarkerType markerType) {
     return markerType >= JumpMarkerType::TO_BRANCH_END && markerType <= JumpMarkerType::TO_LOGICAL_BIN_OP_END;
 }
 
-/**
- * \returns the index of the jump marker within the jump markers array
-*/
 JumpMarker& CodeGen::addJumpMarker(JumpMarkerType type) {
     return jumpMarkers.emplace_back(byteCode.size(), type);
 }
 
-/**
- * Updates jump markers with destination. Sets type of each updated marker to JumpMarkerType::SET
- * \param destination the destination
- * \param type type of jump marker to update
- * \param from update markers from this index within the jumper markers container until the end
-*/
 void CodeGen::updateJumpMarkersTo(const uint64_t destination, JumpMarkerType type, uint32_t from) {
     for (auto iter = std::next(jumpMarkers.begin(), from); iter != jumpMarkers.end(); ++iter) {
         JumpMarker& jumpMarker = *iter;
@@ -360,10 +338,6 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
     }
 }
 
-/**
- * Have to figure out stack alignment
- * \returns the size of the type
-*/
 void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     if (typeToken.getType() == TokenType::REFERENCE) {
@@ -413,11 +387,6 @@ void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) 
 // GENERAL EXPRESSIONS
 // ========================================
 
-/**
- * 
- * \note if the expression is a string literal, the returned object has
- * memory allocated using new within the field value.type (TokenList)
-*/
 ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
     switch (currExp.getType()) {
         case ExpressionType::ARRAY_ACCESS: {
@@ -449,15 +418,6 @@ ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool con
     }
 }
 
-/*
-
-keep track of which register a variable is in,
-if its not in a register then allocate one for it
-if theres no more register then :/
-update value on stack with the value in the register if its been updated (need to mark a register as changed or not)
-be sure to free registers if they are no longer needed
-
-*/
 ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAccess) {
     if (arrAccess.array.getBinOp()) {
         return {};
@@ -472,12 +432,6 @@ ExpressionResult CodeGen::generateExpressionContainerLiteral(const ContainerLite
     return {};
 }
 
-/**
- * Generates a function call expression
- * \param functionCall the function call node
- * \returns an ExpressionResult object
- * 
-*/
 ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &functionCall) {
     // need to lookup return type so we can make room for it
     const std::string& functionName = tk->extractToken(functionCall.name);
@@ -579,10 +533,6 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
     return { std::move(returnValueExpression) };
 }
 
-
-/**
- * Uses the misc register
-*/
 void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResult& left, const ExpressionResult& right) {
     assert(left.isReg);
     const bytecode_t resReg = left.getReg();
@@ -646,13 +596,6 @@ void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResul
     addBytes({{(bc)op, resReg, miscRegisterIndex}});
 }
 
-/**
- * Generates the expression and returns the address of the result.
- * the expression must be of a type that has a resulting address.
- * Valid expression types: value (value must be an identifier, which is a valid variable), array access, binary op member access, unary op dereference
- * \returns an ExpressionResult object. isTemp is true if isReg is true.
- * if isReg is set to false, it means there is something wrong with the expression. this should have been caught in the checker stage
-*/
 ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
     ExpressionResult expRes;
     expRes.isPointerToValue = true;
@@ -743,7 +686,6 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
         }
     }
 }
-
 
 ExpressionResult CodeGen::loadValue(const Expression &expression) {
     ExpressionResult expRes;
@@ -894,9 +836,6 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
     }
 }
 
-/**
- * Loads the data pointed at by expRes into a register
-*/
 ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp, bytecode_t reg) {
     assert(pointerExp.isReg);
     assert(pointerExp.isPointerToValue);
@@ -954,9 +893,6 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
     return expRes;
 }
 
-/**
- * Stores data
-*/
 void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, ExpressionResult &valueExp) {
     assert(pointerExp.isReg);
     assert(pointerExp.isPointerToValue);
@@ -976,12 +912,6 @@ void CodeGen::copyValue(ExpressionResult &pointerExp, ExpressionResult &valueExp
     (void)valueExp;
 }
 
-
-/**
- * Adds to a pointer based on type size
- * \param pointerExp the pointer expression to add to. Must be a pointer type
- * \param indexExp the index expression, can be any integral value
-*/
 void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResult &indexExp) {
     assert(isSigned(getTypeFromTokenList(*indexExp.value.type).getType()) || isUnsigned(getTypeFromTokenList(*indexExp.value.type).getType()));
     assert(getTypeFromTokenList(*pointerExp.value.type).getType() == TokenType::POINTER);
@@ -1015,10 +945,7 @@ bool isCommutative(OpCode op) {
     );
 }
 
-/**
- * Generates byte code for a mathematical binary expression
- * Preserves any non-temporary values
-*/
+
 ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
     ExpressionResult leftResult = generateExpression(binOp.leftSide);
     ExpressionResult rightResult = generateExpression(binOp.rightSide);
@@ -1108,10 +1035,6 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
     }
 }
 
-/**
- * Generates byte code for assignment expressions
- * Values on the left side are not preserved
-*/
 ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
     // checkers job to insure the assignment is valid
     ExpressionResult rightResult = generateExpression(binOp.rightSide);
@@ -1138,16 +1061,6 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
     return leftResult;
 }
 
-/**
- * Generates the code for a boolean bin op.
- * When controlFlow is set to true, this will set the jumpOp field in the return value to the correct jump op.
- * When controlFlow is set to false, the result will be put into a register
- * \param binOp the binOp object to generate code for
- * \param op the op code used to do the comparison
- * \param jumpOp the jump op code to use on control flow statement. jump on !condition, so the jump op jumps when the condition is false. used when controlFlow is true
- * \param getOp the get op code to use when placing the result in a register. used when controlFlow is false
- * \param controlFlow dictates if the jump op will be returned, or if the get op will be used and a register will be returned
-*/
 ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp, bool controlFlow) {
     // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
     if (binOp.op.getType() == TokenType::LOGICAL_AND || binOp.op.getType() == TokenType::LOGICAL_OR) {
@@ -1638,7 +1551,6 @@ void CodeGen::generateStatement(const Statement& statement) {
     }
 }
 
-
 void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
     switch (controlFlowStatement.type) {
         case ControlFlowStatementType::FOR_LOOP: {
@@ -1754,11 +1666,6 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     }
 }
 
-/**
- * Generate a branching statement
- * if return result is true,
- * adds a jump marker of type JumpMarkerType::TO_BRANCH_END that must be updated by the caller to land wherever needed
-*/
 BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& ifStatement) {
     ExpressionResult expRes = generateExpression(ifStatement.condition, true);
     if (expRes.jumpOp == OpCode::NOP) {
@@ -1781,8 +1688,6 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
     return BranchStatementResult::ADDED_JUMP;
 }
 
-/**
-*/
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
     // generate return expression
     ExpressionResult returnValueExp = generateExpression(returnStatement.returnValue);
@@ -1829,16 +1734,27 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
 // STACK MANAGEMENT
 // ========================================
 
+uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
+    StackItem& stackItem = stackItems[stackItemIndex];
+    switch (stackItem.type) {
+        case StackItemType::NONE: { assert(false); break; }
+        case StackItemType::MARKER: { assert(false); break; }
+        case StackItemType::VARIABLE: { return stackItem.variable.positionOnStack; }
+        case StackItemType::PADDING:
+        case StackItemType::ARGUMENT:
+        case StackItemType::RETURN_ADDRESS: 
+        case StackItemType::RETURN_VALUE_SPACE_POINTER:
+        case StackItemType::RETURNED_VALUE_SPACE: { return stackItem.positionOnStack; }
+        case StackItemType::SAVED_TEMPORARY: { return stackItem.savedTempValue.positionOnStack; }
+    }
+    assert(false);
+    exit(1);
+}
 
 void CodeGen::addSpaceToStack(uint32_t space) {
     efficientImmAddOrSub(stackPointerIndex, space, OpCode::SUB);
 }
 
-/**
- * Adds padding to the stack
- * \param padding how much padding to add
- * \param virtualOnly if padding should only be added to the virtual stack
-*/
 void CodeGen::addPaddingToStack(uint32_t padding, bool virtualOnly) {
     if (padding) {
         if (!virtualOnly) {
@@ -1852,12 +1768,6 @@ void CodeGen::addPaddingToStack(uint32_t padding, bool virtualOnly) {
     }
 }
 
-/**
- * Adds padding + space room to the stack, and adds a stack item for the padding
- * \param padding how much padding to add
- * \param space how much space after the padding to add
- * \returns the offset for start of 'space'
-*/
 uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
     assert(space);
     addSpaceToStack(padding + space);
@@ -1872,14 +1782,6 @@ uint32_t CodeGen::addPaddingAndSpaceToStack(uint32_t padding, uint32_t space) {
     return currSP + padding + space;
 }
 
-/**
- * Adds a variable dec to the virtual stack. Also adds padding if necessary.
- * \param varDec the variable declaration to be added
- * \param alignTo optionally set the alignment. if left at the default of 0, will use the type's alignment
- * \param virtualOnly if set to true, only adds padding and var dec to virtual stack (does not update bytecode)
- *  otherwise will update the bytecode by padding, and padding only
- * \returns a pointer to the struct info of the type if the type is a struct, otherwise nullptr
-*/
 const StructInformation* CodeGen::addVarDecToStack(VariableDec& varDec, uint32_t alignTo, bool virtualOnly) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     uint32_t padding, size;
@@ -1915,7 +1817,6 @@ const StructInformation* CodeGen::addVarDecToStack(VariableDec& varDec, uint32_t
     return pStructInfo;
 }
 
-
 uint32_t CodeGen::getCurrStackPointerPosition() {
     auto iter = stackItems.rbegin();
     while (iter != stackItems.rend()) {
@@ -1929,9 +1830,6 @@ uint32_t CodeGen::getCurrStackPointerPosition() {
     return 0;
 }
 
-/**
- * 
-*/
 StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemType stackItemType, uint32_t alignTo) {
     const TokenList* type = expRes.value.type;
     assert(type);
@@ -2015,14 +1913,6 @@ StackItem& CodeGen::addExpressionResToStack(ExpressionResult& expRes, StackItemT
     }
 }
 
-/*
-  * Memory layout information needs to be standardized per function,
-  * but general memory layout for a function call:
-  *    HIGH ADDRESS                                              LOW ADDRESS
-  *   Argument 1 | Argument 2 | ... | Argument N | Return Address
-  * 
-  * - Callee unwinds and destructs all variables on return
-*/
 void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
     // add parameters
     if (funcDec.params.curr.type != StatementType::NONE) {
@@ -2055,18 +1945,6 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
     stackItems.emplace_back(returnAddress);
 }
 
-/**
- * Generates the byte code needed to clear the stack at index 'from' until 'to'.
- * A negative 'to' value results in the entire stack being cleared.
- * Does not remove any items from the virtual stack.
- * 
- * Have to be careful using this since we have to pass the indexes in.
- * For example, when we want to do a return statement, we clear the stack until the return address index
- * pop the return address off, clear the rest of the stack (function arguments) until the return value index, and then return.
- * 
- * \param from the index to start from
- * \param to the index to go to
-*/
 void CodeGen::fakeClearStackFromTo(const uint32_t from, const int32_t to) {
     // this for loop is going in the wrong order for destruction
     // must be reverse order of placed on stack, not same order
@@ -2087,23 +1965,6 @@ void CodeGen::fakeClearStackFromTo(const uint32_t from, const int32_t to) {
     efficientImmAddOrSub(stackPointerIndex, stackUsage, OpCode::ADD);
 }
 
-uint32_t CodeGen::getPositionOnStack(uint32_t stackItemIndex) {
-    StackItem& stackItem = stackItems[stackItemIndex];
-    switch (stackItem.type) {
-        case StackItemType::NONE: { assert(false); break; }
-        case StackItemType::MARKER: { assert(false); break; }
-        case StackItemType::VARIABLE: { return stackItem.variable.positionOnStack; }
-        case StackItemType::PADDING:
-        case StackItemType::ARGUMENT:
-        case StackItemType::RETURN_ADDRESS: 
-        case StackItemType::RETURN_VALUE_SPACE_POINTER:
-        case StackItemType::RETURNED_VALUE_SPACE: { return stackItem.positionOnStack; }
-        case StackItemType::SAVED_TEMPORARY: { return stackItem.savedTempValue.positionOnStack; }
-    }
-    assert(false);
-    exit(1);
-}
-
 uint32_t CodeGen::getVarOffsetFromSP(const StackVariable &variableInfo) {
     return getOffsetFromSP(variableInfo.positionOnStack);
 }
@@ -2115,9 +1976,6 @@ uint32_t CodeGen::getOffsetFromSP(uint32_t positionOnStack) {
     return getCurrStackPointerPosition() - positionOnStack;
 }
 
-/**
- * Pops the item at the top of the stack off
-*/
 void CodeGen::popValue(const TokenList& type, const bytecode_t reg) {
     const uint32_t size = getSizeOfType(getTypeFromTokenList(type));
     const OpCode popOp = getPopOpForSize(size);
@@ -2129,11 +1987,6 @@ void CodeGen::popValue(const TokenList& type, const bytecode_t reg) {
     stackItems.pop_back();
 }
 
-/**
- * Pops saved values back into the registers where they are expected to be.
- * Should always be called after an expression with isReturnedValue is acquired,
- * but the returned value should be popped first
-*/
 void CodeGen::postFunctionCall() {
     while (stackItems.back().type == StackItemType::SAVED_TEMPORARY) {
         SavedTempValue& savedTemp = stackItems.back().savedTempValue;
@@ -2178,9 +2031,6 @@ uint32_t CodeGen::getSizeOfType(Token typeToken) {
     return getSizeOfBuiltinType(typeToken.getType());
 }
 
-/**
- * 
-*/
 void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
     assert(op == OpCode::SUB || op == OpCode::ADD);
     OpCode small, imm;
@@ -2324,9 +2174,3 @@ std::ostream& operator<<(std::ostream& os, const std::vector<StackItem>& obj) {
     }
     return os;
 }
-
-
-// ========================================
-// COMPARING
-// ========================================
-

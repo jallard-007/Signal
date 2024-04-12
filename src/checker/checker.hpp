@@ -126,19 +126,59 @@ struct Checker {
     NodeMemPool &memPool;
 
     Checker(Program&, std::vector<Tokenizer>&, NodeMemPool&);
+
     bool check(bool = false);
+
+    /**
+     * Scans all global declarations and registers them in the table, checking that the name is available
+     * Also registers struct members in the struct table
+    */
     void firstTopLevelScan();
+
+    /**
+     * Validates function types, global variable types, struct member variable types, struct member function types.
+     * Everything that was registered in the first pass
+    */
     void secondTopLevelScan(bool = false);
     void fullScan();
-    void checkFunction(FunctionDec&);
+
+    /**
+     * Validates the internals of a function
+     * \param funcDec the function declaration to check
+     */
+    void checkFunction(FunctionDec& funcDec);
+
     bool validateFunctionHeader(FunctionDec&);
     void validateStructTopLevel(StructDec&);
     StructInformation& getStructInfo(const StructDec&);
     void checkForStructCycles(const GeneralDec&, std::vector<StructDec *>&);
+
+    /**
+     * 
+     * \returns if the statement is of return or exit type
+    */
     bool checkStatement(Statement&, TokenList&, bool, bool);
+
+    /**
+     * \param scope The scope to check
+     * \param returnType the return type of the scope
+     * \param isReturnRequired set to true if a return is required within this scope
+     * \param isLoop is the scope within a loop
+     * \param isSwitch is the scope within a switch
+     * \returns true if all code paths return a value
+    */
     bool checkScope(Scope&, TokenList&, bool, bool);
+
     bool checkLocalVarDec(VariableDec&);
-    ResultingType checkExpression(const Expression&,const StructInformation* = nullptr);
+
+    /**
+     * Returns the resulting type from an expression
+     * the ResultingType always contains a valid pointer
+     * \param expression the expression to check
+     * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
+    */
+    ResultingType checkExpression(const Expression& expression,const StructInformation* structMap = nullptr);
+
     ResultingType checkBinOpExpression(const BinOp&);
     ResultingType checkUnOpExpression(const UnOp&);
     ResultingType checkTokenExpression(Token,const StructInformation* = nullptr);
@@ -146,7 +186,17 @@ struct Checker {
     bool checkContainerLiteralStruct(ContainerLiteral&, const StructInformation&);
     ResultingType checkContainerLiteralArray(ContainerLiteral&);
     ResultingType checkMemberAccess(ResultingType&, const BinOp&);
-    bool checkType(TokenList&, bool = false);
+
+    /**
+     * Validates a type
+     * \param type the type to check
+     * \param isReturnType if the type is for a return type
+     * \returns true if the type is a valid type, false otherwise (adds the error to errors)
+     * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
+     *  check if the emplaced error is 'void' and remove it if called for a function return type
+    */
+    bool checkType(TokenList& type, bool isReturnType = false);
+
     bool checkAssignment(const TokenList*, const TokenList*, bool, bool = false);
 
     void addError(const CheckerError&);
@@ -155,8 +205,28 @@ struct Checker {
 };
 
 bool canBeConvertedToBool(const TokenList*);
+
+/**
+ * Returns the actual type from a token list
+*/
 Token getTypeFromTokenList(const TokenList&);
+
 TokenType getTypeQualifier(const TokenList&);
-uint32_t getPaddingNeeded(uint32_t, uint32_t, uint32_t);
-uint32_t getSizeOfBuiltinType(TokenType);
+
+/**
+ * Returns the amount of padding needed to align an item in memory
+ * \param currOffset is the current offset within the container, 0 is assumed to be 8 byte aligned
+ * \param size the size of the item in bytes
+ * \param alignTo the alignment needed in bytes
+ * \returns the number of bytes of padding needed to align 
+*/
+uint32_t getPaddingNeeded(uint32_t currOffset, uint32_t size, uint32_t alignTo);
+
+/**
+ * Returns the size of a type
+ * \param tokenType the type
+ * \returns the size of the type
+*/
+uint32_t getSizeOfBuiltinType(TokenType tokenType);
+
 const GeneralDec *getDecPtr(const TokenList *);

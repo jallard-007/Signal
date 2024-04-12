@@ -97,9 +97,7 @@ void Parser::swapTokenizer(Tokenizer& nextTokenizer) {
     tokenizer = &nextTokenizer;
 }
 
-/**
- * Parses the entire tokenizer ouput
-*/
+
 bool Parser::parse() {
     Token token = tokenizer->peekNext();
     while (token.getType() != TokenType::END_OF_FILE) {
@@ -112,10 +110,6 @@ bool Parser::parse() {
     return true;
 }
 
-/**
- * Parses the next general declaration
- * \returns a pointer to the declaration
-*/
 GeneralDec* Parser::parseNext() {
     Token token = tokenizer->tokenizeNext();
     if (token.getType() == TokenType::FUNC) {

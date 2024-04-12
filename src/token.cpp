@@ -82,11 +82,11 @@ bool Token::operator==(const Token& tk) const {
 }
 
 std::ostream& operator<<(std::ostream& os, const TokenType& obj) {
-    os << tokenTypeToString[(uint8_t)obj];
+    os << tokenTypeToTypeString[(uint8_t)obj];
     return os;
 }
 
-const char* tokenTypeToString [] = {
+const char* tokenTypeToTypeString [] = {
     "NONE",
     "BAD_VALUE",
     "END_OF_FILE",
@@ -202,7 +202,7 @@ const char* tokenTypeToString [] = {
     "THIS"
 };
 
-const TokenType numToType [128] {
+const TokenType charToType [128] {
     TokenType::END_OF_FILE , // 0 null character
     TokenType::BAD_VALUE,  // 1 start of heading
     TokenType::BAD_VALUE , // 2 start of text

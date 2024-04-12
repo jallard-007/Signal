@@ -205,10 +205,6 @@ bool Checker::check(bool testing) {
     return errors.empty();
 }
 
-/**
- * Scans all global declarations and registers them in the table, checking that the name is available
- * Also registers struct members in the struct table
-*/
 void Checker::firstTopLevelScan() {
     for (GeneralDecList *list = &program.decs; list; list = list->next) {
         tk = &tokenizers[list->curr.tokenizerIndex];
@@ -318,10 +314,6 @@ void Checker::firstTopLevelScan() {
     }
 }
 
-/**
- * Validates function types, global variable types, struct member variable types, struct member function types.
- * Everything that was registered in the first pass
-*/
 void Checker::secondTopLevelScan(bool testing) {
     for (GeneralDecList* list = &program.decs; list; list = list->next) {
         tk = &tokenizers[list->curr.tokenizerIndex];
@@ -598,11 +590,6 @@ void Checker::validateStructTopLevel(StructDec& structDec) {
     }
 }
 
-/**
- * Validates the internals of a function
- * \param funcDec the function declaration to check
- * \returns true if the function is valid
-  */
 void Checker::checkFunction(FunctionDec& funcDec) {
     // validate parameter names
     if (funcDec.params.curr.type != StatementType::NONE) {
@@ -646,10 +633,6 @@ void Checker::checkFunction(FunctionDec& funcDec) {
     }
 }
 
-/**
- * 
- * \returns if the statement is of return or exit type
-*/
 bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool isLoop, bool isSwitch) {
     switch (statement.type) {
         case StatementType::CONTROL_FLOW: {
@@ -777,13 +760,6 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
     return false;
 }
 
-/**
- * \param scope The scope to check
- * \param locals name of all local variables allocated 
- * \param returnType the return type of the scope
- * \param isReturnRequired set to true if a return is required within this scope
- * \returns true if all code paths return a value
-*/
 bool Checker::checkScope(Scope& scope, TokenList& returnType, bool isLoop, bool isSwitch) {
     const uint32_t prevSize = locals.size();
     StatementList* list = &scope.scopeStatements;
@@ -1109,11 +1085,6 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
     return {&largest, false};
 }
 
-/**
- * Returns the resulting type from an expression
- * the ResultingType always contains a valid pointer
- * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
-*/
 ResultingType Checker::checkExpression(const Expression& expression, const StructInformation* structMap) {
     switch(expression.getType()) {
         case ExpressionType::BINARY_OP: {
@@ -1158,13 +1129,6 @@ ResultingType Checker::checkExpression(const Expression& expression, const Struc
     }
 }
 
-/**
- * Validates a type
- * \param type the type to check
- * \returns true if the type is a valid type, false otherwise (adds the error to errors)
- * \note in the case of the type being just 'void', will return false even though it is valid for function return types.
- *  check if the emplaced error is 'void' and remove it if called for a function return type
-*/
 bool Checker::checkType(TokenList& type, bool isReturnType) {
     /**
    * Used to track the type info. 0 means we can have a ref, 0-2 means pointer, and 3 means an actual type was found
@@ -1365,8 +1329,6 @@ void Checker::removeLastError() {
     errors.pop_back();
 }
 
-/**
-*/
 bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, const StructInformation& structInfo) {
     ExpressionList* expList = &containerLiteral.values;
     if (expList->curr.getType() == ExpressionType::NONE) {
@@ -1400,8 +1362,6 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
     return true;
 }
 
-/**
-*/
 ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLiteral) {
     bool namedIndices = false;
     ExpressionList* expList = &containerLiteral.values;
@@ -1526,6 +1486,7 @@ bool checkIdentifierAssignment(const TokenList* lTypeList, const TokenList* rTyp
 /**
  * Checks, in a relaxed fashion (implicit casting), if a type can be assigned to another
  * Both of the types must be of concrete type.
+ * \note this is not declared in the header file
 */
 bool concreteTypesCanBeDirectlyAssigned(const TokenList* lTypeList, const TokenList* rTypeList) {
     const TokenType lType = getTypeFromTokenList(*lTypeList).getType();
@@ -1700,8 +1661,8 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
     }
 }
 
-// only builtin types can be converted to bool, except for void and string literal.
 bool canBeConvertedToBool(const TokenList* type) {
+    // only builtin types can be converted to bool, except for void and string literal.
     TokenType tokenType = type->exp.getToken().getType();
     if (type->exp.getToken().getType() == TokenType::REFERENCE) {
         assert(type->next);
@@ -1799,11 +1760,6 @@ StructInformation& Checker::getStructInfo(const StructDec& structDec) {
     return info;
 }
 
-/**
- * Returns the size of a type
- * \param token the token of the type
- * \returns the size of the type
-*/
 uint32_t getSizeOfBuiltinType(const TokenType type) {
     switch (type) {
         case TokenType::BOOL: {
@@ -1850,21 +1806,11 @@ uint32_t getSizeOfBuiltinType(const TokenType type) {
     }
 }
 
-/**
- * Returns the amount of padding needed to align an item in memory
- * \param currOffset is the current offset within the container, 0 is assumed to be 8 byte aligned
- * \param size the size of the item in bytes
- * \param alignTo the alignment needed in bytes
- * \returns the number of bytes of padding needed to align 
-*/
 uint32_t getPaddingNeeded(const uint32_t currOffset, const uint32_t size, const uint32_t alignTo) {
     const uint32_t mod = (currOffset + size) % alignTo;
     return mod != 0 ? alignTo - mod : 0;
 }
 
-/**
- * Returns the actual type from a token list
-*/
 Token getTypeFromTokenList(const TokenList& tokenList) {
     if (tokenList.exp.getType() == ExpressionType::VALUE) {
         return tokenList.exp.getToken();

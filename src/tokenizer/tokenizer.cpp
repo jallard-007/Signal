@@ -4,35 +4,31 @@
 
 TokenPositionInfo::TokenPositionInfo(uint32_t lineNum, uint32_t linePos): lineNum{lineNum}, linePos{linePos} {}
 
+void Tokenizer::setup() {
+    if (content.size() > UINT32_MAX) {
+        std::cerr << "File: '" << filePath << "' is too large. Maximum allowed size is " << UINT32_MAX << " bytes\n";
+        exit(1);
+    }
+    newlinePositions.reserve(content.size() / 40);
+    newlinePositions.emplace_back(0);
+}
+
 Tokenizer::Tokenizer(std::string&& filePath, std::vector<unsigned char>&& fileContent):
     filePath{std::move(filePath)}, content{std::move(fileContent)}
 {
-    if (fileContent.size() > UINT32_MAX) {
-        std::cerr << "File too large\n";
-        exit(1);
-    }
-    newlinePositions.reserve(fileContent.size() / 40);
-    newlinePositions.emplace_back(0);
+    setup();
 }
+
 Tokenizer::Tokenizer(std::string&& filePath, const std::vector<unsigned char>& fileContent):
     filePath{std::move(filePath)}, content{fileContent}
 {
-    if (fileContent.size() > UINT32_MAX) {
-        std::cerr << "File too large\n";
-        exit(1);
-    }
-    newlinePositions.reserve(fileContent.size() / 40);
-    newlinePositions.emplace_back(0);
+    setup();
 }
+
 Tokenizer::Tokenizer(std::string&& filePath, const std::string& fileContent):
     filePath{std::move(filePath)}, content{fileContent.begin(), fileContent.end() + 1}
 {
-    if (fileContent.size() > UINT32_MAX) {
-        std::cerr << "File too large\n";
-        exit(1);
-    }
-    newlinePositions.reserve(fileContent.size() / 40);
-    newlinePositions.emplace_back(0);
+    setup();
 }
 
 // does binary search on the newline list to find the line number
@@ -62,17 +58,6 @@ void Tokenizer::tokenizeAll(std::vector<Token>& tokens) {
     while (tokens.emplace_back(tokenizeNext()).getType() != TokenType::END_OF_FILE);
 }
 
-#define END_OF_IDENTIFIER(c) TokenType tNext = numToType[(uint8_t)content[++position]]; \
-if (tNext != TokenType::IDENTIFIER && tNext != TokenType::DECIMAL_NUMBER) { \
-    type = c; \
-    break; \
-}
-
-/**
- * Allows peeking to the next token
- * Successive calls to this function will return the same Token.
- * The Token must be consumed by calling tokenizeNext before peeking to the next
-*/
 Token Tokenizer::peekNext() {
     if (peeked.getType() != TokenType::NONE) {
         return peeked;
@@ -98,9 +83,12 @@ Token Tokenizer::tokenizeNext() {
         std::cerr << "Error: Non-ASCII character encountered: value = [" << (uint8_t)c << "]\n";
         exit(1);
     }
-    TokenType type = numToType[(uint8_t)c];
+    TokenType type = charToType[(uint8_t)c];
     switch (type) {
         case TokenType::IDENTIFIER: {
+            // this is the fastest way i have found to tokenize keywords, but it's not very clean.
+            // if new keywords are added, it can be generated using the other/tokenizeKeywordsGenerator.py script
+
             movePastIdentifier();
             const uint32_t length = position - tokenStartPos;
             switch (length) {
@@ -398,9 +386,6 @@ Token Tokenizer::tokenizeNext() {
                 std::cerr << filePath << ':' << posInfo.lineNum << ':' << posInfo.linePos << "\nUnclosed character literal\n";
                 exit(1);
             }
-            // TODO: validate content of character. escaped characters :(
-            // maybe do this during type checking?
-            // ' '\n \r \t \' \" \\ \v \f \e \b \a \127 - \0
             break;
         }
 
@@ -453,7 +438,7 @@ Token Tokenizer::tokenizeNext() {
         }
 
         default: {
-            const TokenType tNext = numToType[(uint8_t)content[++position]];
+            const TokenType tNext = charToType[(uint8_t)content[++position]];
             switch (type) {
                 case TokenType::NOT: {
                     if (tNext == TokenType::ASSIGNMENT) {
@@ -513,7 +498,7 @@ Token Tokenizer::tokenizeNext() {
                 case TokenType::LESS_THAN: {
                     if (tNext == TokenType::LESS_THAN) {
                         ++position;
-                        if (numToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
+                        if (charToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
                             ++position;
                             type = TokenType::SHIFT_LEFT_ASSIGNMENT;
                         } else {
@@ -528,7 +513,7 @@ Token Tokenizer::tokenizeNext() {
                 case TokenType::GREATER_THAN: {
                     if (tNext == TokenType::GREATER_THAN) {
                         ++position;
-                        if (numToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
+                        if (charToType[(uint8_t)content[position]] == TokenType::ASSIGNMENT) {
                             ++position;
                             type = TokenType::SHIFT_RIGHT_ASSIGNMENT;
                         } else {
@@ -614,7 +599,7 @@ void Tokenizer::moveToNextNonWhiteSpaceChar() {
 
 void Tokenizer::movePastIdentifier() {
     for (; position < content.size(); ++position) {
-        const TokenType type = numToType[(uint8_t)content[position]];
+        const TokenType type = charToType[(uint8_t)content[position]];
         if (type != TokenType::IDENTIFIER && type != TokenType::DECIMAL_NUMBER) {
             return;
         }

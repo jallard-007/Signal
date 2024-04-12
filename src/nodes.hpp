@@ -1,8 +1,17 @@
+/**
+ * This implements the 'formal' grammar found in sampleCode/grammar.pr
+ * note that the grammar found in that file may be out of date, but generally it should be fairly close to what is done here
+*/
+
 #pragma once
 
 #include <cassert>
 #include "tokenizer/tokenizer.hpp"
 
+/**
+ * Putting this define here so that it can be found everywhere else.
+ * Could make another file for it, but idk this is easier
+*/
 #define SIZE_OF_REGISTER 8
 
 typedef class NodeMemPool NodeMemPool;
@@ -27,6 +36,15 @@ enum class ExpressionType: uint8_t {
 };
 
 struct Expression {
+    /**
+     * The pointer to the sub expression and expression type is packed within 8 bytes
+     * The reason this works is because since sizeof(void *) is 8, and aligning requirements for a pointer puts it at
+     * an address with $address % 8 == 0 ; the least significant 3 bits of the pointer will always be set to 0.
+     * By using getters and setters, we can pull out the type before getting a pointer
+     * It's important that each subexpression node must also have an alignment requirement of 8.
+     * 
+     * Since Token is also a subexpression, the Token struct should leave the least significant 3 bits untouched
+    */
     private:
     union {
         uint64_t type;
@@ -496,6 +514,10 @@ struct Program {
     void prettyPrint(std::vector<Tokenizer>&, std::string&) const;
 };
 
+/**
+ * builtin type TokenLists
+ * Used in checker, compTime, and codeGen
+*/
 namespace TokenListTypes { 
     extern TokenList noneValue;
     extern TokenList badValue;
