@@ -382,6 +382,34 @@ void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) 
     }
 }
 
+void CodeGen::generateStructDeclaration(const StructDec& structDec) {
+    const StructDecList* structDecList = &structDec.decs;
+    while (structDecList) {
+        switch (structDecList->type) {
+            case StructDecType::NONE: {
+                break;
+            }
+            case StructDecType::FUNC: {
+                generateFunctionDeclaration(*structDecList->funcDec);
+                break;
+            }
+            case StructDecType::VAR: {
+                break;
+            }
+        }
+        structDecList = structDecList->next;
+    }
+}
+
+void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
+    assert(stackItems.empty());
+    addFunctionSignatureToVirtualStack(funcDec);
+    // have checker add empty return statement for void functions
+    functionDecPointerToIndex[&funcDec] = byteCode.size();
+    generateStatementList(&funcDec.body.scopeStatements);
+    stackItems.clear();
+}
+
 
 // ========================================
 // GENERAL EXPRESSIONS
@@ -1427,25 +1455,6 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
 // STRUCTS
 // ========================================
 
-void CodeGen::generateStructDeclaration(const StructDec& structDec) {
-    const StructDecList* structDecList = &structDec.decs;
-    while (structDecList) {
-        switch (structDecList->type) {
-            case StructDecType::NONE: {
-                break;
-            }
-            case StructDecType::FUNC: {
-                generateFunctionDeclaration(*structDecList->funcDec);
-                break;
-            }
-            case StructDecType::VAR: {
-                break;
-            }
-        }
-        structDecList = structDecList->next;
-    }
-}
-
 
 // ========================================
 // SCOPES
@@ -1495,14 +1504,6 @@ void CodeGen::endSoftScope() {
 // FUNCTIONS
 // ========================================
 
-void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
-    assert(stackItems.empty());
-    addFunctionSignatureToVirtualStack(funcDec);
-    // have checker add empty return statement for void functions
-    functionDecPointerToIndex[&funcDec] = byteCode.size();
-    generateStatementList(&funcDec.body.scopeStatements);
-    stackItems.clear();
-}
 
 // ========================================
 // STATEMENTS
@@ -1553,92 +1554,10 @@ void CodeGen::generateStatement(const Statement& statement) {
 
 void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFlowStatement) {
     switch (controlFlowStatement.type) {
-        case ControlFlowStatementType::FOR_LOOP: {
-            // const uint32_t currStack = stackItems.size();
-            generateStatement(controlFlowStatement.forLoop->initialize);
-            const uint64_t startOfLoopIndex = byteCode.size();
-            const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
-            const BranchStatementResult res = generateBranchStatement(controlFlowStatement.forLoop->statement);
-            {
-                const ExpressionResult iterExp = generateExpression(controlFlowStatement.forLoop->iteration);
-                if (iterExp.isTemp) {
-                    freeRegister(iterExp.getReg());
-                }
-            }
-            addJumpMarker(JumpMarkerType::TO_LOOP_START);
-            addJumpOp(OpCode::RS_JUMP);
-            if (res == BranchStatementResult::ADDED_JUMP) {
-                updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, loopJumpMarkersFrom);
-            }
-            updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, loopJumpMarkersFrom);
-            updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, loopJumpMarkersFrom);
-            if (controlFlowStatement.forLoop->initialize.type == StatementType::VARIABLE_DEC) {
-                assert(nameToStackItemIndex[tk->extractToken(controlFlowStatement.forLoop->initialize.varDec->name)] == stackItems.size() - 1);
-                fakeClearStackFromTo(stackItems.size() - 1, stackItems.size() - 2);
-                stackItems.pop_back();
-            }
-            break;
-        }
-        case ControlFlowStatementType::WHILE_LOOP: {
-            const uint64_t startOfLoopIndex = byteCode.size();
-            const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
-            BranchStatement& whileLoop = controlFlowStatement.whileLoop->statement;
-            const BranchStatementResult res = generateBranchStatement(whileLoop);
-            // place unconditional jump at the end of the while loop to go to start
-            addJumpMarker(JumpMarkerType::TO_LOOP_START);
-            addJumpOp(OpCode::RS_JUMP);
-            if (res == BranchStatementResult::ADDED_JUMP) {
-                updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, loopJumpMarkersFrom);
-            }
-            // update jump markers added by break / continue
-            updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, loopJumpMarkersFrom);
-            updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, loopJumpMarkersFrom);
-            break; 
-        }
+        case ControlFlowStatementType::FOR_LOOP: generateForLoopStatement(*controlFlowStatement.forLoop); break;
+        case ControlFlowStatementType::WHILE_LOOP: generateWhileLoopStatement(*controlFlowStatement.whileLoop); break; 
         case ControlFlowStatementType::CONDITIONAL_STATEMENT: {
-            const BranchStatement& ifStatement = controlFlowStatement.conditional->ifStatement;
-            const ElifStatementList *elifStatementList = controlFlowStatement.conditional->elifStatement;
-            const Scope* elseStatement = controlFlowStatement.conditional->elseStatement;
-            const uint32_t ifChainJumpMarkersFrom = jumpMarkers.size();
-            // addJumpMarker(JumpMarkerType::IF_CHAIN_START); // mark start of this if/elif/else chain
-
-            // if statement
-            {
-                const BranchStatementResult res = generateBranchStatement(ifStatement);
-                if (elifStatementList || elseStatement) {
-                    // elif/else statements follow, add a jump after the this so that we skip the rest
-                    addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
-                    addJumpOp(OpCode::RS_JUMP);
-                }
-                if (res == BranchStatementResult::ADDED_JUMP) {
-                    // update if false condition jump to go to code after the branch
-                    updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, ifChainJumpMarkersFrom);
-                }
-            }
-
-            // elif statements
-            while (elifStatementList) {
-                const uint32_t markersStart = jumpMarkers.size();
-                const BranchStatementResult res = generateBranchStatement(elifStatementList->elif);
-                elifStatementList = elifStatementList->next;
-                if (elifStatementList || elseStatement) {
-                    // elif/else statements follow, add a jump after the this so that we skip the rest
-                    addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
-                    addJumpOp(OpCode::RS_JUMP);
-                }
-                if (res == BranchStatementResult::ADDED_JUMP) {
-                    // update elif false condition jump to go to code after the branch
-                    updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, markersStart);
-                }
-            }
-
-            // else statement
-            if (elseStatement) {
-                generateScope(*elseStatement);
-            }
-
-            // update all TO_IF_CHAIN_END jump ops until IF_CHAIN_START to go to current index
-            updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, ifChainJumpMarkersFrom);
+            generateConditionalStatement(*controlFlowStatement.conditional);
             break;
         }
         case ControlFlowStatementType::RETURN_STATEMENT: {
@@ -1666,24 +1585,138 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
     }
 }
 
+void CodeGen::generateForLoopStatement(const ForLoop& forLoop) {
+    // store where we are in the stack
+    const uint32_t forLoopStartStackIndex = getCurrStackPointerPosition();
+
+    // generate the initializer statement
+    // for (i:int = 0 ; i < 10; ++i) { body }
+    //      ^^^^^^^^^
+    generateStatement(forLoop.initialize);
+
+    // store where the loop starts
+    const uint64_t startOfLoopIndex = byteCode.size();
+    // don't look past this point while updating jump markers
+    const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
+
+    // generate the body
+    // for (i:int = 0 ; i < 10; ++i) { body }
+    //                  ^^^^^^       ^^^^^^^^
+    const BranchStatementResult res = generateBranchStatement(forLoop.loop);
+    {
+        // generate the body
+        // for (i:int = 0 ; i < 10; ++i) { body }
+        //                          ^^^
+        const ExpressionResult iterExp = generateExpression(forLoop.iteration);
+        if (iterExp.isTemp) {
+            freeRegister(iterExp.getReg());
+        }
+    }
+
+    generateEndLoop(startOfLoopIndex, loopJumpMarkersFrom, res);
+
+    // clear the initializer statement if it took any space on the stack. this should only be the case if it was a variable dec
+    if (stackItems.size() - 1 > forLoopStartStackIndex) {
+        assert(forLoop.initialize.type == StatementType::VARIABLE_DEC);
+        assert(nameToStackItemIndex[tk->extractToken(forLoop.initialize.varDec->name)] == stackItems.size() - 1);
+        fakeClearStackFromTo(stackItems.size() - 1, forLoopStartStackIndex);
+        stackItems.pop_back();
+    }
+}
+
+void CodeGen::generateWhileLoopStatement(const WhileLoop& whileLoop) {
+    const uint64_t startOfLoopIndex = byteCode.size();
+    const uint32_t loopJumpMarkersFrom = jumpMarkers.size();
+    const BranchStatement& loop = whileLoop.loop;
+    const BranchStatementResult res = generateBranchStatement(loop);
+
+    generateEndLoop(startOfLoopIndex, loopJumpMarkersFrom, res);
+}
+
+void CodeGen::generateEndLoop(const uint32_t startOfLoopIndex, const uint32_t loopJumpMarkersFrom, const BranchStatementResult res) {
+    // place unconditional jump at the end of the loop to go to start
+    addJumpMarker(JumpMarkerType::TO_LOOP_START);
+    addJumpOp(OpCode::RS_JUMP);
+
+    if (res == BranchStatementResult::ADDED_JUMP) {
+        updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, loopJumpMarkersFrom);
+    }
+    // update jump markers added by break / continue
+    updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_LOOP_END, loopJumpMarkersFrom);
+    updateJumpMarkersTo(startOfLoopIndex, JumpMarkerType::TO_LOOP_START, loopJumpMarkersFrom);
+}
+
+void CodeGen::generateConditionalStatement(const ConditionalStatement& condStatement) {
+    const BranchStatement& ifStatement = condStatement.ifStatement;
+    const ElifStatementList *elifStatementList = condStatement.elifStatement;
+    const Scope* elseStatement = condStatement.elseStatement;
+    const uint32_t ifChainJumpMarkersFrom = jumpMarkers.size();
+    // addJumpMarker(JumpMarkerType::IF_CHAIN_START); // mark start of this if/elif/else chain
+
+    // if statement
+    {
+        const BranchStatementResult res = generateBranchStatement(ifStatement);
+        if (elifStatementList || elseStatement) {
+            // elif/else statements follow, add a jump after the this so that we skip the rest
+            addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
+            addJumpOp(OpCode::RS_JUMP);
+        }
+        if (res == BranchStatementResult::ADDED_JUMP) {
+            // update if false condition jump to go to code after the branch
+            updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, ifChainJumpMarkersFrom);
+        }
+    }
+
+    // elif statements
+    while (elifStatementList) {
+        const uint32_t markersStart = jumpMarkers.size();
+        const BranchStatementResult res = generateBranchStatement(elifStatementList->elif);
+        elifStatementList = elifStatementList->next;
+        if (elifStatementList || elseStatement) {
+            // elif/else statements follow, add a jump after the this so that we skip the rest
+            addJumpMarker(JumpMarkerType::TO_IF_CHAIN_END);
+            addJumpOp(OpCode::RS_JUMP);
+        }
+        if (res == BranchStatementResult::ADDED_JUMP) {
+            // update elif false condition jump to go to code after the branch
+            updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_BRANCH_END, markersStart);
+        }
+    }
+
+    // else statement
+    if (elseStatement) {
+        generateScope(*elseStatement);
+    }
+
+    // update all TO_IF_CHAIN_END jump ops until IF_CHAIN_START to go to current index
+    updateJumpMarkersTo(byteCode.size(), JumpMarkerType::TO_IF_CHAIN_END, ifChainJumpMarkersFrom);
+}
+
 BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& ifStatement) {
+    // generate the conditional statement, set controlFlow argument to true
+    // if (cond) { body }
+    //     ^^^^
     ExpressionResult expRes = generateExpression(ifStatement.condition, true);
     if (expRes.jumpOp == OpCode::NOP) {
         if (!expRes.isReg) {
             // condition is a constant value, can test at compile time
-            // TODO: have to evaluate this based on type
-            if (*(uint32_t *)expRes.value.getData()) {
+            // TODO: have to evaluate this based on type. use comp time and compare to zero
+            if (*(uint64_t *)expRes.value.getData()) {
                 // condition always true
                 generateScope(ifStatement.body);
                 return BranchStatementResult::ALWAYS_TRUE;
             } // else condition always false, don't generate
             return BranchStatementResult::ALWAYS_FALSE;
         }
+        // else the value is in a register, set flags and add jump
         addBytes({{(bc)OpCode::SET_FLAGS, expRes.getReg()}});
         expRes.jumpOp = OpCode::RS_JUMP_E;
     }
     addJumpMarker(JumpMarkerType::TO_BRANCH_END);
     addJumpOp(expRes.jumpOp);
+    // generate the body
+    // if (cond) { body }
+    //           ^^^^^^^
     generateScope(ifStatement.body);
     return BranchStatementResult::ADDED_JUMP;
 }
@@ -1691,23 +1724,14 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
 void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
     // generate return expression
     ExpressionResult returnValueExp = generateExpression(returnStatement.returnValue);
-    // clear until return address
-    const uint32_t returnAddressStackIndex = nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER];
-    assert(stackItems[returnAddressStackIndex].positionOnStack >= 8);
-    fakeClearStackFromTo(stackItems.size() - 1, returnAddressStackIndex);
-    // might want to change this to an allocated register
-    bytecode_t raReg = allocateRegister();
-    if (raReg == returnRegisterIndex) {
-        raReg = allocateRegister();
-    }
-    addBytes({{(bc)OpCode::POP_Q, raReg}});
+
+    // if there was a return express, move the result into the return register
     if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
         assert(getSizeOfType(getTypeFromTokenList(*returnValueExp.value.type)) <= SIZE_OF_REGISTER);
         // move value into returnRegisterIndex
-        if (returnAddressStackIndex > 0) {
-            fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
-        }
         if (returnValueExp.isPointerToValue) {
+            // in the case that the returnValueExp reg is returnRegisterIndex, that's fine
+            // it will simply load from the address in that reg and write back the value
             returnValueExp = loadValueFromPointer(returnValueExp, returnRegisterIndex);
             assert(returnValueExp.getReg() == returnRegisterIndex);
         } else if (returnValueExp.isReg) {
@@ -1717,11 +1741,29 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
         } else {
             moveImmToReg(returnRegisterIndex, returnValueExp);
         }
+        registers[returnRegisterIndex].inUse = true;
     }
-    else if (returnAddressStackIndex > 0) {
+
+    // clear until return address on stack
+    const uint32_t returnAddressStackIndex = nameToStackItemIndex[STACK_RETURN_ADDRESS_IDENTIFIER];
+    assert(stackItems[returnAddressStackIndex].positionOnStack >= 8);
+    fakeClearStackFromTo(stackItems.size() - 1, returnAddressStackIndex);
+
+    // allocate a register to store the return address
+    bytecode_t raReg = allocateRegister();
+
+    // pop return address
+    addBytes({{(bc)OpCode::POP_Q, raReg}});
+
+    // clear the rest of the stack
+    if (returnAddressStackIndex > 0) {
         fakeClearStackFromTo(returnAddressStackIndex - 1, -1);
     }
+
+    // add jump to go back to caller
     addBytes({{(bc)OpCode::JUMP, raReg}});
+
+    // free registers
     freeRegister(raReg);
     freeRegister(returnRegisterIndex);
     if (returnValueExp.isTemp) {

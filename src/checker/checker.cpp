@@ -464,7 +464,7 @@ void Checker::fullScan() {
 bool Checker::validateFunctionHeader(FunctionDec &funcDec) {
     bool valid = true;
     // check return type
-    if (!checkType(funcDec.returnType), true) {
+    if (!checkType(funcDec.returnType, true)) {
         valid = false;
     } else {
         const Token typeToken = getTypeFromTokenList(funcDec.returnType);
@@ -647,12 +647,12 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                         assert(false);
                         exit(1);
                     }
-                    ResultingType res = checkExpression(forLoop.statement.condition);
+                    ResultingType res = checkExpression(forLoop.loop.condition);
                     if (res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && res.value.type->exp.getToken().getType() != TokenType::NONE && !canBeConvertedToBool(res.value.type)) {
-                        addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &forLoop.statement.condition});
+                        addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &forLoop.loop.condition});
                     }
                     checkExpression(forLoop.iteration);
-                    checkScope(forLoop.statement.body, returnType, isLoop, isSwitch);
+                    checkScope(forLoop.loop.body, returnType, isLoop, isSwitch);
                     if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
                         lookUp.erase(locals.back());
                         locals.pop_back();
@@ -706,8 +706,8 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                     break;
                 }
                 case ControlFlowStatementType::WHILE_LOOP: {
-                    checkExpression(statement.controlFlow->whileLoop->statement.condition);
-                    checkScope(statement.controlFlow->whileLoop->statement.body, returnType, isLoop, isSwitch);
+                    checkExpression(statement.controlFlow->whileLoop->loop.condition);
+                    checkScope(statement.controlFlow->whileLoop->loop.body, returnType, isLoop, isSwitch);
                     break;
                 }
                 case ControlFlowStatementType::NONE: {

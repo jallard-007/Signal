@@ -429,8 +429,8 @@ TEST_CASE("generating return statement", "[codeGen]") {
         codeGen.generateFunctionDeclaration(funcDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::POP_Q, 1,
             (bc)OpCode::MOVE_SI, 10, 1,
+            (bc)OpCode::POP_Q, 1,
             (bc)OpCode::JUMP, 1
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
@@ -650,9 +650,8 @@ R"(
         expected.byteCode[conditionJump] = expected.byteCode.size() - (conditionJump - 1);
         expected.alignForImm(2, 2);
         expected.addBytes({{
-            (bc)OpCode::ADD_I, 30, 4, 0,
             (bc)OpCode::DEC, 30,
-            (bc)OpCode::INC, 30,
+            (bc)OpCode::ADD_I, 30, 5, 0,
             (bc)OpCode::POP_Q, 1,
             (bc)OpCode::JUMP, 1,
         }});
@@ -785,10 +784,9 @@ TEST_CASE("generate struct", "[codeGen]") {
         expected.addBytes({{
             (bc)OpCode::SUB_I, stackPointerIndex, 8, 0,
             (bc)OpCode::LOAD_Q, 1, stackPointerIndex,
-            (bc)OpCode::NOP,
+            (bc)OpCode::MOVE, returnRegisterIndex, 1,
             (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
             (bc)OpCode::POP_Q, 2,
-            (bc)OpCode::MOVE, returnRegisterIndex, 1,
             (bc)OpCode::JUMP, 2,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
@@ -808,9 +806,10 @@ TEST_CASE("generate struct", "[codeGen]") {
             (bc)OpCode::LOAD_B, 0, 2,
             (bc)OpCode::SHIFT_L_I, 0, 16, 0,
             (bc)OpCode::OR, 1, 0,
+            (bc)OpCode::MOVE, returnRegisterIndex, 1,
+            (bc)OpCode::NOP,
             (bc)OpCode::ADD_I, stackPointerIndex, 3, 0,
             (bc)OpCode::POP_Q, 2,
-            (bc)OpCode::MOVE, returnRegisterIndex, 1,
             (bc)OpCode::JUMP, 2,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);

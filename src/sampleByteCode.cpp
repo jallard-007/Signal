@@ -1,5 +1,5 @@
 #include <iostream>
-#include "bytecodeDesign.hpp"
+#include "bytecodeDesign/bytecodeDesign.hpp"
 #include "interpreter/interpreter.hpp"
 
 #define bc bytecode_t

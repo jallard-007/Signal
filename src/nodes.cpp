@@ -247,7 +247,7 @@ ReturnStatement* ReturnStatement::deepCopy(NodeMemPool& mem) {
 
 ForLoop* ForLoop::deepCopy(NodeMemPool& mem) {
     ForLoop *copy = mem.makeForLoop();
-    copy->statement = statement.deepCopy(mem);
+    copy->loop = loop.deepCopy(mem);
     copy->initialize = initialize.deepCopy(mem);
     copy->iteration = iteration.deepCopy(mem);
     return copy;
@@ -314,7 +314,7 @@ TokenList TokenList::deepCopy(NodeMemPool& mem) {
 
 WhileLoop* WhileLoop::deepCopy(NodeMemPool& mem) {
     WhileLoop* copy = mem.makeWhileLoop();
-    copy->statement = statement.deepCopy(mem);
+    copy->loop = loop.deepCopy(mem);
     return copy;
 }
 

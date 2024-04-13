@@ -270,6 +270,11 @@ struct CodeGen {
     */
     void generateVariableDeclaration(VariableDec&, bool = true);
 
+    void generateStructDeclaration(const StructDec&);
+
+    void generateFunctionDeclaration(const FunctionDec&);
+
+
 // GENERAL EXPRESSIONS
 
     /**
@@ -356,7 +361,7 @@ struct CodeGen {
     [[nodiscard]] ExpressionResult incrementOrDecrement(const UnOp&, TokenType);
 
 // STRUCTS
-    void generateStructDeclaration(const StructDec&);
+
 
 // SCOPES
     void generateScope(const Scope&);
@@ -365,18 +370,32 @@ struct CodeGen {
     void endSoftScope();
 
 // FUNCTIONS
-    void generateFunctionDeclaration(const FunctionDec&);
+
 
 // STATEMENTS
     void generateStatement(const Statement&);
     void generateControlFlowStatement(const ControlFlowStatement&);
+    void generateForLoopStatement(const ForLoop& forLoop);
+    void generateWhileLoopStatement(const WhileLoop& whileLoop);
 
     /**
-     * Generate a branching statement
-     * if return result is true,
-     * adds a jump marker of type JumpMarkerType::TO_BRANCH_END that must be updated by the caller to land wherever needed
+     * Updates jump markers and adds un unconditional jump to loop back
+     * Should be called after generating a loop statement
+     * \param startOfLoopIndex the start of the loop within the bytecode
+     * \param loopJumpMarkersFrom go until this point while updating jump markers
+     * \param res the result of the conditional statement
     */
-    BranchStatementResult generateBranchStatement(const BranchStatement&);
+    void generateEndLoop(uint32_t startOfLoopIndex, uint32_t loopJumpMarkersFrom, BranchStatementResult res);
+
+    void generateConditionalStatement(const ConditionalStatement& condStatement);
+
+
+    /**
+     * Generate a branching statement. If return result is BranchStatementResult::ADDED_JUMP,
+     * a jump marker was added of type JumpMarkerType::TO_BRANCH_END that must be updated to land at the end of the branch
+     * \param branchStatement the branch statement
+    */
+    BranchStatementResult generateBranchStatement(const BranchStatement& branchStatement);
 
     /**
     */
@@ -422,10 +441,6 @@ struct CodeGen {
      * Generates the byte code needed to clear the stack at index 'from' until 'to'.
      * A negative 'to' value results in the entire stack being cleared.
      * Does not remove any items from the virtual stack.
-     * 
-     * Have to be careful using this since we have to pass the indexes in.
-     * For example, when we want to do a return statement, we clear the stack until the return address index
-     * pop the return address off, clear the rest of the stack (function arguments) until the return value index, and then return.
      * 
      * \param from the index to start from
      * \param to the index to go to

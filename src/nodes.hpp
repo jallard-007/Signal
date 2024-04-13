@@ -308,7 +308,7 @@ struct SwitchStatement {
 
 // whileLoop:= while (expression) scope
 struct WhileLoop {
-    BranchStatement statement;
+    BranchStatement loop;
     WhileLoop() = default;
     WhileLoop(const WhileLoop&) = default;
     void prettyPrint(Tokenizer&, std::string&, uint32_t) const;
@@ -318,7 +318,7 @@ struct WhileLoop {
 // forLoop:= for (expression | varDec | nothing ; expression | nothing; expression | nothing) scope
 struct ForLoop {
     Statement initialize;
-    BranchStatement statement;
+    BranchStatement loop;
     Expression iteration;
     ForLoop() = default;
     ForLoop(const ForLoop &) = default;

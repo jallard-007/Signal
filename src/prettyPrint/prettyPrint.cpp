@@ -352,12 +352,12 @@ void ControlFlowStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t
 void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::FOR) + '(';
     initialize.prettyPrint(tk, str, indentation);
-    if (statement.condition.getType() == ExpressionType::NONE) {
+    if (loop.condition.getType() == ExpressionType::NONE) {
         str += ';';
     } else {
         str += "; ";
     }
-    statement.condition.prettyPrint(tk, str);
+    loop.condition.prettyPrint(tk, str);
     if (iteration.getType() == ExpressionType::NONE) {
         str += ';';
     } else {
@@ -365,7 +365,7 @@ void ForLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation)
     }
     iteration.prettyPrint(tk, str);
     str += ") ";
-    statement.body.prettyPrint(tk, str, indentation);
+    loop.body.prettyPrint(tk, str, indentation);
 }
 
 void ReturnStatement::prettyPrint(Tokenizer& tk, std::string& str) const {
@@ -407,7 +407,7 @@ void SwitchScopeStatementList::prettyPrint(Tokenizer& tk, std::string& str, uint
 
 void WhileLoop::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
     str += typeToString.at(TokenType::WHILE);
-    statement.prettyPrint(tk ,str, indentation);
+    loop.prettyPrint(tk ,str, indentation);
 }
 
 void BranchStatement::prettyPrint(Tokenizer& tk, std::string& str, uint32_t indentation) const {
