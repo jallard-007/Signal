@@ -24,6 +24,10 @@ TEST_CASE("variable creation", "[codeGen]") {
         ParseStatementErrorType errorType = parser.parseStatement(statement);
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.varDec);
+
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+
         codeGen.generateVariableDeclaration(*statement.varDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.alignForImm(2, 2);
@@ -37,6 +41,10 @@ TEST_CASE("variable creation", "[codeGen]") {
         ParseStatementErrorType errorType = parser.parseStatement(statement);
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.varDec);
+
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+
         codeGen.generateVariableDeclaration(*statement.varDec);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{(bc)OpCode::MOVE_SI, 1, 10}});
@@ -55,6 +63,10 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.controlFlow);
         REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
+
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.alignForImm(2, 2);
@@ -80,10 +92,10 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
         }
         Statement statement;
         ParseStatementErrorType errorType = parser.parseStatement(statement);
-
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.controlFlow);
         REQUIRE(statement.controlFlow->type == ControlFlowStatementType::FOR_LOOP);
+
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.alignForImm(2, 2);
@@ -97,10 +109,12 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         ParseStatementErrorType errorType = parser.parseStatement(statement);
-
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.controlFlow);
         REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.alignForImm(2, 2);
@@ -252,9 +266,9 @@ TEST_CASE("short-circuit logical bin ops", "[codeGen]") {
         expected.addBytes({{(bc)OpCode::LOAD_B, 3, 4}});
 
         expected.addBytes({{(bc)OpCode::LOGICAL_AND, 2, 3}});
-        expected.addBytes({{(bc)OpCode::GET_NE, 2}}); // save the result
+        expected.addBytes({{(bc)OpCode::GET_NE, 0}}); // save the result
 
-        expected.addBytes({{(bc)OpCode::LOGICAL_OR, 1, 2}});
+        expected.addBytes({{(bc)OpCode::LOGICAL_OR, 1, 0}});
         expected.addBytes({{(bc)OpCode::RS_JUMP_E, 0}}); // jump if false
 
         CHECK(codeGen.byteCode == expected.byteCode);

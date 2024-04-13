@@ -338,21 +338,18 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
     }
 }
 
+// TODO: Arrays, structs
 void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     if (typeToken.getType() == TokenType::REFERENCE) {
         // TODO: implement as pointer to result? 
+        assert(false);
     }
     else if (isBuiltInType(typeToken.getType())) {
         ExpressionResult expRes;
         if (initialize && varDec.initialAssignment) {
             expRes = generateExpression(*varDec.initialAssignment);
-            if (!expRes.isReg) {
-                moveImmToReg(allocateRegister(), expRes);
-            } else if (expRes.isPointerToValue) {
-                bytecode_t reg = allocateRegister();
-                expRes = loadValueFromPointer(expRes, reg);
-            }
+            postExpression(expRes, true);
         }
         addVarDecToStack(varDec);
         const uint32_t size = getSizeOfBuiltinType(typeToken.getType());
@@ -415,34 +412,114 @@ void CodeGen::generateFunctionDeclaration(const FunctionDec& funcDec) {
 // GENERAL EXPRESSIONS
 // ========================================
 
-ExpressionResult CodeGen::generateExpression(const Expression &currExp, bool controlFlow) {
-    switch (currExp.getType()) {
-        case ExpressionType::ARRAY_ACCESS: {
-            return generateExpressionArrAccess(*currExp.getArrayAccess());
-        }
-        // case ExpressionType::ARRAY_LITERAL:
-        // case ExpressionType::STRUCT_LITERAL: {
-        //   return generateExpressionArrOrStructLit(*currExp.getArrayOrStructLiteral());
-        // }
-        case ExpressionType::BINARY_OP: {
-            return generateExpressionBinOp(*currExp.getBinOp(), controlFlow);
-        }
-        case ExpressionType::FUNCTION_CALL: {
-            return generateExpressionFunctionCall(*currExp.getFunctionCall());
-        }
+ExpressionResult CodeGen::generateExpression(const Expression &expression) {
+    switch (expression.getType()) {
         case ExpressionType::NONE: {
             return {};
         }
+        case ExpressionType::BINARY_OP: {
+            return generateExpressionBinOp(*expression.getBinOp());
+        }
         case ExpressionType::UNARY_OP: {
-            return generateExpressionUnOp(*currExp.getUnOp());
+            return generateExpressionUnOp(*expression.getUnOp());
         }
         case ExpressionType::VALUE: {
-            return loadValue(currExp);
+            return loadValue(expression);
         }
-        default: {
-            std::cerr << "Code generation not implemented for this expression type\n";
+        case ExpressionType::FUNCTION_CALL: {
+            return generateExpressionFunctionCall(*expression.getFunctionCall());
+        }
+        case ExpressionType::ARRAY_ACCESS: {
+            return generateExpressionArrAccess(*expression.getArrayAccess());
+        }
+        case ExpressionType::CONTAINER_LITERAL: {
+            assert(false);
             exit(1);
         }
+        case ExpressionType::LITERAL_VALUE: {
+            ExpressionResult expRes {
+                .value = *expression.getLiteralValue(),
+            };
+            if (expRes.value.type->exp.getToken().getType() == TokenType::STRING_LITERAL) {
+                expRes = handleStringLiteral(expRes);
+            }
+            return expRes;
+        }
+    }
+    assert(false);
+    exit(1);
+}
+
+BranchStatementResult CodeGen::postExpressionControlFlow(ExpressionResult& expRes) {
+    if (expRes.jumpOp != OpCode::NOP) {
+        return BranchStatementResult::ADDED_JUMP;
+    }
+
+    if (!expRes.isReg) {
+        // condition is a constant value, can test at compile time
+        // TODO: have to evaluate this based on type. use comp time and compare to zero
+        if (*(uint64_t *)expRes.value.getData()) {
+            // condition always true
+            return BranchStatementResult::ALWAYS_TRUE;
+        } // else condition always false, don't generate
+        return BranchStatementResult::ALWAYS_FALSE;
+    }
+    if (expRes.isPointerToValue) {
+        const bytecode_t reg =  allocateRegister();
+        expRes = loadValueFromPointer(expRes, reg);
+        assert(expRes.getReg() == reg);
+    }
+    // else the value is in a register, set flags and add jump
+    addBytes({{(bc)OpCode::SET_FLAGS, expRes.getReg()}});
+    expRes.jumpOp = OpCode::RS_JUMP_E;
+    return BranchStatementResult::ADDED_JUMP;
+}
+
+void CodeGen::postExpression(ExpressionResult& expRes, bool loadImmediate, int16_t reg) {
+    bytecode_t regToUse;
+    assert(reg < NUM_REGISTERS);
+
+    if (reg < 0) {
+        regToUse = allocateRegister();
+    } else {
+        regToUse = (bytecode_t)reg;
+    }
+
+    // check for boolean expression
+    if (expRes.getOp != OpCode::NOP) {
+        addBytes({{(bc)expRes.getOp, regToUse}});
+        expRes.getOp = OpCode::NOP;
+        expRes.jumpOp = OpCode::NOP;
+        expRes.setReg(regToUse);
+        return;
+    }
+
+    if (!expRes.isReg) {
+        if (!loadImmediate) {
+            return;
+        }
+        assert(!expRes.isPointerToValue);
+        moveImmToReg(regToUse, expRes);
+        return;
+    }
+
+    assert(expRes.isReg);
+    if (!expRes.isTemp) {
+        addBytes({{(bc)OpCode::MOVE, regToUse, expRes.getReg()}});
+        expRes.setReg(regToUse);
+    }
+
+    if (expRes.isPointerToValue) {
+        expRes = loadValueFromPointer(expRes, regToUse);
+        assert(expRes.getReg() == regToUse);
+    }
+    else if (reg >= 0 && expRes.getReg() != regToUse) {
+        assert(reg == regToUse);
+        addBytes({{(bc)OpCode::MOVE, regToUse, expRes.getReg()}});
+        freeRegister(expRes.getReg());
+        expRes.setReg(regToUse);
+    } else {
+        freeRegister(regToUse);
     }
 }
 
@@ -678,7 +755,16 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
             // otherwise it's a stack variable so get offset from stack pointer
             const std::string& ident = tk->extractToken(expression.getToken());
             uint32_t stackItemIndex = nameToStackItemIndex[ident];
+            assert(stackItems[stackItemIndex].type == StackItemType::VARIABLE);
             StackVariable& stackVar = stackItems[stackItemIndex].variable;
+
+            // TODO:
+            // if the variable is a reference, we want the address of what it's referencing
+            // a reference should just be implemented as a pointer in most cases, so just return the value of the pointer
+            if (stackVar.varDec.type.exp.getToken().getType() == TokenType::REFERENCE) {
+                assert(false); // marking as unimplemented
+            }
+
             uint32_t offset = getVarOffsetFromSP(stackVar);
             if (offset) {
                 expRes.setReg(allocateRegister());
@@ -689,10 +775,6 @@ ExpressionResult CodeGen::getAddressOfExpression(const Expression& expression) {
                 expRes.isTemp = false;
             }
             expRes.value.type = &stackVar.varDec.type;
-            if (expRes.value.type->exp.getToken().getType() == TokenType::REFERENCE) {
-                // always move past references
-                expRes.value.type = expRes.value.type->next;
-            }
             return expRes;
         }
         case ExpressionType::ARRAY_ACCESS: {
@@ -719,92 +801,13 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
     ExpressionResult expRes;
     const Token& token = expression.getToken();
     switch (token.getType()) {
-        case TokenType::STRING_LITERAL: {
-            // expRes.value.type points to memory allocated with new
-            expRes.value = loadLiteralValue(*tk, token);
-            std::unique_ptr<std::string> stringLiteral {*(std::string **)expRes.value.getData()};
-            // check if string is already in data section
-            for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
-                if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
-                    continue;
-                }
-                const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
-                uint64_t stringLength = strlen(pString);
-                if (stringLiteral->length() == stringLength && *stringLiteral == pString) {
-                    expRes.value.set(i);
-                    return expRes;
-                }
-                i += stringLength;
-            }
-            // place string literal in data section of bytecode, return offset to start of string
-            const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, (void *)stringLiteral->data(), stringLiteral->length() + 1);
-            if (dataSectionEntry.indexInDataSection) {
-                {
-                    ExpressionResult stringExp;
-                    stringExp.setReg(allocateRegister());
-                    ExpressionResult dataPointerExp;
-                    dataPointerExp.setReg(dataPointerIndex);
-                    expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
-                    expRes.setReg(stringExp.getReg());
-                }
-                efficientImmAddOrSub(expRes.getReg(), dataSectionEntry.indexInDataSection, OpCode::ADD);
-            } else {
-                expRes.setReg(dataPointerIndex);
-                expRes.isTemp = false;
-            }
-            return expRes;
-        }
-        case TokenType::DECIMAL_NUMBER: {
-            std::string decimalNumber = tk->extractToken(token);
-            uint64_t num = std::stoull(decimalNumber);
-            expRes.value.set(num);
-            if (num <= INT32_MAX) {
-                expRes.value.type = &TokenListTypes::int32Value;
-            } else if (num <= UINT32_MAX) {
-                expRes.value.type = &TokenListTypes::uint32Value;
-            } else if (num <= INT64_MAX) {
-                expRes.value.type = &TokenListTypes::int64Value;
-            } // already set to uint64_t
-            return expRes;
-        }
-        case TokenType::BINARY_NUMBER: {
-            assert(token.getLength() > 2);
-            std::string binaryNumber = tk->extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::BINARY_NUMBER});
-            uint64_t num = std::stoull(binaryNumber, nullptr, 2);
-            expRes.value.set(num);
-            if (num <= INT32_MAX) {
-                expRes.value.type = &TokenListTypes::int32Value;
-            } else if (num <= UINT32_MAX) {
-                expRes.value.type = &TokenListTypes::uint32Value;
-            } else if (num <= INT64_MAX) {
-                expRes.value.type = &TokenListTypes::int64Value;
-            } // already set to uint64_t
-            return expRes;
-        }
-        case TokenType::FLOAT_NUMBER: {
-            std::string binaryNumber = tk->extractToken(token);
-            double num = std::stod(binaryNumber);
-            expRes.value.set(num);
-            return expRes;
-        }
-        case TokenType::HEX_NUMBER: { 
-            assert(token.getLength() > 2);
-            std::string hexNumber = tk->extractToken(Token{token.getPosition() + 2, (uint16_t)(token.getLength() - 2), TokenType::HEX_NUMBER});
-            /*
-            std::invalid_argument
-            std::out_of_range
-            */
-            uint64_t num = std::stoull(hexNumber, nullptr, 16);
-            expRes.value.set(num);
-            if (num <= INT32_MAX) {
-                expRes.value.type = &TokenListTypes::int32Value;
-            } else if (num <= UINT32_MAX) {
-                expRes.value.type = &TokenListTypes::uint32Value;
-            } else if (num <= INT64_MAX) {
-                expRes.value.type = &TokenListTypes::int64Value;
-            } // already set to uint64_t
-            return expRes;
-        }
+        // case TokenType::DECIMAL_NUMBER:
+        // case TokenType::BINARY_NUMBER:
+        // case TokenType::FLOAT_NUMBER:
+        // case TokenType::HEX_NUMBER: {
+        //     expRes.value = loadLiteralValue(*tk, expression.getToken());
+        //     return expRes;
+        // }
         case TokenType::STDIN: {
             expRes.isPointerToValue = true;
             expRes.setReg(allocateRegister());
@@ -858,10 +861,45 @@ ExpressionResult CodeGen::loadValue(const Expression &expression) {
             return expRes;
         }
         default: {
-            expRes.value = loadLiteralValue(*tk, token);
-            return expRes;
+            assert(false);
+            exit(1);
         }
     }
+}
+
+ExpressionResult CodeGen::handleStringLiteral(ExpressionResult &expRes) {
+    // expRes.value.type points to memory allocated with new
+    std::unique_ptr<std::string> stringLiteral {*(std::string **)expRes.value.getData()};
+    // check if string is already in data section
+    for (uint32_t i = 0; i < dataSectionEntries.size(); ++i) {
+        if (dataSectionEntries[i].type != DataSectionEntryType::STRING_LITERAL) {
+            continue;
+        }
+        const char *pString = (const char *)dataSection.data() + dataSectionEntries[i].indexInDataSection;
+        uint64_t stringLength = strlen(pString);
+        if (stringLiteral->length() == stringLength && *stringLiteral == pString) {
+            expRes.value.set(i);
+            return expRes;
+        }
+        i += stringLength;
+    }
+    // place string literal in data section of bytecode, return offset to start of string
+    const DataSectionEntry& dataSectionEntry = addToDataSection(DataSectionEntryType::STRING_LITERAL, (void *)stringLiteral->data(), stringLiteral->length() + 1);
+    if (dataSectionEntry.indexInDataSection) {
+        {
+            ExpressionResult stringExp;
+            stringExp.setReg(allocateRegister());
+            ExpressionResult dataPointerExp;
+            dataPointerExp.setReg(dataPointerIndex);
+            expressionResWithOp(OpCode::MOVE, OpCode::NOP, stringExp, dataPointerExp);
+            expRes.setReg(stringExp.getReg());
+        }
+        efficientImmAddOrSub(expRes.getReg(), dataSectionEntry.indexInDataSection, OpCode::ADD);
+    } else {
+        expRes.setReg(dataPointerIndex);
+        expRes.isTemp = false;
+    }
+    return expRes;
 }
 
 ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerExp, bytecode_t reg) {
@@ -992,9 +1030,8 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
 
     // left imm, right imm
     if (leftImm && rightImm) {
-        assert(false); // should be handled by checker
-        // both operands are immediate values, return the result
-        // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
+        assert(false); // handled by checker
+        exit(1);
     }
     // beyond this point, only one of left or right can possibly be an imm
 
@@ -1066,6 +1103,7 @@ ExpressionResult CodeGen::mathematicalBinOp(const BinOp& binOp, const OpCode op,
 ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, const OpCode opImm) {
     // checkers job to insure the assignment is valid
     ExpressionResult rightResult = generateExpression(binOp.rightSide);
+    postExpression(rightResult, false);
     ExpressionResult leftResult = getAddressOfExpression(binOp.leftSide);
     assert(leftResult.isReg);
     assert(leftResult.isPointerToValue);
@@ -1089,9 +1127,9 @@ ExpressionResult CodeGen::assignmentBinOp(const BinOp& binOp, const OpCode op, c
     return leftResult;
 }
 
-ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp, bool controlFlow) {
+ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp) {
     // TODO: this is really messy, try to clean up. logical and / logical or are done on their own
-    if (binOp.op.getType() == TokenType::LOGICAL_AND || binOp.op.getType() == TokenType::LOGICAL_OR) {
+    if (op == OpCode::LOGICAL_AND || op == OpCode::LOGICAL_OR) {
         uint64_t shortCircuitIndexStart = 0;
         // if left and right are both constant, we need to save the left side till we get the right, and then do the eval
         // if left is a constant, we can discard the left side since either the expression will not go on, or the result is dependent on the right side
@@ -1099,7 +1137,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         
         // so if left is not a reg, we know it's value does not matter
 
-        ExpressionResult leftResult = generateExpression(binOp.leftSide, controlFlow);
+        ExpressionResult leftResult = generateExpression(binOp.leftSide);
         uint32_t startJumpMarkers = jumpMarkers.size();
         // if jump op is set, the flags are already set, 
         if (!leftResult.isReg && leftResult.jumpOp == OpCode::NOP) {
@@ -1110,13 +1148,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             leftResult.value = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, leftResult.value, zeroExp);
             if (!*(bool*)leftResult.value.getData()) {
                 // for &&, expression is false, don't generate anymore
-                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
+                if (op == OpCode::LOGICAL_AND) {
                     return leftResult;
                 }
                 // for ||, need to check next, but can remove left side
             } else {
                 // for ||, expression is true, don't generate anymore
-                if (binOp.op.getType() == TokenType::LOGICAL_OR) {
+                if (op == OpCode::LOGICAL_OR) {
                     return leftResult;
                 }
                 // for &&, need to check next, but can remove left side
@@ -1131,7 +1169,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
                 shortCircuitIndexStart = byteCode.size();
                 addBytes({{(bc)OpCode::SET_FLAGS, leftResult.getReg()}});
             }
-            if (binOp.op.getType() == TokenType::LOGICAL_AND) {
+            if (op == OpCode::LOGICAL_AND) {
                 addJumpMarker(JumpMarkerType::TO_LOGICAL_BIN_OP_END);
                 addJumpOp(OpCode::RS_JUMP_E); // if leftResult is false, skip right side
             }
@@ -1144,7 +1182,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         // l no reg immediate
         // l is reg value is loaded in register
         
-        ExpressionResult rightResult = generateExpression(binOp.rightSide, controlFlow && !leftResult.isReg);
+        ExpressionResult rightResult = generateExpression(binOp.rightSide);
         // r no reg r no jump, immediate
         // r is reg r no jump, value is loaded in register
         // r is reg r is jump, not possible
@@ -1154,8 +1192,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             // right side is immediate value
             if (!leftResult.isReg) {
                 assert(false); // handled by checker
-                // both sides are immediate
-                // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
+                exit(1);
             }
             // left result is not an immediate
             byteCode.resize(shortCircuitIndexStart);
@@ -1165,13 +1202,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             rightResult.value = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult.value, zeroExp);
             if (!*(bool*)rightResult.value.getData()) {
                 // for &&, cond is always false
-                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
+                if (op == OpCode::LOGICAL_AND) {
                     return rightResult;
                 }
                 // for ||, depends on left side
             } else {
                 // for ||, cond is always true
-                if (binOp.op.getType() == TokenType::LOGICAL_AND) {
+                if (op == OpCode::LOGICAL_AND) {
                     return rightResult;
                 }
                 // for &&, depends on left side
@@ -1197,36 +1234,15 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             freeRegister(leftResult.getReg());
         }
         ExpressionResult expRes;
-        if (controlFlow) {
-            expRes.jumpOp = jumpOp;
-        } else {
-            expRes.isReg = true;
-            expRes.isTemp = true;
-            const bc reg = allocateRegister();
-            addBytes({{(bc)getOp, reg}});
-            expRes.setReg(reg);
-        }
+        expRes.jumpOp = jumpOp;
+        expRes.getOp = getOp;
         return expRes;
     } else {
+        // TODO: this will need to be worked on / tested
         ExpressionResult leftResult = generateExpression(binOp.leftSide);
+        postExpression(leftResult, true);
         ExpressionResult rightResult = generateExpression(binOp.rightSide);
-        if (!leftResult.isReg) { // immediate value
-            if (!rightResult.isReg) {
-                assert(false); // handled by checker
-                // return evaluateBinOpImmExpression(binOp.op.getType(), leftResult, rightResult);
-            }
-            const bc reg = allocateRegister();
-            moveImmToReg(reg, leftResult);
-            leftResult.isReg = true;
-            leftResult.setReg(reg);
-            leftResult.isTemp = true;
-        } else if (!rightResult.isReg) {
-            const bc reg = allocateRegister();
-            moveImmToReg(reg, rightResult);
-            rightResult.isReg = true;
-            rightResult.setReg(reg);
-            rightResult.isTemp = true;
-        }
+        postExpression(rightResult, true);
         addBytes({{(bc)op, leftResult.getReg(), rightResult.getReg()}});
         if (rightResult.isTemp) {
             freeRegister(rightResult.getReg());
@@ -1235,20 +1251,13 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             freeRegister(leftResult.getReg());
         }
         ExpressionResult expRes;
-        if (controlFlow) {
-            expRes.jumpOp = jumpOp;
-        } else {
-            expRes.isReg = true;
-            expRes.isTemp = true;
-            const bc reg = allocateRegister();
-            addBytes({{(bc)getOp, reg}});
-            expRes.setReg(reg);
-        }
+        expRes.jumpOp = jumpOp;
+        expRes.getOp = jumpOp;
         return expRes;
     }
 }
 
-ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool controlFlow) {
+ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp) {
     switch (binOp.op.getType()) {
         // member access
         case TokenType::DOT: {
@@ -1328,28 +1337,28 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
         // figure out marker system to allow replacement of jump instruction values
         // logical
         case TokenType::EQUAL: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_NE, OpCode::GET_E, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_NE, OpCode::GET_E);
         }
         case TokenType::NOT_EQUAL: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_E, OpCode::GET_NE);
         }
         case TokenType::LOGICAL_AND: {
-            return booleanBinOp(binOp, OpCode::LOGICAL_AND, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
+            return booleanBinOp(binOp, OpCode::LOGICAL_AND, OpCode::RS_JUMP_E, OpCode::GET_NE);
         }
         case TokenType::LOGICAL_OR: {
-            return booleanBinOp(binOp, OpCode::LOGICAL_OR, OpCode::RS_JUMP_E, OpCode::GET_NE, controlFlow);
+            return booleanBinOp(binOp, OpCode::LOGICAL_OR, OpCode::RS_JUMP_E, OpCode::GET_NE);
         }
         case TokenType::LESS_THAN: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_GE, OpCode::GET_L, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_GE, OpCode::GET_L);
         }
         case TokenType::LESS_THAN_EQUAL: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_G, OpCode::GET_LE, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_G, OpCode::GET_LE);
         }
         case TokenType::GREATER_THAN: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_LE, OpCode::GET_G, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_LE, OpCode::GET_G);
         }
         case TokenType::GREATER_THAN_EQUAL: {
-            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_L, OpCode::GET_GE, controlFlow);
+            return booleanBinOp(binOp, OpCode::CMP, OpCode::RS_JUMP_L, OpCode::GET_GE);
         }
         default: {
             std::cerr << "Invalid token type in BinOp expression [" << (int32_t)binOp.op.getType() << "]\n";
@@ -1365,16 +1374,10 @@ ExpressionResult CodeGen::generateExpressionBinOp(const BinOp& binOp, bool contr
 
 ExpressionResult CodeGen::defaultUnOp(const UnOp& unOp, OpCode op) {
     ExpressionResult expRes = generateExpression(unOp.operand);
+    postExpression(expRes, false);
     if (!expRes.isReg) {
         assert(false); // handled by checker
-        // evaluate imm
-        // return evaluateUnaryOpImmExpression(unOp.op.getType(), expRes);
-    }
-    if (!expRes.isTemp) {
-        const bc reg = allocateRegister();
-        addBytes({{(bc)OpCode::MOVE, reg, expRes.getReg()}});
-        expRes.setReg(reg);
-        expRes.isTemp = true;
+        exit(1);
     }
     addBytes({{(bc)op, expRes.getReg()}});
     return expRes;
@@ -1429,8 +1432,11 @@ ExpressionResult CodeGen::generateExpressionUnOp(const UnOp& unOp) {
         }
         case TokenType::DEREFERENCE: {
             ExpressionResult expRes = generateExpression(unOp.operand);
-            assert(getTypeFromTokenList(*expRes.value.type).getType() == TokenType::POINTER);
-            expRes.value.type = getNextFromTokenList(*expRes.value.type);
+            // postExpression(expRes);
+            assert(getTypeFromTokenList(*expRes.value.type).getType() == TokenType::POINTER || expRes.isPointerToValue);
+            if (expRes.isPointerToValue) {
+                expRes.value.type = getNextFromTokenList(*expRes.value.type);
+            }
             expRes.isPointerToValue = true;
             return expRes;
         }
@@ -1566,10 +1572,7 @@ void CodeGen::generateControlFlowStatement(const ControlFlowStatement& controlFl
         }
         case ControlFlowStatementType::EXIT_STATEMENT: {
             ExpressionResult expRes = generateExpression(controlFlowStatement.returnStatement->returnValue);
-            if (!expRes.isReg) {
-                moveImmToReg(miscRegisterIndex, expRes);
-                expRes.setReg(miscRegisterIndex);
-            }
+            postExpression(expRes, true);
             addBytes({{(bc)OpCode::EXIT, expRes.getReg()}});
             break;
         }
@@ -1696,23 +1699,19 @@ BranchStatementResult CodeGen::generateBranchStatement(const BranchStatement& if
     // generate the conditional statement, set controlFlow argument to true
     // if (cond) { body }
     //     ^^^^
-    ExpressionResult expRes = generateExpression(ifStatement.condition, true);
-    if (expRes.jumpOp == OpCode::NOP) {
-        if (!expRes.isReg) {
-            // condition is a constant value, can test at compile time
-            // TODO: have to evaluate this based on type. use comp time and compare to zero
-            if (*(uint64_t *)expRes.value.getData()) {
-                // condition always true
-                generateScope(ifStatement.body);
-                return BranchStatementResult::ALWAYS_TRUE;
-            } // else condition always false, don't generate
-            return BranchStatementResult::ALWAYS_FALSE;
-        }
-        // else the value is in a register, set flags and add jump
-        addBytes({{(bc)OpCode::SET_FLAGS, expRes.getReg()}});
-        expRes.jumpOp = OpCode::RS_JUMP_E;
+    ExpressionResult expRes = generateExpression(ifStatement.condition);
+    BranchStatementResult res = postExpressionControlFlow(expRes);
+    if (res == BranchStatementResult::ALWAYS_FALSE) {
+        return res;
     }
+    if (res == BranchStatementResult::ALWAYS_TRUE) {
+        // no need to add jump op, just generate scope
+        generateScope(ifStatement.body);
+        return res;
+    }
+
     addJumpMarker(JumpMarkerType::TO_BRANCH_END);
+    assert(expRes.jumpOp != OpCode::NOP);
     addJumpOp(expRes.jumpOp);
     // generate the body
     // if (cond) { body }

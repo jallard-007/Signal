@@ -23,6 +23,9 @@ typedef struct UnOp UnOp;
 typedef struct FunctionCall FunctionCall;
 typedef struct ArrayAccess ArrayAccess;
 typedef struct ContainerLiteral ContainerLiteral;
+typedef struct LiteralValue LiteralValue;
+
+
 
 enum class ExpressionType: uint8_t {
     NONE,
@@ -32,7 +35,8 @@ enum class ExpressionType: uint8_t {
     FUNCTION_CALL,
     ARRAY_ACCESS,
     CONTAINER_LITERAL,
-    // VALUE_LITERAL,
+    LITERAL_VALUE, // there is currently no extra room for another expression type
+    END = LITERAL_VALUE
 };
 
 struct Expression {
@@ -45,6 +49,7 @@ struct Expression {
      * 
      * Since Token is also a subexpression, the Token struct should leave the least significant 3 bits untouched
     */
+    static_assert((uint64_t)ExpressionType::END <= 0b111);
     private:
     union {
         uint64_t type;
@@ -54,6 +59,7 @@ struct Expression {
         FunctionCall *funcCall;
         ArrayAccess *arrAccess;
         ContainerLiteral *containerLiteral;
+        LiteralValue *literalValue;
     };
     public:
     Expression();
@@ -70,6 +76,7 @@ struct Expression {
     inline FunctionCall* getFunctionCall() const { assert(getType() == ExpressionType::FUNCTION_CALL); return (FunctionCall *)((uint64_t)funcCall & ~EXPRESSION_MASK); }
     inline ArrayAccess* getArrayAccess() const { assert(getType() == ExpressionType::ARRAY_ACCESS); return (ArrayAccess *)((uint64_t)arrAccess & ~EXPRESSION_MASK); }
     inline ContainerLiteral* getContainerLiteral() const { assert(getType() == ExpressionType::CONTAINER_LITERAL); return (ContainerLiteral *)((uint64_t)containerLiteral & ~EXPRESSION_MASK); }
+    inline LiteralValue* getLiteralValue() const { assert(getType() == ExpressionType::LITERAL_VALUE); return (LiteralValue *)((uint64_t)literalValue & ~EXPRESSION_MASK); }
     inline ExpressionType getType() const { return (ExpressionType)(type & EXPRESSION_MASK); }
     inline const void *getRawPointer() const { return (const void *)((uint64_t)binOp & ~EXPRESSION_MASK); }
 
@@ -81,6 +88,7 @@ struct Expression {
     inline void setFunctionCall(FunctionCall *ref) { SET_EXP(ExpressionType::FUNCTION_CALL); }
     inline void setArrayAccess(ArrayAccess *ref) { SET_EXP(ExpressionType::ARRAY_ACCESS); }
     inline void setContainerLiteral(ContainerLiteral *ref) { SET_EXP(ExpressionType::CONTAINER_LITERAL); }
+    inline void setLiteralValue(LiteralValue *ref) { SET_EXP(ExpressionType::LITERAL_VALUE); }
     inline void setType(ExpressionType ref) { type = (type & ~EXPRESSION_MASK) | ((char)ref & EXPRESSION_MASK); }
     #undef SET_EXP
     #undef EXPRESSION_MASK
@@ -143,6 +151,35 @@ struct TokenList {
     TokenList deepCopy(NodeMemPool&);
 };
 
+
+typedef struct ExpressionResult ExpressionResult;
+
+struct LiteralValue {
+    TokenList *type;
+    private:
+    unsigned char data [SIZE_OF_REGISTER] {0};
+    public:
+    inline const void *getData() const { return (void *)data; }
+    template <class T> void set(T) = delete;
+    void set(char);
+    void set(uint32_t);
+    void set(uint64_t);
+    void set(int32_t);
+    void set(int64_t);
+    void set(FILE *);
+    void set(double);
+    void set(bool);
+    void set(std::string *, TokenList*);
+
+    template <class T>
+    void setUntyped(T t) {
+        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
+        *(decltype(t) *)data = t;
+    }
+    friend ExpressionResult;
+};
+
+
 // varDec:= simpleVarDec initialization
 //                     | nothing
 struct VariableDec {
@@ -198,6 +235,7 @@ struct BinOp {
     Expression rightSide;
     Expression leftSide;
     Token op;
+
     BinOp() = delete;
     explicit BinOp(const Token&);
     BinOp(const BinOp&) = default;
@@ -210,7 +248,7 @@ struct UnOp {
     Expression operand;
     private:
     // to make the memory layout the same as binOp
-    Expression padding;
+    Expression _padding;
     public:
     Token op;
     UnOp() = delete;

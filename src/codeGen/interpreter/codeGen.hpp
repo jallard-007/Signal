@@ -20,6 +20,7 @@ struct RegisterInfo {
 struct ExpressionResult {
     LiteralValue value;
     OpCode jumpOp {OpCode::NOP};
+    OpCode getOp {OpCode::NOP};
     bool isReg {false};
     bool isTemp {false};
     bool isPointerToValue {false};
@@ -121,7 +122,6 @@ struct DataSectionEntry {
     DataSectionEntry(DataSectionEntryType type, uint32_t indexInDataSection): type{type}, indexInDataSection{indexInDataSection} {}
 };
 
-// #define STACK_RETURN_VALUE_IDENTIFIER "-rvp"
 #define STACK_RETURN_ADDRESS_IDENTIFIER "-ra"
 
 struct CodeGen {
@@ -282,7 +282,15 @@ struct CodeGen {
      * \note if the expression is a string literal, the returned object has
      * memory allocated using new within the field value.type (TokenList)
     */
-    [[nodiscard]] ExpressionResult generateExpression(const Expression&, bool = false);
+    [[nodiscard]] ExpressionResult generateExpression(const Expression&);
+
+    /**
+     * 
+    */
+    void postExpression(ExpressionResult& expRes, bool loadImmediate, int16_t reg = -1);
+
+    BranchStatementResult postExpressionControlFlow(ExpressionResult& expRes);
+
     [[nodiscard]] ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
     [[nodiscard]] ExpressionResult generateExpressionContainerLiteral(const ContainerLiteral&);
 
@@ -306,12 +314,17 @@ struct CodeGen {
      * if isReg is set to false, it means there is something wrong with the expression. this should have been caught in the checker stage
     */
     [[nodiscard]] ExpressionResult getAddressOfExpression(const Expression&);
+
+    [[nodiscard]] ExpressionResult handleStringLiteral(ExpressionResult&);
+
     [[nodiscard]] ExpressionResult loadValue(const Expression&);
 
     /**
      * Loads the data pointed at by expRes into a register
+     * \param expRes the expression result with the pointer expression
+     * \param reg the register to load the value into
     */
-    [[nodiscard]] ExpressionResult loadValueFromPointer(const ExpressionResult &, bytecode_t);
+    [[nodiscard]] ExpressionResult loadValueFromPointer(const ExpressionResult& expRes, bytecode_t reg);
 
     /**
      * Stores data
@@ -352,8 +365,8 @@ struct CodeGen {
      * \param getOp the get op code to use when placing the result in a register. used when controlFlow is false
      * \param controlFlow dictates if the jump op will be returned, or if the get op will be used and a register will be returned
     */
-    [[nodiscard]] ExpressionResult booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp, bool controlFlow = false);
-    [[nodiscard]] ExpressionResult generateExpressionBinOp(const BinOp&, bool = false);
+    [[nodiscard]] ExpressionResult booleanBinOp(const BinOp& binOp, OpCode op, OpCode jumpOp, OpCode getOp);
+    [[nodiscard]] ExpressionResult generateExpressionBinOp(const BinOp&);
 
 // UNARY EXPRESSIONS
     [[nodiscard]] ExpressionResult generateExpressionUnOp(const UnOp&);

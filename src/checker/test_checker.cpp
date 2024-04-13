@@ -360,6 +360,32 @@ TEST_CASE("array types", "[checker]") {
     }
 }
 
+TEST_CASE("cursed", "[checker]") {
+    SECTION("1") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType; var.4; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        REQUIRE(tc.errors.size() == 1);
+    }
+    SECTION("2") {
+        std::vector<Tokenizer> tks;
+        const std::string str = "func main(): void { var: int32 [10]; var[\"hello\"]; } ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        REQUIRE(pr.parse());
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.check(true);
+        REQUIRE(tc.errors.size() == 1);
+    }
+}
+
+
 TEST_CASE("struct types", "[checker]") {
     SECTION("1") {
         std::vector<Tokenizer> tks;

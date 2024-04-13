@@ -281,6 +281,7 @@ Expression Expression::deepCopy(NodeMemPool& mem) {
         case ExpressionType::UNARY_OP: copy.unOp = unOp->deepCopy(mem); break;
         case ExpressionType::VALUE: copy.value = value; break;
         case ExpressionType::CONTAINER_LITERAL: copy.containerLiteral = containerLiteral->deepCopy(mem); break;
+        case ExpressionType::LITERAL_VALUE: copy.literalValue = mem.makeLiteralValue(); *copy.literalValue = *literalValue; break;
         case ExpressionType::NONE: break;
     }
     return copy;

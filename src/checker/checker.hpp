@@ -172,20 +172,24 @@ struct Checker {
     bool checkLocalVarDec(VariableDec&);
 
     /**
-     * Returns the resulting type from an expression
-     * the ResultingType always contains a valid pointer
+     * Returns the resulting type from an expression. The ResultingType always contains a valid pointer.
+     * You must check if the result is a literal.
+     * If it is a literal, release the sub expression, then make a new LiteralValue node using the memPool,
+     * assign the LiteralValue to the original root expression
+     * and copy the returned ResultingType.value to the newly allocated LiteralValue node.
      * \param expression the expression to check
      * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
     */
-    ResultingType checkExpression(const Expression& expression,const StructInformation* structMap = nullptr);
+    ResultingType checkExpression(Expression& expression, const StructInformation* structMap = nullptr);
+    void postCheckExpression(ResultingType&, Expression& expression);
 
-    ResultingType checkBinOpExpression(const BinOp&);
-    ResultingType checkUnOpExpression(const UnOp&);
-    ResultingType checkTokenExpression(Token,const StructInformation* = nullptr);
-    ResultingType checkFunctionCallExpression(const FunctionCall&,const StructInformation* = nullptr);
+    ResultingType checkBinOpExpression(BinOp&);
+    ResultingType checkUnOpExpression(UnOp&);
+    ResultingType checkTokenExpression(Token, const StructInformation* = nullptr);
+    ResultingType checkFunctionCallExpression(FunctionCall&, const StructInformation* = nullptr);
     bool checkContainerLiteralStruct(ContainerLiteral&, const StructInformation&);
     ResultingType checkContainerLiteralArray(ContainerLiteral&);
-    ResultingType checkMemberAccess(ResultingType&, const BinOp&);
+    ResultingType checkMemberAccess(ResultingType&, BinOp&);
 
     /**
      * Validates a type

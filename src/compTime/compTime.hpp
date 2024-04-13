@@ -5,33 +5,6 @@
 #include <string>
 #include "nodes.hpp"
 
-typedef struct ExpressionResult ExpressionResult;
-
-struct LiteralValue {
-    TokenList *type;
-    private:
-    unsigned char data [SIZE_OF_REGISTER] {0};
-    public:
-    inline const void *getData() const { return (void *)data; }
-    template <class T> void set(T) = delete;
-    void set(char);
-    void set(uint32_t);
-    void set(uint64_t);
-    void set(int32_t);
-    void set(int64_t);
-    void set(FILE *);
-    void set(double);
-    void set(bool);
-    void set(std::string *, TokenList*);
-
-    template <class T>
-    void setUntyped(T t) {
-        static_assert(sizeof(T)<=sizeof(data), "T does not fit in data");
-        *(decltype(t) *)data = t;
-    }
-    friend ExpressionResult;
-};
-
 
 // ========================================
 // COMPILE TIME EVALUATION

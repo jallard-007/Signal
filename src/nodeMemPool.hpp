@@ -19,6 +19,7 @@ class NodeMemPool {
     MemPool<ControlFlowStatement> controlFlows;
     MemPool<ArrayAccess> arrayAccesses;
     MemPool<TokenList> tokenLists;
+    MemPool<LiteralValue> literalValues;
     MemPool<Expression> expressions;
     MemPool<ExpressionList> expressionLists;
     MemPool<Scope> scopes;
@@ -51,6 +52,7 @@ public:
         controlFlows.reset();
         arrayAccesses.reset();
         tokenLists.reset();
+        literalValues.reset();
         expressions.reset();
         expressionLists.reset();
         scopes.reset();
@@ -82,6 +84,7 @@ public:
     ControlFlowStatement* makeControlFlowStatement() {return controlFlows.get();}
     ArrayAccess* makeArrayAccess(const ArrayAccess& ref) {return arrayAccesses.get(ref);}
     TokenList* makeTokenList() {return tokenLists.get();}
+    LiteralValue* makeLiteralValue() {return literalValues.get();}
     Expression* makeExpression() {return expressions.get();}
     ExpressionList* makeExpressionList() {return expressionLists.get();}
     Scope* makeScope() {return scopes.get();}
@@ -112,6 +115,7 @@ public:
     void release(const ControlFlowStatement* ptr) { controlFlows.release(ptr);}
     void release(const ArrayAccess* ptr) { arrayAccesses.release(ptr);}
     void release(const TokenList* ptr) { tokenLists.release(ptr);}
+    void release(const LiteralValue* ptr) { literalValues.release(ptr);}
     void release(const Expression* ptr) { expressions.release(ptr);}
     void release(const ExpressionList* ptr) { expressionLists.release(ptr);}
     void release(const Scope* ptr) { scopes.release(ptr);}

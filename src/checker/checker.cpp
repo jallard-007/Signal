@@ -5,31 +5,32 @@
 
 const TokenList* getNextFromTokenList(const TokenList&);
 
-void memPoolReleaseWholeExpression(NodeMemPool& memPool, Expression* exp);
+void memPoolReleaseWholeExpression(NodeMemPool& memPool, Expression& exp);
 
 void memPoolReleaseWholeExpressionList(NodeMemPool& memPool, ExpressionList* expList) {
-    memPoolReleaseWholeExpression(memPool, &expList->curr);
+    memPoolReleaseWholeExpression(memPool, expList->curr);
     expList = expList->next;
     while (expList) {
-        memPoolReleaseWholeExpression(memPool, &expList->curr);
+        memPoolReleaseWholeExpression(memPool, expList->curr);
         ExpressionList* prev = expList;
         expList = expList->next;
         memPool.release(prev);
     }
 }
 
-void memPoolReleaseWholeExpression(NodeMemPool& memPool, Expression* exp) {
-    if (!exp->getRawPointer()) {
+void memPoolReleaseWholeExpression(NodeMemPool& memPool, Expression& exp) {
+    if (!exp.getRawPointer()) {
         return;
     }
-    switch(exp->getType()) {
+    switch(exp.getType()) {
         case ExpressionType::NONE: break;
-        case ExpressionType::BINARY_OP: { memPoolReleaseWholeExpression(memPool, &exp->getBinOp()->rightSide); memPoolReleaseWholeExpression(memPool, &exp->getBinOp()->leftSide); memPool.release(exp->getBinOp()); break; }
-        case ExpressionType::UNARY_OP: { memPoolReleaseWholeExpression(memPool, &exp->getUnOp()->operand); memPool.release(exp->getUnOp()); break; }
+        case ExpressionType::BINARY_OP: { memPoolReleaseWholeExpression(memPool, exp.getBinOp()->rightSide); memPoolReleaseWholeExpression(memPool, exp.getBinOp()->leftSide); memPool.release(exp.getBinOp()); break; }
+        case ExpressionType::UNARY_OP: { memPoolReleaseWholeExpression(memPool, exp.getUnOp()->operand); memPool.release(exp.getUnOp()); break; }
         case ExpressionType::VALUE: break;
-        case ExpressionType::FUNCTION_CALL:  { memPoolReleaseWholeExpressionList(memPool, &exp->getFunctionCall()->args); memPool.release(exp->getFunctionCall()); break; }
-        case ExpressionType::ARRAY_ACCESS: { memPoolReleaseWholeExpression(memPool, &exp->getArrayAccess()->array); memPoolReleaseWholeExpression(memPool, &exp->getArrayAccess()->offset); memPool.release(exp->getArrayAccess()); break; }
-        case ExpressionType::CONTAINER_LITERAL: { memPoolReleaseWholeExpressionList(memPool, &exp->getContainerLiteral()->values); memPool.release(exp->getContainerLiteral()); break; }
+        case ExpressionType::FUNCTION_CALL:  { memPoolReleaseWholeExpressionList(memPool, &exp.getFunctionCall()->args); memPool.release(exp.getFunctionCall()); break; }
+        case ExpressionType::ARRAY_ACCESS: { memPoolReleaseWholeExpression(memPool, exp.getArrayAccess()->array); memPoolReleaseWholeExpression(memPool, exp.getArrayAccess()->offset); memPool.release(exp.getArrayAccess()); break; }
+        case ExpressionType::CONTAINER_LITERAL: { memPoolReleaseWholeExpressionList(memPool, &exp.getContainerLiteral()->values); memPool.release(exp.getContainerLiteral()); break; }
+        case ExpressionType::LITERAL_VALUE: { memPool.release(exp.getLiteralValue()); break; }
     }
 }
 
@@ -57,14 +58,14 @@ Token getTokenOfExpression(const Expression& exp) {
         case ExpressionType::VALUE: {
             return exp.getToken();
         }
+
+        case ExpressionType::LITERAL_VALUE:
         case ExpressionType::NONE: {
             return Token();
         }
-        default: {
-            std::cerr << "cannot get token of this expression\n";
-            exit(1);
-        }
     }
+    assert(false);
+    exit(1);
 }
 
 CheckerError::CheckerError(CheckerErrorType type): token{}, tkIndex{}, type{type}  {}
@@ -642,16 +643,21 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                     if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
                         checkLocalVarDec(*forLoop.initialize.varDec);
                     } else if (forLoop.initialize.type == StatementType::EXPRESSION) {
-                        checkExpression(*forLoop.initialize.expression);
+                        ResultingType res = checkExpression(*forLoop.initialize.expression);
+                        postCheckExpression(res, *forLoop.initialize.expression);
                     } else if (forLoop.initialize.type != StatementType::NONE) {
                         assert(false);
                         exit(1);
                     }
-                    ResultingType res = checkExpression(forLoop.loop.condition);
-                    if (res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && res.value.type->exp.getToken().getType() != TokenType::NONE && !canBeConvertedToBool(res.value.type)) {
-                        addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &forLoop.loop.condition});
+                    { // check condition
+                        ResultingType res = checkExpression(forLoop.loop.condition);
+                        if (res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && res.value.type->exp.getToken().getType() != TokenType::NONE && !canBeConvertedToBool(res.value.type)) {
+                            addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &forLoop.loop.condition});
+                        }
+                        postCheckExpression(res, forLoop.loop.condition);
                     }
-                    checkExpression(forLoop.iteration);
+                    ResultingType res = checkExpression(forLoop.iteration);
+                    postCheckExpression(res, forLoop.iteration);
                     checkScope(forLoop.loop.body, returnType, isLoop, isSwitch);
                     if (forLoop.initialize.type == StatementType::VARIABLE_DEC) {
                         lookUp.erase(locals.back());
@@ -663,20 +669,28 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                     auto & cond = *statement.controlFlow->conditional;
                     {
                         ResultingType res = checkExpression(cond.ifStatement.condition);
-                        if (res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && 
-                        !canBeConvertedToBool(res.value.type)) {
+                        if (
+                            res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && 
+                            !canBeConvertedToBool(res.value.type)
+                        ) {
                             addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &cond.ifStatement.condition});
                         }
+                        postCheckExpression(res, cond.ifStatement.condition);
                     }
                     checkScope(cond.ifStatement.body, returnType, isLoop, isSwitch);
-                    for(ElifStatementList* elifList = cond.elifStatement; elifList; elifList = elifList->next) {
+
+                    for (ElifStatementList* elifList = cond.elifStatement; elifList; elifList = elifList->next) {
                         ResultingType res = checkExpression(elifList->elif.condition);
-                        if (res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && 
-                        !canBeConvertedToBool(res.value.type)) {
+                        if (
+                            res.value.type->exp.getToken().getType() != TokenType::BAD_VALUE && 
+                            !canBeConvertedToBool(res.value.type)
+                        ) {
                             addError({CheckerErrorType::CANNOT_BE_CONVERTED_TO_BOOL, tk->tokenizerIndex, &cond.ifStatement.condition});
                         }
+                        postCheckExpression(res, elifList->elif.condition);
                         checkScope(elifList->elif.body, returnType, isLoop, isSwitch);
                     }
+
                     if (cond.elseStatement) {
                         checkScope(*cond.elseStatement, returnType, isLoop, isSwitch);
                     }
@@ -684,6 +698,7 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                 }
                 case ControlFlowStatementType::RETURN_STATEMENT: {
                     ResultingType res = checkExpression(statement.controlFlow->returnStatement->returnValue);
+                    postCheckExpression(res, statement.controlFlow->returnStatement->returnValue);
                     if (res.value.type->exp.getToken().getType() == TokenType::NONE && returnType.exp.getToken().getType() == TokenType::VOID) {
                         break; // ok
                     }
@@ -694,19 +709,18 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                 }
                 case ControlFlowStatementType::EXIT_STATEMENT: {
                     ResultingType res = checkExpression(statement.controlFlow->returnStatement->returnValue);
-                    if (res.value.type->exp.getToken().getType() == TokenType::NONE && returnType.exp.getToken().getType() == TokenType::VOID) {
-                        break; // ok
-                    }
                     if (!checkAssignment(&TokenListTypes::int64Value, res.value.type, false)) {
                         addError({CheckerErrorType::INVALID_EXIT_TYPE, tk->tokenizerIndex, &statement.controlFlow->returnStatement->returnValue});
                     }
+                    postCheckExpression(res, statement.controlFlow->returnStatement->returnValue);
                     return true;
                 }
                 case ControlFlowStatementType::SWITCH_STATEMENT: {
                     break;
                 }
                 case ControlFlowStatementType::WHILE_LOOP: {
-                    checkExpression(statement.controlFlow->whileLoop->loop.condition);
+                    ResultingType res = checkExpression(statement.controlFlow->whileLoop->loop.condition);
+                    postCheckExpression(res, statement.controlFlow->whileLoop->loop.condition);
                     checkScope(statement.controlFlow->whileLoop->loop.body, returnType, isLoop, isSwitch);
                     break;
                 }
@@ -718,7 +732,8 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
         }
         
         case StatementType::EXPRESSION: {
-            checkExpression(*statement.expression);
+            ResultingType res = checkExpression(*statement.expression);
+            postCheckExpression(res, *statement.expression);
             break;
         }
         
@@ -811,6 +826,7 @@ bool Checker::checkLocalVarDec(VariableDec& varDec) {
             addError({CheckerErrorType::CANNOT_ASSIGN, tk->tokenizerIndex, varDec.initialAssignment});
             return false;
         }
+        postCheckExpression(expressionType, *varDec.initialAssignment);
     }
     else if (varDec.type.exp.getToken().getType() == TokenType::ARRAY_TYPE) {
         if (varDec.type.exp.getToken().getLength() == 0) {
@@ -821,7 +837,7 @@ bool Checker::checkLocalVarDec(VariableDec& varDec) {
     return true;
 }
 
-ResultingType Checker::checkFunctionCallExpression(const FunctionCall& funcCall, const StructInformation* structMap) {
+ResultingType Checker::checkFunctionCallExpression(FunctionCall& funcCall, const StructInformation* structMap) {
     const GeneralDec *decPtr;
     StatementList *paramList;
     TokenList *returnType;
@@ -867,7 +883,7 @@ ResultingType Checker::checkFunctionCallExpression(const FunctionCall& funcCall,
     }
     // valid function, now check parameters
     // parameters are already validated on second top level scan. so assume the statements are all varDecs and valid
-    const ExpressionList* argList = &funcCall.args;
+    ExpressionList* argList = &funcCall.args;
     do {
         ResultingType resultingType = checkExpression(argList->curr);
         if (resultingType.value.type->exp.getToken().getType() != TokenType::BAD_VALUE) {
@@ -884,6 +900,7 @@ ResultingType Checker::checkFunctionCallExpression(const FunctionCall& funcCall,
                 // types dont match
                 addError({CheckerErrorType::TYPE_DOES_NOT_MATCH, tk->tokenizerIndex, &argList->curr, decPtr});
             }
+            postCheckExpression(resultingType, argList->curr);
         }
         paramList = paramList->next;
         argList = argList->next;
@@ -932,7 +949,7 @@ ResultingType Checker::checkTokenExpression(const Token token, const StructInfor
     return { loadLiteralValue(*tk, token) };
 }
 
-ResultingType Checker::checkUnOpExpression(const UnOp& unOp) {
+ResultingType Checker::checkUnOpExpression(UnOp& unOp) {
     const TokenType op = unOp.op.getType();
     if (op == TokenType::DEREFERENCE) {
         ResultingType res = checkExpression(unOp.operand);
@@ -978,7 +995,7 @@ ResultingType Checker::checkUnOpExpression(const UnOp& unOp) {
     return {&TokenListTypes::badValue, false};
 }
 
-ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
+ResultingType Checker::checkBinOpExpression(BinOp& binOp) {
     ResultingType leftSide = checkExpression(binOp.leftSide);
     const TokenType op = binOp.op.getType();
     const TokenType leftSideType = leftSide.value.type->exp.getToken().getType();
@@ -995,6 +1012,8 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
         if (leftSide.isLiteral && rightSide.isLiteral) {
             return evaluateBinOpImmExpression(op, leftSide.value, rightSide.value);
         }
+        postCheckExpression(leftSide, binOp.leftSide);
+        postCheckExpression(rightSide, binOp.rightSide);
         return {&TokenListTypes::boolValue, false};
     }
     
@@ -1006,7 +1025,7 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
         ) {
             addError({CheckerErrorType::CANNOT_COMPARE_TYPE, tk->tokenizerIndex, &binOp.leftSide});
         }
-        ResultingType rightSide = checkExpression(binOp.leftSide);
+        ResultingType rightSide = checkExpression(binOp.rightSide);
         if (
             rightSide.value.type->exp.getToken().getType() == TokenType::IDENTIFIER
             || rightSide.value.type->exp.getToken().getType() == TokenType::VOID
@@ -1017,6 +1036,8 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
         if (leftSide.isLiteral && rightSide.isLiteral) {
             return evaluateBinOpImmExpression(op, leftSide.value, rightSide.value);
         }
+        postCheckExpression(leftSide, binOp.leftSide);
+        postCheckExpression(rightSide, binOp.rightSide);
         return {&TokenListTypes::boolValue, false};
     }
 
@@ -1042,6 +1063,7 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
     }
 
     ResultingType rightSide = checkExpression(binOp.rightSide);
+    postCheckExpression(rightSide, binOp.rightSide);
     const TokenType rightSideType = rightSide.value.type->exp.getToken().getType();
     if (isAssignment(binOp.op.getType())) {
         if (leftSideType == TokenType::BAD_VALUE || rightSideType == TokenType::BAD_VALUE) {
@@ -1053,8 +1075,10 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
         else if (!checkAssignment(leftSide.value.type, rightSide.value.type, false)) {
             addError({CheckerErrorType::CANNOT_ASSIGN, tk->tokenizerIndex, binOp.op});
         }
+        postCheckExpression(leftSide, binOp.leftSide);
         return {leftSide.value.type, true};
     }
+    postCheckExpression(leftSide, binOp.leftSide);
 
     if (leftSideType == TokenType::BAD_VALUE && rightSideType == TokenType::BAD_VALUE) {
         return {&TokenListTypes::badValue, false};
@@ -1085,7 +1109,7 @@ ResultingType Checker::checkBinOpExpression(const BinOp& binOp) {
     return {&largest, false};
 }
 
-ResultingType Checker::checkExpression(const Expression& expression, const StructInformation* structMap) {
+ResultingType Checker::checkExpression(Expression& expression, const StructInformation* structMap) {
     switch(expression.getType()) {
         case ExpressionType::BINARY_OP: {
             return checkBinOpExpression(*expression.getBinOp());
@@ -1108,6 +1132,9 @@ ResultingType Checker::checkExpression(const Expression& expression, const Struc
             if (!arrayType.value.type->next) {
                 return {&TokenListTypes::badValue, false};
             }
+            postCheckExpression(arrayType, expression.getArrayAccess()->array);
+            ResultingType offset = checkExpression(expression.getArrayAccess()->offset);
+            postCheckExpression(offset, expression.getArrayAccess()->offset);
             return {arrayType.value.type->next, true};
         }
         case ExpressionType::NONE: {
@@ -1122,10 +1149,20 @@ ResultingType Checker::checkExpression(const Expression& expression, const Struc
             }
             return checkContainerLiteralArray(*expression.getContainerLiteral());
         }
-        default: {
+        case ExpressionType::LITERAL_VALUE: {
             assert(false);
             exit(1);
         }
+    }
+    assert(false);
+    exit(1);
+}
+
+void Checker::postCheckExpression(ResultingType& res, Expression& expression) {
+    if (res.isLiteral) {
+        memPoolReleaseWholeExpression(memPool, expression);
+        expression.setLiteralValue(memPool.makeLiteralValue());
+        *expression.getLiteralValue() = res.value;
     }
 }
 
@@ -1183,6 +1220,7 @@ bool Checker::checkType(TokenList& type, bool isReturnType) {
                 errorType = CheckerErrorType::NON_CONSTANT_SIZE_ARRAY;
                 break;
             }
+            postCheckExpression(res, sizeExp);
 
             const TokenType resType = getTypeFromTokenList(*res.value.type).getType();
             if (!isUnsigned(resType) && !isSigned(resType)) {
@@ -1212,7 +1250,7 @@ bool Checker::checkType(TokenList& type, bool isReturnType) {
             const uint16_t arraySize = *(uint16_t*)res.value.getData();
             const uint32_t tokenPos = list->exp.getContainerLiteral()->pos;
             // we convert the container expression to a single token, so release the sub expression
-            memPoolReleaseWholeExpression(memPool, &sizeExp);
+            memPoolReleaseWholeExpression(memPool, sizeExp);
             memPool.release(list->exp.getContainerLiteral());
             list->exp.setToken({tokenPos, arraySize, TokenType::ARRAY_TYPE});
             assert(list->exp.getToken().getLength() == arraySize);
@@ -1298,7 +1336,7 @@ bool Checker::checkType(TokenList& type, bool isReturnType) {
     return false;
 }
 
-ResultingType Checker::checkMemberAccess(ResultingType& leftSide, const BinOp& binOp) {
+ResultingType Checker::checkMemberAccess(ResultingType& leftSide, BinOp& binOp) {
     if (binOp.rightSide.getType() == ExpressionType::VALUE) {
         if (binOp.rightSide.getToken().getType() != TokenType::IDENTIFIER) {
             addError({CheckerErrorType::EXPECTED_IDENTIFIER, tk->tokenizerIndex, binOp.rightSide.getToken()});
@@ -1343,6 +1381,7 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
             return false;
         }
         ResultingType indexType = checkExpression(expList->curr.getBinOp()->leftSide, &structInfo);
+        postCheckExpression(indexType, expList->curr.getBinOp()->leftSide);
         const Token typeToken = getTypeFromTokenList(*indexType.value.type);
         if (typeToken.getType() == TokenType::BAD_VALUE) {
             return false;
@@ -1354,6 +1393,7 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
             subStructInfo = &structLookUp[genDec->structDec];
         }
         ResultingType resType = checkExpression(expList->curr.getBinOp()->rightSide, subStructInfo);
+        postCheckExpression(resType, expList->curr.getBinOp()->rightSide);
         if (!checkAssignment(indexType.value.type, resType.value.type, true, false)) {
             addError({CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE, tk->tokenizerIndex, &expList->curr});
             return false;
@@ -1382,6 +1422,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
             expList->curr.getBinOp()->op.getType() == TokenType::ASSIGNMENT
         ) {
             ResultingType indexType = checkExpression(expList->curr.getBinOp()->leftSide);
+            postCheckExpression(indexType, expList->curr.getBinOp()->leftSide);
             const Token typeToken = getTypeFromTokenList(*indexType.value.type);
             if (typeToken.getType() == TokenType::BAD_VALUE) {
                 return {&TokenListTypes::badValue, false};
@@ -1393,6 +1434,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 }
                 // not a named index, variable assignment within container literal
                 ResultingType resType = checkExpression(expList->curr);
+                postCheckExpression(resType, expList->curr);
                 if (!arrayItemType) {
                     arrayItemType = resType.value.type;
                 }
@@ -1408,6 +1450,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
             }
             namedIndices = true;
             ResultingType resType = checkExpression(expList->curr.getBinOp()->rightSide);
+            postCheckExpression(resType, expList->curr.getBinOp()->rightSide);
             if (!arrayItemType) {
                 arrayItemType = resType.value.type;
             }
@@ -1444,6 +1487,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
         if (!arrayItemType) {
             arrayItemType = resType.value.type;
             if (arrayItemType->exp.getToken().getType() == TokenType::STRING_LITERAL) {
+                arrayItemType = memPool.makeTokenList();
                 arrayItemType->exp.setToken({expList->curr.getToken().getPosition(), 0, TokenType::POINTER});
                 arrayItemType->next = memPool.makeTokenList();
                 arrayItemType->next->exp.setToken({0, 0, TokenType::CHAR_TYPE});
@@ -1459,6 +1503,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 return {&TokenListTypes::badValue, false};
             }
         }
+        postCheckExpression(resType, expList->curr);
         ++size;
     }
     {
