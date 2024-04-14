@@ -163,9 +163,6 @@ enum class TokenType : uint8_t {
     THIS,
 };
 
-/**
- * Need to change to uint64_t so that this works with little and big endian in Expression node (expression type)
-*/
 struct Token {
     private:
     uint64_t token = 0;

@@ -268,7 +268,9 @@ struct CodeGen {
 
     /**
     */
-    void generateVariableDeclaration(VariableDec&, bool = true);
+    void generateVariableDeclaration(VariableDec&);
+
+    void generateArrayVariableDeclaration(VariableDec&);
 
     void generateStructDeclaration(const StructDec&);
 
@@ -426,8 +428,8 @@ struct CodeGen {
     void addPaddingToStack(uint32_t padding, bool virtualOnly = false);
 
     /**
-     * Adds padding + space room to the stack, and adds a stack item for the padding
-     * Generally you should be adding another stack item for the space added
+     * Adds padding + space room to the stack, and adds a stack item for the padding.
+     * You should be adding another stack item for the space added
      * \param padding how much padding to add
      * \param space how much space after the padding to add
      * \returns the offset for start of 'space'
@@ -480,10 +482,11 @@ struct CodeGen {
 // OTHER
     bytecode_t allocateRegister();
     void freeRegister(bytecode_t);
-    uint32_t getSizeOfType(Token);
+    uint32_t getSizeOfType(const TokenList*);
     void efficientImmAddOrSub(bytecode_t, uint64_t, OpCode);
 };
 
+Token getBaseTypeOfArray(const TokenList *tokenList);
 
 OpCode getLoadOpForSize(uint32_t);
 OpCode getStoreOpForSize(uint32_t);

@@ -6,7 +6,7 @@
 #include <chrono>
 #include "./parser/parser.hpp"
 #include "./checker/checker.hpp"
-#include "./codeGen/interpreter/codeGen.hpp"
+#include "./codeGen/bytecode/codeGen.hpp"
 #include "./utils.hpp"
 
 /**

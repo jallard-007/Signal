@@ -3,7 +3,6 @@
 #include <set>
 #include "checker.hpp"
 
-const TokenList* getNextFromTokenList(const TokenList&);
 
 void memPoolReleaseWholeExpression(NodeMemPool& memPool, Expression& exp);
 
@@ -1575,12 +1574,12 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
         if (lType == TokenType::REFERENCE || rType == TokenType::REFERENCE) {
             if (lType == TokenType::REFERENCE) {
                 // have to move past the reference, but now strict type checking is required
-                leftSide = getNextFromTokenList(*leftSide);
+                leftSide = getNextFromTokenListConst(*leftSide);
                 strictRequired = true;
             }
             if (rType == TokenType::REFERENCE) {
                 // right side being a reference does not matter, just move past
-                rightSide = getNextFromTokenList(*rightSide);
+                rightSide = getNextFromTokenListConst(*rightSide);
             }
             continue;
         }
@@ -1616,12 +1615,12 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
         if (lType == TokenType::REFERENCE || rType == TokenType::REFERENCE) {
             if (lType == TokenType::REFERENCE) {
                 // have to move past the reference, but now strict type checking is required
-                leftSide = getNextFromTokenList(*leftSide);
+                leftSide = getNextFromTokenListConst(*leftSide);
                 strictRequired = true;
             }
             if (rType == TokenType::REFERENCE) {
                 // right side being a reference does not matter, just move past
-                rightSide = getNextFromTokenList(*rightSide);
+                rightSide = getNextFromTokenListConst(*rightSide);
             }
             continue;
         }
@@ -1631,7 +1630,7 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
                 return false;
             }
             if (rType == TokenType::STRING_LITERAL) {
-                leftSide = getNextFromTokenList(*leftSide);
+                leftSide = getNextFromTokenListConst(*leftSide);
                 const TokenType lNextType = getTypeFromTokenList(*leftSide).getType();
                 if (lNextType != TokenType::CHAR_TYPE) {
                     return false;
@@ -1656,7 +1655,7 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
                 if (lType != TokenType::ARRAY_TYPE) {
                     return false;
                 }
-                leftSide = getNextFromTokenList(*leftSide);
+                leftSide = getNextFromTokenListConst(*leftSide);
                 const TokenType lNextType = getTypeFromTokenList(*leftSide).getType();
                 if (lNextType != TokenType::CHAR_TYPE) {
                     return false;
@@ -1683,11 +1682,11 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
                     if (lType != TokenType::CONTAINER_LITERAL) {
                         return false;
                     }
-                    if (!getNextFromTokenList(*leftSide)) {
+                    if (!getNextFromTokenListConst(*leftSide)) {
                         return false;
                     }
                 }
-                if (!getNextFromTokenList(*rightSide)) {
+                if (!getNextFromTokenListConst(*rightSide)) {
                     return true;
                 }
             }
@@ -1701,9 +1700,13 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
             }
         }
 
-        leftSide = getNextFromTokenList(*leftSide);
-        rightSide = getNextFromTokenList(*rightSide);
+        leftSide = getNextFromTokenListConst(*leftSide);
+        rightSide = getNextFromTokenListConst(*rightSide);
     }
+}
+
+uint32_t Checker::getSizeOfType(const TokenList& tokenList) {
+    return ::getSizeOfType(lookUp, structLookUp, *tk, &tokenList);
 }
 
 bool canBeConvertedToBool(const TokenList* type) {
@@ -1726,6 +1729,29 @@ TokenList& Checker::largestType(TokenList& typeA, TokenList& typeB) {
         return typeA;
     }
     return typeB;
+}
+
+uint32_t getSizeOfType(
+    std::unordered_map<std::string, const GeneralDec *> &lookUp,
+    std::unordered_map<const StructDec *, StructInformation>& structLookUp,
+    Tokenizer &tk,
+    const TokenList *tokenList
+) {
+    Token typeToken = getTypeFromTokenList(*tokenList);
+    uint32_t size = 1;
+    while (typeToken.getType() == TokenType::ARRAY_TYPE) {
+        const uint32_t arraySize = typeToken.getLength();
+        size *= arraySize;
+        tokenList = getNextFromTokenListConst(*tokenList);
+        assert(tokenList);
+        typeToken = getTypeFromTokenList(*tokenList);
+    }
+    if (typeToken.getType() == TokenType::IDENTIFIER) {
+        const GeneralDec* genDec = lookUp[tk.extractToken(typeToken)];
+        const StructInformation& structInfo = structLookUp[genDec->structDec];
+        return size * structInfo.size;
+    }
+    return size * getSizeOfBuiltinType(typeToken.getType());
 }
 
 StructInformation& Checker::getStructInfo(const StructDec& structDec) {
@@ -1758,7 +1784,7 @@ StructInformation& Checker::getStructInfo(const StructDec& structDec) {
         }
         else if (typeToken.getType() == TokenType::ARRAY_TYPE) {
             const uint32_t arraySize = typeToken.getLength();
-            const TokenList* arrayType = getNextFromTokenList(structDecList->varDec->type);
+            const TokenList* arrayType = getNextFromTokenListConst(structDecList->varDec->type);
             assert(arrayType);
             typeToken = getTypeFromTokenList(*arrayType);
             if (typeToken.getType() == TokenType::IDENTIFIER) {
@@ -1846,6 +1872,7 @@ uint32_t getSizeOfBuiltinType(const TokenType type) {
         }
         default: {
             std::cerr << "Invalid TokenType "<< type << " in getSizeOfBuiltinType\n";
+            assert(false);
             exit(1);
         }
     }
@@ -1871,7 +1898,7 @@ Token getTypeFromTokenList(const TokenList& tokenList) {
     }
 }
 
-const TokenList* getNextFromTokenList(const TokenList& tokenList) {
+const TokenList* getNextFromTokenListConst(const TokenList& tokenList) {
     const TokenList* next = tokenList.next;
     while (next && (next->exp.getType() == ExpressionType::VALUE && isTypeQualifier(next->exp.getToken().getType()))) {
         next = next->next;
@@ -1890,7 +1917,7 @@ TokenType getTypeQualifier(const TokenList& tokenList) {
 const GeneralDec *getDecPtr(const TokenList *type) {
     assert(type->exp.getType() == ExpressionType::VALUE && type->exp.getToken().getType() == TokenType::IDENTIFIER);
     assert(type->next);
-    type = getNextFromTokenList(*type);
+    type = getNextFromTokenListConst(*type);
     assert(type->exp.getToken().getType() == TokenType::DEC_PTR);
     return (const GeneralDec *)type->next;
 }

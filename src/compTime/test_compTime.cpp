@@ -39,7 +39,7 @@ LiteralValue evaluate(Tokenizer& tk, const Expression& exp) {
     }
 }
 
-TEST_CASE("constant expressions", "[codeGen]") {
+TEST_CASE("constant expressions", "[compTime]") {
     // should return the actual value of the expression, and the correct type (smallest type that supports that value, min int32_t)
     SECTION("4 + 4") {
         #define EXPRESSION 4 + 4

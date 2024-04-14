@@ -338,16 +338,28 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
     }
 }
 
-// TODO: Arrays, structs
-void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) {
+
+void CodeGen::generateVariableDeclaration(VariableDec& varDec) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
+    // reference and array type must be above the isBuiltInType section as those are considered built ins
     if (typeToken.getType() == TokenType::REFERENCE) {
-        // TODO: implement as pointer to result? 
-        assert(false);
+        assert(varDec.initialAssignment);
+        ExpressionResult expRes = getAddressOfExpression(*varDec.initialAssignment);
+        assert(expRes.isPointerToValue);
+        addVarDecToStack(varDec);
+        const OpCode pushOp = getPushOpForSize(getSizeOfBuiltinType(typeToken.getType()));
+        assert(pushOp != OpCode::NOP);
+        addBytes({{(bc)pushOp, expRes.getReg()}});
+        if (expRes.isTemp) {
+            freeRegister(expRes.getReg());
+        }
+    }
+    else if (typeToken.getType() == TokenType::ARRAY_TYPE) {
+        generateArrayVariableDeclaration(varDec);
     }
     else if (isBuiltInType(typeToken.getType())) {
         ExpressionResult expRes;
-        if (initialize && varDec.initialAssignment) {
+        if (varDec.initialAssignment) {
             expRes = generateExpression(*varDec.initialAssignment);
             postExpression(expRes, true);
         }
@@ -373,10 +385,30 @@ void CodeGen::generateVariableDeclaration(VariableDec& varDec, bool initialize) 
         addVarDecToStack(varDec, 0, true);
         addSpaceToStack(getCurrStackPointerPosition() - beforePos);
     }
-    // TODO: add array support
     else {
         assert(false);
     }
+}
+
+void CodeGen::generateArrayVariableDeclaration(VariableDec& varDec) {
+    const Token typeToken = getTypeFromTokenList(varDec.type);
+    assert(typeToken.getType() == TokenType::ARRAY_TYPE);
+    const Token baseType = getBaseTypeOfArray(&varDec.type);
+    uint32_t align, sizeOfBaseType;
+    if (baseType.getType() == TokenType::IDENTIFIER) {
+        const GeneralDec* genDec = lookUp[tk->extractToken(baseType)];
+        assert(genDec->type == GeneralDecType::STRUCT);
+        StructInformation& structInfo = structLookUp[genDec->structDec];
+        sizeOfBaseType = structInfo.size;
+        align = structInfo.alignTo;
+    } else {
+        sizeOfBaseType = getSizeOfBuiltinType(baseType.getType());
+        align = sizeOfBaseType;
+    }
+    const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfBaseType, align);
+    addPaddingToStack(padding);
+    // TODO: check if there is an initializer: zero out memory, add each expression within
+    // otherwise just add room for the array
 }
 
 void CodeGen::generateStructDeclaration(const StructDec& structDec) {
@@ -906,8 +938,7 @@ ExpressionResult CodeGen::loadValueFromPointer(const ExpressionResult &pointerEx
     assert(pointerExp.isReg);
     assert(pointerExp.isPointerToValue);
     TokenList* type = pointerExp.value.type;
-    const Token typeToken = getTypeFromTokenList(*type);
-    const uint32_t sizeOfType = getSizeOfType(typeToken);
+    const uint32_t sizeOfType = getSizeOfType(type);
     if (sizeOfType > 8) {
         // cannot be loaded into a register
         return pointerExp;
@@ -966,8 +997,7 @@ void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, Expression
         moveImmToReg(allocateRegister(), valueExp);
     }
     const TokenList* type = pointerExp.value.type;
-    const Token typeToken = getTypeFromTokenList(*type);
-    const uint32_t sizeOfType = getSizeOfType(typeToken);
+    const uint32_t sizeOfType = getSizeOfType(type);
     const OpCode storeOp = getStoreOpForSize(sizeOfType);
     assert(storeOp != OpCode::NOP);
     addBytes({{(bc)storeOp, pointerExp.getReg(), valueExp.getReg()}});
@@ -981,8 +1011,7 @@ void CodeGen::copyValue(ExpressionResult &pointerExp, ExpressionResult &valueExp
 void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResult &indexExp) {
     assert(isSigned(getTypeFromTokenList(*indexExp.value.type).getType()) || isUnsigned(getTypeFromTokenList(*indexExp.value.type).getType()));
     assert(getTypeFromTokenList(*pointerExp.value.type).getType() == TokenType::POINTER);
-    const Token nextType = getTypeFromTokenList(*getNextFromTokenList(*pointerExp.value.type));
-    uint32_t sizeOfType = getSizeOfType(nextType);
+    uint32_t sizeOfType = getSizeOfType(getNextFromTokenList(*pointerExp.value.type));
     if (sizeOfType > 1) {
         if (!indexExp.isReg) {
             LiteralValue sizeLiteral;
@@ -1238,7 +1267,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
         expRes.getOp = getOp;
         return expRes;
     } else {
-        // TODO: this will need to be worked on / tested
+        // TODO: this will need to be tested
         ExpressionResult leftResult = generateExpression(binOp.leftSide);
         postExpression(leftResult, true);
         ExpressionResult rightResult = generateExpression(binOp.rightSide);
@@ -1497,8 +1526,8 @@ void CodeGen::endSoftScope() {
             stackItems.pop_back();
             break;
         }
-        // TODO: run destructor for each item within this scope
-        stackUsage += getSizeOfType(getTypeFromTokenList(stackItems.back().variable.varDec.type));
+        // TODO: once destructors are added, run destructor for each item
+        stackUsage += getSizeOfType(&stackItems.back().variable.varDec.type);
         stackItems.pop_back();
         assert(!stackItems.empty()); // paired with marker comment above
     }
@@ -1726,7 +1755,7 @@ void CodeGen::generateReturnStatement(const ReturnStatement& returnStatement) {
 
     // if there was a return express, move the result into the return register
     if (returnStatement.returnValue.getType() != ExpressionType::NONE) {
-        assert(getSizeOfType(getTypeFromTokenList(*returnValueExp.value.type)) <= SIZE_OF_REGISTER);
+        assert(getSizeOfType(returnValueExp.value.type) <= SIZE_OF_REGISTER);
         // move value into returnRegisterIndex
         if (returnValueExp.isPointerToValue) {
             // in the case that the returnValueExp reg is returnRegisterIndex, that's fine
@@ -1967,7 +1996,7 @@ void CodeGen::addFunctionSignatureToVirtualStack(const FunctionDec& funcDec) {
         }
     }
 
-    assert(getSizeOfType(getTypeFromTokenList(funcDec.returnType)) <= SIZE_OF_REGISTER);
+    assert(getSizeOfType(&funcDec.returnType) <= SIZE_OF_REGISTER);
     const uint32_t sizeOfPointer = getSizeOfBuiltinType(TokenType::POINTER);
     // add return address
     const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfPointer, sizeOfPointer);
@@ -2018,7 +2047,7 @@ uint32_t CodeGen::getOffsetFromSP(uint32_t positionOnStack) {
 }
 
 void CodeGen::popValue(const TokenList& type, const bytecode_t reg) {
-    const uint32_t size = getSizeOfType(getTypeFromTokenList(type));
+    const uint32_t size = getSizeOfType(&type);
     const OpCode popOp = getPopOpForSize(size);
     if (popOp == OpCode::NOP) {
         // TODO:
@@ -2063,13 +2092,8 @@ void CodeGen::freeRegister(bytecode_t regNum) {
     regInfo.inUse = false;
 }
 
-uint32_t CodeGen::getSizeOfType(Token typeToken) {
-    if (typeToken.getType() == TokenType::IDENTIFIER) {
-        const GeneralDec* genDec = lookUp[tk->extractToken(typeToken)];
-        const StructInformation& structInfo = structLookUp[genDec->structDec];
-        return structInfo.size;
-    }
-    return getSizeOfBuiltinType(typeToken.getType());
+uint32_t CodeGen::getSizeOfType(const TokenList* tokenList) {
+    return ::getSizeOfType(lookUp, structLookUp, *tk, tokenList);
 }
 
 void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
@@ -2098,6 +2122,13 @@ void CodeGen::efficientImmAddOrSub(bytecode_t reg, uint64_t val, OpCode op) {
     }
 }
 
+Token getBaseTypeOfArray(const TokenList *tokenList) {
+    assert(getTypeFromTokenList(*tokenList).getType() == TokenType::ARRAY_TYPE);
+    while (getTypeFromTokenList(*tokenList).getType() == TokenType::ARRAY_TYPE) {
+        tokenList = getNextFromTokenListConst(*tokenList);
+    }
+    return getTypeFromTokenList(*tokenList);
+}
 
 OpCode getLoadOpForSize(const uint32_t size) {
     switch(size) {

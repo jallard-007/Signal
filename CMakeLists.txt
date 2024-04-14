@@ -15,7 +15,7 @@ endif()
 
 # common lib
 add_library(common STATIC
-    src/codeGen/interpreter/codeGen.cpp
+    src/codeGen/bytecode/codeGen.cpp
     src/checker/checker.cpp
     src/prettyPrint/prettyPrint.cpp
     src/parser/parser.cpp
@@ -54,7 +54,7 @@ if ( UNIX )
         src/prettyPrint/test_prettyPrint.cpp
         src/checker/test_checker.cpp
         src/interpreter/test_interpreter.cpp
-        src/codeGen/interpreter/test_codeGen.cpp
+        src/codeGen/bytecode/test_codeGen.cpp
         src/bytecodeDesign/test_bytecodeDesign.cpp
         src/compTime/test_compTime.cpp
     )

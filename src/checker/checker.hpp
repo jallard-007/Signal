@@ -201,6 +201,8 @@ struct Checker {
     */
     bool checkType(TokenList& type, bool isReturnType = false);
 
+    uint32_t getSizeOfType(const TokenList&);
+
     bool checkAssignment(const TokenList*, const TokenList*, bool, bool = false);
 
     void addError(const CheckerError&);
@@ -211,9 +213,26 @@ struct Checker {
 bool canBeConvertedToBool(const TokenList*);
 
 /**
+ * gets the total size of a type
+ * \param lookUp the general declaration look up map
+ * \param structLookUp the struct information look up map
+ * \param tk the tokenizer object
+ * \param typeList the type list of the type
+ * \returns the total size in bytes of the type
+*/
+uint32_t getSizeOfType(
+    std::unordered_map<std::string, const GeneralDec *> &lookUp,
+    std::unordered_map<const StructDec *, StructInformation>& structLookUp,
+    Tokenizer &tk,
+    const TokenList* tokenList
+);
+
+/**
  * Returns the actual type from a token list
 */
 Token getTypeFromTokenList(const TokenList&);
+
+const TokenList* getNextFromTokenListConst(const TokenList&);
 
 TokenType getTypeQualifier(const TokenList&);
 

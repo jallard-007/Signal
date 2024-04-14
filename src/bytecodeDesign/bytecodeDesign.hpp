@@ -44,6 +44,7 @@ enum class BuiltInFunction: bytecode_t {
     MEM_COPY, // MEM_COPY arg1, arg2, arg3 | copy arg3 bytes from arg2 to arg1
     MEM_MOVE, // MEM_MOVE arg1, arg2, arg3 | copy arg3 bytes from arg2 to arg1, handles arg1 and arg2 overlapping
     MEM_COMPARE, // MEM_COMPARE arg1, arg2, arg3 | compare arg3 bytes from arg2 to arg1
+    MEM_SET, // MEM_SET arg1, arg2, arg3 | sets the first arg3 bytes of memory pointed at by arg1 to arg2
 
     // strings
     STR_LENGTH, // STR_LENGTH arg1 | returns the length of char array array at arg1

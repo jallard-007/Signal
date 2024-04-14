@@ -17,6 +17,9 @@ __builtin func MEM_MOVE mem_move(dest: void ptr, src: void ptr, n: uint64): void
 # MEM_COMPARE, // MEM_COMPARE arg1, arg2, arg3 | compare arg3 bytes from arg2 to arg1
 __builtin func MEM_COMPARE mem_compare(src1: void ptr, src2: void ptr, n: uint64): int32;
 
+# MEM_SET, // MEM_SET arg1, arg2, arg3 | sets the first arg3 bytes of memory pointed at by arg1 to arg2
+__builtin func MEM_SET mem_set(src1: void ptr, value: int32, n: uint64): int32;
+
 # STR_LENGTH, // STR_LENGTH arg1 | returns the length of char array array at arg1
 __builtin func STR_LENGTH str_length(src: const char ptr): uint64;
 

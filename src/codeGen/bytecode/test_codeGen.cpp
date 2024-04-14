@@ -772,6 +772,58 @@ TEST_CASE("get address of expression", "[codeGen]") {
     }
 }
 
+TEST_CASE("generate array", "[codeGen]") {
+    SECTION("1") {
+        const std::string str = " var: int32 [1]; ";
+        testBoilerPlate(str);
+        Statement statement;
+        REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+        codeGen.generateStatement(statement);
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, stackPointerIndex, 4, 0
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("2") {
+        const std::string str = " var: int32 [10]; ";
+        testBoilerPlate(str);
+        Statement statement;
+        REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+        codeGen.generateStatement(statement);
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, stackPointerIndex, 40, 0
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("2") {
+        const std::string str = " var: int32 [10] = [1]; ";
+        testBoilerPlate(str);
+        Statement statement;
+        REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+        codeGen.generateStatement(statement);
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::XOR, 1, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::MOVE_SI, 1, 1,
+            (bc)OpCode::STORE_D, stackPointerIndex, 1
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+}
+
 TEST_CASE("generate struct", "[codeGen]") {
     SECTION("1") {
         const std::string str = "struct MyStruct { var: int32; } func MyFunc(): void { var: MyStruct; } ";
@@ -823,6 +875,30 @@ TEST_CASE("generate struct", "[codeGen]") {
             (bc)OpCode::MOVE, returnRegisterIndex, 1,
             (bc)OpCode::NOP,
             (bc)OpCode::ADD_I, stackPointerIndex, 3, 0,
+            (bc)OpCode::POP_Q, 2,
+            (bc)OpCode::JUMP, 2,
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("4") {
+        const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): void { g: MyStruct = [ c = 'c', u = 20 ] ; } ";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        codeGen.generate();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::XOR, 1, 1,
+            (bc)OpCode::PUSH_Q, 1,
+            (bc)OpCode::MOVE_SI, 1, 'c',
+            (bc)OpCode::STORE_B, stackPointerIndex, 1,
+
+            (bc)OpCode::MOVE, 2, stackPointerIndex,
+            (bc)OpCode::ADD_I, 2, 4, 0,
+            (bc)OpCode::MOVE_SI, 1, 20,
+            (bc)OpCode::STORE_W, 2, 1,
+
+            (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
             (bc)OpCode::POP_Q, 2,
             (bc)OpCode::JUMP, 2,
         }});

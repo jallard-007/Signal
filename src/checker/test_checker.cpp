@@ -142,7 +142,7 @@ struct customType {
     CHECK(tc.errors.empty());
 }
 
-#define SET_UP(str) \
+#define SET_UP_GET_STRUCT_INFO_TEST(str) \
     std::vector<Tokenizer> tokenizers; \
     Tokenizer& tokenizer = tokenizers.emplace_back("./src/parser/test_parser.cpp", str); \
     Parser parser{tokenizer, memPool}; \
@@ -155,17 +155,17 @@ struct customType {
     REQUIRE(genDec->structDec); \
     auto& structInfo = checker.getStructInfo(*genDec->structDec)
 
-TEST_CASE("getStructInfo", "[codeGen]") {
+TEST_CASE("getStructInfo", "[checker]") {
     SECTION("one") {
         const std::string str = "struct StructName { x: uint32; }";
-        SET_UP(str);
+        SET_UP_GET_STRUCT_INFO_TEST(str);
         CHECK(structInfo.size == 4);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["x"].position == 0);
     }
     SECTION("two") {
         const std::string str = "struct StructName { y:bool; x: uint32; }";
-        SET_UP(str);
+        SET_UP_GET_STRUCT_INFO_TEST(str);
         CHECK(structInfo.size == 8);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -173,7 +173,7 @@ TEST_CASE("getStructInfo", "[codeGen]") {
     }
     SECTION("three") {
         const std::string str = "struct StructName { x: uint32; y:bool; }";
-        SET_UP(str);
+        SET_UP_GET_STRUCT_INFO_TEST(str);
         CHECK(structInfo.size == 8);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 4);
@@ -181,7 +181,7 @@ TEST_CASE("getStructInfo", "[codeGen]") {
     }
     SECTION("four") {
         const std::string str = "struct StructName { y:bool; x: uint32; j:bool; }";
-        SET_UP(str);
+        SET_UP_GET_STRUCT_INFO_TEST(str);
         CHECK(structInfo.size == 12);
         CHECK(structInfo.alignTo == 4);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -190,7 +190,7 @@ TEST_CASE("getStructInfo", "[codeGen]") {
     }
     SECTION("five") {
         const std::string str = "struct Thing { y:bool; x: uint32; j:bool; } struct StructName { y:Thing; x: bool; j:uint32 ptr; }";
-        SET_UP(str);
+        SET_UP_GET_STRUCT_INFO_TEST(str);
         CHECK(structInfo.size == 24);
         CHECK(structInfo.alignTo == 8);
         CHECK(structInfo.memberLookup["y"].position == 0);
@@ -199,162 +199,144 @@ TEST_CASE("getStructInfo", "[codeGen]") {
     }
 }
 
+#undef SET_UP_GET_STRUCT_INFO_TEST
+
+#define SET_UP_VAR_DEC_TEST(str) \
+    std::vector<Tokenizer> tks; \
+    tks.emplace_back("./src/checker/test_checker.cpp", str); \
+    Parser pr{tks.back(), memPool}; \
+    Statement statement; \
+    ParseStatementErrorType errorType = pr.parseStatement(statement); \
+    REQUIRE(errorType == ParseStatementErrorType::NONE); \
+    Checker tc{pr.program, tks, memPool}; \
+    tc.tk = &tks.back(); \
+    TokenList retType = TokenListTypes::voidValue
+
+TEST_CASE("var dec", "[checker]") {
+    SECTION("1") {
+        const std::string str = "var: int32; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
+    }
+}
+
+TEST_CASE("reference var", "[checker]") {
+    SECTION("1") {
+        const std::string str = "var: int32;  varRef: int32 ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("2") {
+        const std::string str = "var: int32;  varRef: const int32 ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("3") {
+        // qualifier dropped
+        const std::string str = "var: const int32 = 0;  varRef: int32 ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.size() == 1);
+    }
+    SECTION("4") {
+        const std::string str = "var: int32 [10];  varRef: int32 [10] ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("5") {
+        const std::string str = "var: const char ptr;  varRef: const char ptr ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
+    }
+    SECTION("6") {
+        // missing const in ref type
+        const std::string str = "var: const char ptr;  varRef: char ptr ref = var; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        REQUIRE(tc.errors.size() == 1);
+    }
+    SECTION("7") {
+        // missing initializer
+        const std::string str = " varRef: int32 ref; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        REQUIRE(tc.errors.size() == 1);
+    }
+}
+
 TEST_CASE("array types", "[checker]") {
     SECTION("1") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [10]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement; 
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("size too small") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [0]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement; 
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
     }
     SECTION("size too small again") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [-1]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement; 
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
     }
     SECTION("size too large") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [0xffffffffff]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement; 
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
     }
     SECTION("missing size") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 []; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::EXPECTED_SIZE);
     }
     SECTION("initial assignment 1") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [] = [1, 2]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.empty());
     }
     SECTION("initial assignment 2") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [1] = [1, 2]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
     }
     SECTION("initial assignment 3") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: const char ptr [] = [\"hello\", \"yup\"]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("initial assignment 4") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [2][2]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.empty());
     }
     SECTION("initial assignment 5") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [2][2] = [[1, 2], [1, 2]]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("initial assignment 6") {
-        std::vector<Tokenizer> tks;
         const std::string str = "var: int32 [2][2] = [[], [1, 2]]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Statement statement;
-        ParseStatementErrorType errorType = pr.parseStatement(statement);
-        REQUIRE(errorType == ParseStatementErrorType::NONE);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        TokenList retType = TokenListTypes::voidValue;
+        SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.empty());
     }
@@ -363,95 +345,87 @@ TEST_CASE("array types", "[checker]") {
 TEST_CASE("cursed", "[checker]") {
     SECTION("1") {
         std::vector<Tokenizer> tks;
-        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType; var.4; } ";
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType; var.4; var.\"field\"; var.'a'; var.true; var.false; var.nullptr; var.MyType; } ";
         tks.emplace_back("./src/checker/test_checker.cpp", str);
         Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
+        const bool res = pr.parse();
+        REQUIRE(res);
         Checker tc{pr.program, tks, memPool};
         tc.tk = &tks.back();
         tc.check(true);
-        REQUIRE(tc.errors.size() == 1);
+        REQUIRE(tc.errors.size() == 7);
     }
     SECTION("2") {
         std::vector<Tokenizer> tks;
-        const std::string str = "func main(): void { var: int32 [10]; var[\"hello\"]; } ";
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: int32 [10]; var[\"hello\"]; var['a']; var[true]; var[false]; var[nullptr]; var[MyType]; } ";
         tks.emplace_back("./src/checker/test_checker.cpp", str);
         Parser pr{tks.back(), memPool};
         REQUIRE(pr.parse());
         Checker tc{pr.program, tks, memPool};
         tc.tk = &tks.back();
         tc.check(true);
+        REQUIRE(tc.errors.size() == 6);
+    }
+    SECTION("2") {
+        std::vector<Tokenizer> tks;
+        const std::string str = " \"hello\" = \"wut\"; ";
+        tks.emplace_back("./src/checker/test_checker.cpp", str);
+        Parser pr{tks.back(), memPool};
+        Statement statement;
+        ParseStatementErrorType errorType = pr.parseStatement(statement);
+        REQUIRE(errorType == ParseStatementErrorType::NONE);
+        Checker tc{pr.program, tks, memPool};
+        tc.tk = &tks.back();
+        tc.checkStatement(statement, TokenListTypes::voidValue, false, false);
         REQUIRE(tc.errors.size() == 1);
     }
 }
 
+#define SET_UP_DEFAULT_TEST(str) \
+    std::vector<Tokenizer> tks; \
+    tks.emplace_back("./src/checker/test_checker.cpp", str); \
+    Parser pr{tks.back(), memPool}; \
+    REQUIRE(pr.parse()); \
+    Checker tc{pr.program, tks, memPool}; \
+    tc.tk = &tks.back();
+
 
 TEST_CASE("struct types", "[checker]") {
     SECTION("1") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         CHECK(tc.errors.empty());
     }
     SECTION("2") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = []; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
-        tc.check(true);
+        SET_UP_DEFAULT_TEST(str);
+         tc.check(true);
         CHECK(tc.errors.empty());
     }
     SECTION("3") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0]; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         CHECK(tc.errors.empty());
     }
     SECTION("4") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0, other = 0]; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_DEFAULT_TEST(str);
         CHECK_FALSE(tc.check(true));
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::NO_SUCH_MEMBER_VARIABLE);
     }
     SECTION("5") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [0]; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::EXPECTING_NAMED_INDEX);
     }
     SECTION("6") {
-        std::vector<Tokenizer> tks;
         const std::string str = "struct MyType { field: int32; var: double; } func main(): void { var: MyType = [var = 1.0]; } ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        REQUIRE(pr.parse());
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         CHECK(tc.errors.empty());
     }
@@ -523,48 +497,40 @@ TEST_CASE("checkAssignment", "[codeGen]") {
     }
 }
 
+#define SET_UP_CHECK_CONTAINER_TEST(str) \
+    std::vector<Tokenizer> tks; \
+    tks.emplace_back("./src/checker/test_checker.cpp", str); \
+    Parser pr{tks.back(), memPool}; \
+    Expression expression; \
+    ParseExpressionErrorType errorType = pr.parseExpression(expression); \
+    REQUIRE(errorType == ParseExpressionErrorType::NONE); \
+    REQUIRE(pr.expected.empty()); \
+    REQUIRE(pr.unexpected.empty()); \
+    REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL); \
+    Checker tc{pr.program, tks, memPool}; \
+    tc.tk = &tks.back()
+
+#define POST_EXPRESSION_CHECK_CONTAINER_TEST() \
+    CHECK(res.isLiteral); \
+    CHECK(!res.isLValue); \
+    REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE); \
+    Token token = res.value.type->exp.getToken(); \
+    CHECK(token.getType() == TokenType::CONTAINER_LITERAL)
+
 TEST_CASE("checkContainerLiteral", "[codeGen]") {
     SECTION("1") {
-        std::vector<Tokenizer> tks;
         const std::string str = "[]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Expression expression;
-        ParseExpressionErrorType errorType = pr.parseExpression(expression);
-        REQUIRE(errorType == ParseExpressionErrorType::NONE);
-        REQUIRE(pr.expected.empty());
-        REQUIRE(pr.unexpected.empty());
-        REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
-        CHECK(res.isLiteral);
-        CHECK(!res.isLValue);
-        REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
-        Token token = res.value.type->exp.getToken();
-        CHECK(token.getType() == TokenType::CONTAINER_LITERAL);
+        POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 0);
         CHECK_FALSE(res.value.type->next);
     }
     SECTION("2") {
-        std::vector<Tokenizer> tks;
         const std::string str = "[1]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Expression expression;
-        ParseExpressionErrorType errorType = pr.parseExpression(expression);
-        REQUIRE(errorType == ParseExpressionErrorType::NONE);
-        REQUIRE(pr.expected.empty());
-        REQUIRE(pr.unexpected.empty());
-        REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
-        CHECK(res.isLiteral);
-        CHECK(!res.isLValue);
-        REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
-        Token token = res.value.type->exp.getToken();
-        CHECK(token.getType() == TokenType::CONTAINER_LITERAL);
+        POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 1);
         REQUIRE(res.value.type->next);
         REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
@@ -572,24 +538,10 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         CHECK(tokenNext.getType() == TokenType::INT32_TYPE);
     }
     SECTION("3") {
-        std::vector<Tokenizer> tks;
         const std::string str = "['a', 'B']; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Expression expression;
-        ParseExpressionErrorType errorType = pr.parseExpression(expression);
-        REQUIRE(errorType == ParseExpressionErrorType::NONE);
-        REQUIRE(pr.expected.empty());
-        REQUIRE(pr.unexpected.empty());
-        REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
-        CHECK(res.isLiteral);
-        CHECK(!res.isLValue);
-        REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
-        Token token = res.value.type->exp.getToken();
-        CHECK(token.getType() == TokenType::CONTAINER_LITERAL);
+        POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 2);
         REQUIRE(res.value.type->next);
         REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
@@ -597,24 +549,10 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         CHECK(tokenNext.getType() == TokenType::CHAR_TYPE);
     }
     SECTION("4") {
-        std::vector<Tokenizer> tks;
         const std::string str = "['a', 2]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Expression expression;
-        ParseExpressionErrorType errorType = pr.parseExpression(expression);
-        REQUIRE(errorType == ParseExpressionErrorType::NONE);
-        REQUIRE(pr.expected.empty());
-        REQUIRE(pr.unexpected.empty());
-        REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
-        CHECK(res.isLiteral);
-        CHECK(!res.isLValue);
-        REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
-        Token token = res.value.type->exp.getToken();
-        CHECK(token.getType() == TokenType::CONTAINER_LITERAL);
+        POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 2);
         REQUIRE(res.value.type->next);
         REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
@@ -622,18 +560,8 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         CHECK(tokenNext.getType() == TokenType::INT32_TYPE);
     }
     SECTION("5") {
-        std::vector<Tokenizer> tks;
         const std::string str = "['a', 2.0]; ";
-        tks.emplace_back("./src/checker/test_checker.cpp", str);
-        Parser pr{tks.back(), memPool};
-        Expression expression;
-        ParseExpressionErrorType errorType = pr.parseExpression(expression);
-        REQUIRE(errorType == ParseExpressionErrorType::NONE);
-        REQUIRE(pr.expected.empty());
-        REQUIRE(pr.unexpected.empty());
-        REQUIRE(expression.getType() == ExpressionType::CONTAINER_LITERAL);
-        Checker tc{pr.program, tks, memPool};
-        tc.tk = &tks.back();
+        SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
         REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
         Token token = res.value.type->exp.getToken();

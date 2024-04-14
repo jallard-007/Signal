@@ -112,6 +112,12 @@ int Interpreter::runProgram() {
                     sp += 24;
                     break;
                 }
+                case BuiltInFunction::MEM_SET: {
+                    // 8 bytes str1 | 4 bytes value | 4 bytes padding | 8 bytes size
+                    rr = (uint64_t)std::memset(VOID_P_SP(16), INT32_SP(8), UINT64_SP(0));
+                    sp += 24;
+                    break;
+                }
     
                 // strings
                 case BuiltInFunction::STR_LENGTH: {
