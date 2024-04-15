@@ -242,3 +242,5 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
 LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand);
 
 bool stringLiteralParser(std::string&);
+
+std::pair<bool, char> charLiteralParser(std::string&);

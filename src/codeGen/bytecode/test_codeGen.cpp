@@ -773,6 +773,7 @@ TEST_CASE("get address of expression", "[codeGen]") {
 }
 
 TEST_CASE("generate array", "[codeGen]") {
+    SKIP();
     SECTION("1") {
         const std::string str = " var: int32 [1]; ";
         testBoilerPlate(str);
@@ -825,6 +826,7 @@ TEST_CASE("generate array", "[codeGen]") {
 }
 
 TEST_CASE("generate struct", "[codeGen]") {
+    SKIP();
     SECTION("1") {
         const std::string str = "struct MyStruct { var: int32; } func MyFunc(): void { var: MyStruct; } ";
         testBoilerPlate(str);

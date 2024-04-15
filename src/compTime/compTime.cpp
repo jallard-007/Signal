@@ -46,22 +46,9 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
     LiteralValue expRes;
     switch (token.getType()) {
         case TokenType::CHAR_LITERAL: {
+            // TODO: standardize this with string literal parsing, we should not have two copies
             const std::string& charLiteral = tk.extractToken(token);
-            // convert charLiteral to its numeric value and return it
-            if (charLiteral.size() == 3) {
-                expRes.set(charLiteral[1]);
-                return expRes;
-            } else if (charLiteral.size() == 4) {
-                assert(charLiteral[1] == '\\');
-                switch (charLiteral[2]) {
-                    case '0': expRes.set('\0'); break;
-                    case 'n': expRes.set('\n'); break;
-                    case 't': expRes.set('\t'); break;
-                    default: expRes.set(charLiteral[2]); break;
-                }
-                return expRes;
-            }
-            assert(false);
+            expRes.set(charLiteral[1]); // temporary
             return expRes;
         }
         case TokenType::STRING_LITERAL: {
@@ -69,7 +56,9 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
             if (!stringLiteralParser(stringLiteral)) {
                 // what to do here?
                 // maybe just print a warning, invalid string literal
-                assert(false);
+                // for now just return bad value
+                expRes.type = &TokenListTypes::badValue;
+                return expRes;
             }
             // oh no, not new
             // this is a little bit naughty, but might just leak this memory, (just the TokenList, the string will get freed)
@@ -372,4 +361,10 @@ bool stringLiteralParser(std::string& str) {
         }
     }
     return valid;
+}
+
+// TODO:
+std::pair<bool, char> charLiteralParser(std::string& str) {
+    (void)str;
+    return {true, 0};
 }
