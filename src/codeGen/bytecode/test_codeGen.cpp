@@ -811,14 +811,16 @@ TEST_CASE("generate array", "[codeGen]") {
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::XOR, 1, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::MOVE_SI, 1, 1,
-            (bc)OpCode::STORE_D, stackPointerIndex, 1
+            (bc)OpCode::SUB_I, 30, 40, 0,
+            (bc)OpCode::PUSH_Q, 30,
+            (bc)OpCode::XOR, 0, 0,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::MOVE_SI, 0, 40,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_SET,
+            (bc)OpCode::MOVE, 1, 30,
+            (bc)OpCode::MOVE_SI, 2, 1,
+            (bc)OpCode::STORE_D, 1, 2,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }

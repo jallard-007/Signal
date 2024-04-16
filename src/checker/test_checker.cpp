@@ -511,7 +511,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
     tc.tk = &tks.back()
 
 #define POST_EXPRESSION_CHECK_CONTAINER_TEST() \
-    CHECK(res.isLiteral); \
+    CHECK(!res.isLiteral); \
     CHECK(!res.isLValue); \
     REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE); \
     Token token = res.value.type->exp.getToken(); \

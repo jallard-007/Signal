@@ -1407,7 +1407,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
     TokenList *actualContainerType = memPool.makeTokenList();
     actualContainerType->exp.setToken({containerLiteral.pos, 0, TokenType::CONTAINER_LITERAL});
     if (expList->curr.getType() == ExpressionType::NONE) {
-        return {actualContainerType, false, true};
+        return {actualContainerType, false};
     }
     TokenList* arrayItemType = nullptr;
     uint64_t size = 0;
@@ -1511,7 +1511,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
         actualContainerType->exp.setToken(temp);
         actualContainerType->next = arrayItemType;
     }
-    return {actualContainerType, false, true};
+    return {actualContainerType, false};
 }
 
 bool checkIdentifierAssignment(const TokenList* lTypeList, const TokenList* rTypeList) {

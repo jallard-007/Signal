@@ -272,6 +272,8 @@ struct CodeGen {
 
     void generateArrayVariableDeclaration(VariableDec&);
 
+    void generateContainerLiteral(const ExpressionList *exp, TokenList *type, ExpressionResult& pointerExp, uint32_t&, uint32_t);
+
     void generateStructDeclaration(const StructDec&);
 
     void generateFunctionDeclaration(const FunctionDec&);
@@ -294,7 +296,6 @@ struct CodeGen {
     BranchStatementResult postExpressionControlFlow(ExpressionResult& expRes);
 
     [[nodiscard]] ExpressionResult generateExpressionArrAccess(const ArrayAccess&);
-    [[nodiscard]] ExpressionResult generateExpressionContainerLiteral(const ContainerLiteral&);
 
     /**
      * Generates a function call expression

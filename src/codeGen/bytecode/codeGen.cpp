@@ -338,7 +338,6 @@ void CodeGen::generateGeneralDeclaration(const GeneralDec& genDec) {
     }
 }
 
-
 void CodeGen::generateVariableDeclaration(VariableDec& varDec) {
     const Token typeToken = getTypeFromTokenList(varDec.type);
     // reference and array type must be above the isBuiltInType section as those are considered built ins
@@ -406,9 +405,124 @@ void CodeGen::generateArrayVariableDeclaration(VariableDec& varDec) {
         align = sizeOfBaseType;
     }
     const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), sizeOfBaseType, align);
-    addPaddingToStack(padding);
-    // TODO: check if there is an initializer: zero out memory, add each expression within
-    // otherwise just add room for the array
+    const uint32_t arrayLength = typeToken.getLength();
+    assert(sizeOfBaseType * (uint64_t)arrayLength <= UINT32_MAX);
+    const uint32_t arrayByteSize = sizeOfBaseType * arrayLength;
+    addPaddingAndSpaceToStack(padding, arrayByteSize);
+    StackItem stackItem {
+        .variable = {
+            .varDec = varDec,
+            .positionOnStack = getCurrStackPointerPosition(),
+        },
+        .type = StackItemType::VARIABLE,
+    };
+    nameToStackItemIndex[tk->extractToken(varDec.name)] = stackItems.size();
+    stackItems.emplace_back(stackItem);
+    if (!varDec.initialAssignment) {
+        return;
+    }
+    // add call to memset
+    addBytes({{
+        (bc)OpCode::PUSH_Q, stackPointerIndex,
+        (bc)OpCode::XOR, miscRegisterIndex, miscRegisterIndex,
+        (bc)OpCode::PUSH_Q, miscRegisterIndex
+    }});
+    {
+        ExpressionResult arrayByteSizeExp;
+        arrayByteSizeExp.value.set(arrayByteSize);
+        moveImmToReg(miscRegisterIndex, arrayByteSizeExp);
+    }
+    // create pointer reg for writing values to the stack
+    ExpressionResult pointerExp;
+    pointerExp.setReg(allocateRegister());
+    pointerExp.value.type = &varDec.type;
+    pointerExp.isPointerToValue = true;
+
+    addBytes({{
+        (bc)OpCode::PUSH_Q, miscRegisterIndex,
+        (bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_SET,
+        (bc)OpCode::MOVE, pointerExp.getReg(), stackPointerIndex // modifiable pointer to write values to
+    }});
+    assert(varDec.initialAssignment->getType() == ExpressionType::CONTAINER_LITERAL);
+    ExpressionList* expList = &varDec.initialAssignment->getContainerLiteral()->values;
+    uint32_t currIndex = 0;
+    generateContainerLiteral(expList, &varDec.type, pointerExp, currIndex, 0);
+    freeRegister(pointerExp.getReg());
+}
+
+void CodeGen::generateContainerLiteral(
+    const ExpressionList *exp,
+    TokenList *arrayType,
+    ExpressionResult& pointerExp,
+    uint32_t& currIndex,
+    uint32_t baseIndex
+) {
+    assert(
+        arrayType->exp.getType() == ExpressionType::VALUE &&
+        arrayType->exp.getToken().getType() == TokenType::ARRAY_TYPE
+    );
+    // how much we step by between indices
+    TokenList* subType = getNextFromTokenList(*arrayType);
+    pointerExp.value.type = subType;
+    const uint32_t sizeOfType = getSizeOfType(subType);
+    const uint16_t length = arrayType->exp.getToken().getLength();
+    int32_t index = -1;
+    bool named = false;
+    for (; exp; exp = exp->next) {
+        const Expression *pExp;
+        if (
+            exp->curr.getType() == ExpressionType::BINARY_OP &&
+            exp->curr.getBinOp()->op.getType() == TokenType::ASSIGNMENT &&
+            exp->curr.getBinOp()->leftSide.getType() == ExpressionType::LITERAL_VALUE
+        ) {
+            pExp = &exp->curr.getBinOp()->rightSide;
+            named = true;
+            index = *(int32_t *)exp->curr.getBinOp()->leftSide.getLiteralValue()->getData();
+            if (index < 0) {
+                index = baseIndex + (length + index) * sizeOfType;
+            }
+        } else {
+            if (named == true) {
+                assert(false);
+                exit(1);
+            }
+            if (index == -1) {
+                index = baseIndex;
+            } else {
+                index += sizeOfType;
+            }
+            pExp = &exp->curr;
+        }
+
+        assert(index < length && index >= 0);
+
+        // // update pointer
+        // const int32_t diff = (index - prevIndex) * sizeOfType;
+        // if (diff > 0) {
+        //     efficientImmAddOrSub(pointerExp.getReg(), diff, OpCode::ADD);
+        // } else if (diff < 0) {
+        //     efficientImmAddOrSub(pointerExp.getReg(), -diff, OpCode::SUB);
+        // }
+
+        // generate expression and write it using the updated pointer
+        if (pExp->getType() == ExpressionType::CONTAINER_LITERAL) {
+             generateContainerLiteral(&pExp->getContainerLiteral()->values, subType, pointerExp, currIndex, index);
+        } else {
+            const int32_t diff = index - currIndex;
+            if (diff > 0) {
+                efficientImmAddOrSub(pointerExp.getReg(), diff, OpCode::ADD);
+            } else if (diff < 0) {
+                efficientImmAddOrSub(pointerExp.getReg(), -diff, OpCode::SUB);
+            }
+            currIndex += diff;
+            ExpressionResult expRes = generateExpression(*pExp);
+            storeValueToPointer(pointerExp, expRes);
+            if (expRes.isTemp) {
+                freeRegister(expRes.getReg());
+            }
+        }
+    }
+    pointerExp.value.type = arrayType;
 }
 
 void CodeGen::generateStructDeclaration(const StructDec& structDec) {
@@ -557,13 +671,6 @@ void CodeGen::postExpression(ExpressionResult& expRes, bool loadImmediate, int16
 
 ExpressionResult CodeGen::generateExpressionArrAccess(const ArrayAccess &arrAccess) {
     if (arrAccess.array.getBinOp()) {
-        return {};
-    }
-    return {};
-}
-
-ExpressionResult CodeGen::generateExpressionContainerLiteral(const ContainerLiteral &containerLiteral) {
-    if (containerLiteral.values.next) {
         return {};
     }
     return {};
