@@ -212,6 +212,14 @@ TEST_CASE("getStructInfo", "[checker]") {
     tc.tk = &tks.back(); \
     TokenList retType = TokenListTypes::voidValue
 
+#define SET_UP_TWO_VAR_DEC_TEST(str) \
+    SET_UP_VAR_DEC_TEST(str); \
+    tc.checkStatement(statement, retType, false, false); \
+    REQUIRE(tc.errors.empty()); \
+    errorType = pr.parseStatement(statement); \
+    REQUIRE(errorType == ParseStatementErrorType::NONE)
+
+
 TEST_CASE("var dec", "[checker]") {
     SECTION("1") {
         const std::string str = "var: int32; ";
@@ -224,39 +232,39 @@ TEST_CASE("var dec", "[checker]") {
 TEST_CASE("reference var", "[checker]") {
     SECTION("1") {
         const std::string str = "var: int32;  varRef: int32 ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("2") {
         const std::string str = "var: int32;  varRef: const int32 ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("3") {
         // qualifier dropped
         const std::string str = "var: const int32 = 0;  varRef: int32 ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.size() == 1);
     }
     SECTION("4") {
         const std::string str = "var: int32 [10];  varRef: int32 [10] ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("5") {
         const std::string str = "var: const char ptr;  varRef: const char ptr ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         CHECK(tc.errors.empty());
     }
     SECTION("6") {
         // missing const in ref type
         const std::string str = "var: const char ptr;  varRef: char ptr ref = var; ";
-        SET_UP_VAR_DEC_TEST(str);
+        SET_UP_TWO_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
     }
@@ -266,6 +274,20 @@ TEST_CASE("reference var", "[checker]") {
         SET_UP_VAR_DEC_TEST(str);
         tc.checkStatement(statement, retType, false, false);
         REQUIRE(tc.errors.size() == 1);
+        CHECK(tc.errors.back().type == CheckerErrorType::REFERENCE_VARIABLE_MISSING_INITIALIZER);
+    }
+    SECTION("8") {
+        // missing const 
+        const std::string str = " varRef: int32 ref = 0; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        REQUIRE(tc.errors.size() == 1);
+    }
+    SECTION("9") {
+        const std::string str = " varRef: const int32 ref = 0; ";
+        SET_UP_VAR_DEC_TEST(str);
+        tc.checkStatement(statement, retType, false, false);
+        CHECK(tc.errors.empty());
     }
 }
 
@@ -453,7 +475,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Program program;
         std::vector<Tokenizer> tks;
         Checker tc{program, tks, memPool};
-        CHECK(tc.checkAssignment(leftType, rightType, false));
+        CHECK(tc.checkAssignment(leftType, rightType, false, true));
     }
     SECTION("2") {
         TokenList *leftType = makeTypeList({{TokenType::POINTER, TokenType::CHAR_TYPE}});
@@ -461,7 +483,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Program program;
         std::vector<Tokenizer> tks;
         Checker tc{program, tks, memPool};
-        CHECK_FALSE(tc.checkAssignment(leftType, rightType, false));
+        CHECK_FALSE(tc.checkAssignment(leftType, rightType, false, true));
     }
     SECTION("3") {
         std::vector<Tokenizer> tks;
@@ -470,7 +492,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE, TokenType::CONST}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->exp.getTokenRef().setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false);
+        const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK(res);
     }
     SECTION("4") {
@@ -480,7 +502,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->exp.getTokenRef().setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false);
+        const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK(res);
     }
     SECTION("5") {
@@ -492,7 +514,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         leftType->exp.getTokenRef().setLength(5);
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->exp.getTokenRef().setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false);
+        const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK_FALSE(res);
     }
 }

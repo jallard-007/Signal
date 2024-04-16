@@ -33,6 +33,7 @@ enum class CheckerErrorType: uint8_t {
     ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE,
     INVALID_STRING_LITERAL,
     USELESS_CONTAINER_LITERAL,
+    REFERENCE_VARIABLE_MISSING_INITIALIZER,
 
     // array size
     NOT_A_SIZE,
@@ -203,7 +204,20 @@ struct Checker {
 
     uint32_t getSizeOfType(const TokenList&);
 
-    bool checkAssignment(const TokenList*, const TokenList*, bool, bool = false);
+    /**
+     * \param leftSide the type of the left side
+     * \param rightSide the type of the right side
+     * \param initialAssignment if this is an initial assignment
+     * \param rightIsLValue set to true if right side is an l value
+     * \param checkCompatibility check if the types are compatible, rather than for assignment, defaults to false
+    */
+    bool checkAssignment(
+        const TokenList*leftSide,
+        const TokenList* rightSide,
+        bool initialAssignment,
+        bool rightIsLValue,
+        bool checkCompatibility = false
+    );
 
     void addError(const CheckerError&);
     void removeLastError();

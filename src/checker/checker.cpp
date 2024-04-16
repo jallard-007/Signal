@@ -137,6 +137,7 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) co
         case CheckerErrorType::CONTAINER_LITERAL_TOO_LARGE: message += "Container literal too large\n"; break;
         case CheckerErrorType::USELESS_CONTAINER_LITERAL: message += "Useless container literal\n"; break;
         case CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE: message += "Mixing types in array literal\n"; break;
+        case CheckerErrorType::REFERENCE_VARIABLE_MISSING_INITIALIZER: message += "Mixing types in array literal\n"; break;
         case CheckerErrorType::INVALID_MAIN_FUNCTION_SIGNATURE: message += "main function should be defined as so:\nfunc main(argc: uint32, argv: char ptr ptr): int32\n"; break;
     }
     if (dec) {
@@ -701,14 +702,14 @@ bool Checker::checkStatement(Statement& statement, TokenList& returnType, bool i
                     if (res.value.type->exp.getToken().getType() == TokenType::NONE && returnType.exp.getToken().getType() == TokenType::VOID) {
                         break; // ok
                     }
-                    if (!checkAssignment(&returnType, res.value.type, false)) {
+                    if (!checkAssignment(&returnType, res.value.type, false, res.isLValue)) {
                         addError({CheckerErrorType::INCORRECT_RETURN_TYPE, tk->tokenizerIndex, &statement.controlFlow->returnStatement->returnValue});
                     }
                     return true;
                 }
                 case ControlFlowStatementType::EXIT_STATEMENT: {
                     ResultingType res = checkExpression(statement.controlFlow->returnStatement->returnValue);
-                    if (!checkAssignment(&TokenListTypes::int64Value, res.value.type, false)) {
+                    if (!checkAssignment(&TokenListTypes::int64Value, res.value.type, false, res.isLValue)) {
                         addError({CheckerErrorType::INVALID_EXIT_TYPE, tk->tokenizerIndex, &statement.controlFlow->returnStatement->returnValue});
                     }
                     postCheckExpression(res, statement.controlFlow->returnStatement->returnValue);
@@ -809,6 +810,13 @@ bool Checker::checkLocalVarDec(VariableDec& varDec) {
         return false;
     }
     locals.emplace_back(varName);
+
+    if (varDec.type.exp.getToken().getType() == TokenType::REFERENCE && !dec->varDec->initialAssignment) {
+        // reference var missing initializer
+        addError({CheckerErrorType::REFERENCE_VARIABLE_MISSING_INITIALIZER, tk->tokenizerIndex, varDec.name});
+        return false;
+    }
+
     if (dec->varDec->initialAssignment) {
         const StructInformation *structInfo = nullptr;
         if (varDec.type.exp.getToken().getType() == TokenType::IDENTIFIER) {
@@ -821,7 +829,7 @@ bool Checker::checkLocalVarDec(VariableDec& varDec) {
         if (expressionType.value.type->exp.getToken().getType() == TokenType::BAD_VALUE) {
             return false;
         }
-        if (!checkAssignment(&varDec.type, expressionType.value.type, true)) {
+        if (!checkAssignment(&varDec.type, expressionType.value.type, true, expressionType.isLValue)) {
             addError({CheckerErrorType::CANNOT_ASSIGN, tk->tokenizerIndex, varDec.initialAssignment});
             return false;
         }
@@ -895,7 +903,7 @@ ResultingType Checker::checkFunctionCallExpression(FunctionCall& funcCall, const
                 argList = nullptr;
                 break;
             }
-            else if (!checkAssignment(&paramList->curr.varDec->type, resultingType.value.type, true)) {
+            else if (!checkAssignment(&paramList->curr.varDec->type, resultingType.value.type, true, resultingType.isLValue)) {
                 // types dont match
                 addError({CheckerErrorType::TYPE_DOES_NOT_MATCH, tk->tokenizerIndex, &argList->curr, decPtr});
             }
@@ -943,7 +951,7 @@ ResultingType Checker::checkTokenExpression(const Token token, const StructInfor
         return {&varDec->type, true};
     }
     if (token.getType() == TokenType::STDIN || token.getType() == TokenType::STDERR || token.getType() == TokenType::STDOUT) {
-        return {&TokenListTypes::fileValue, false};
+        return {&TokenListTypes::fileValueConst, false};
     }
     return { loadLiteralValue(*tk, token) };
 }
@@ -1071,7 +1079,7 @@ ResultingType Checker::checkBinOpExpression(BinOp& binOp) {
         if (!leftSide.isLValue) {
             addError({CheckerErrorType::CANNOT_ASSIGN_TO_TEMPORARY, tk->tokenizerIndex, &binOp.leftSide});
         }
-        else if (!checkAssignment(leftSide.value.type, rightSide.value.type, false)) {
+        else if (!checkAssignment(leftSide.value.type, rightSide.value.type, false, rightSide.isLValue)) {
             addError({CheckerErrorType::CANNOT_ASSIGN, tk->tokenizerIndex, binOp.op});
         }
         postCheckExpression(leftSide, binOp.leftSide);
@@ -1230,7 +1238,7 @@ bool Checker::checkType(TokenList& type, bool isReturnType) {
                 LiteralValue maxArraySize;
                 maxArraySize.set(UINT32_MAX);
                 LiteralValue validLiteral = evaluateBinOpImmExpression(TokenType::LESS_THAN_EQUAL, res.value, maxArraySize);
-                assert(validLiteral.type == &TokenListTypes::boolValue);
+                assert(validLiteral.type == &TokenListTypes::boolValueConst);
                 if (!*(bool *)validLiteral.getData()) {
                     errorType = CheckerErrorType::INVALID_ARRAY_SIZE;
                     break;
@@ -1240,7 +1248,7 @@ bool Checker::checkType(TokenList& type, bool isReturnType) {
                 LiteralValue minArraySize;
                 minArraySize.set(1);
                 LiteralValue validLiteral = evaluateBinOpImmExpression(TokenType::GREATER_THAN_EQUAL, res.value, minArraySize);
-                assert(validLiteral.type == &TokenListTypes::boolValue);
+                assert(validLiteral.type == &TokenListTypes::boolValueConst);
                 if (!*(bool *)validLiteral.getData()) {
                     errorType = CheckerErrorType::INVALID_ARRAY_SIZE;
                     break;
@@ -1393,7 +1401,7 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
         }
         ResultingType resType = checkExpression(expList->curr.getBinOp()->rightSide, subStructInfo);
         postCheckExpression(resType, expList->curr.getBinOp()->rightSide);
-        if (!checkAssignment(indexType.value.type, resType.value.type, true, false)) {
+        if (!checkAssignment(indexType.value.type, resType.value.type, true, resType.isLValue, false)) {
             addError({CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE, tk->tokenizerIndex, &expList->curr});
             return false;
         }
@@ -1437,7 +1445,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 if (!arrayItemType) {
                     arrayItemType = resType.value.type;
                 }
-                else if (!checkAssignment(arrayItemType, resType.value.type, true, true)) {
+                else if (!checkAssignment(arrayItemType, resType.value.type, true, resType.isLValue, true)) {
                     if (checkAssignment(resType.value.type, arrayItemType, true, true)) {
                         arrayItemType = resType.value.type;
                     } else {
@@ -1453,8 +1461,8 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
             if (!arrayItemType) {
                 arrayItemType = resType.value.type;
             }
-            else if (!checkAssignment(arrayItemType, resType.value.type, true, true)) {
-                if (checkAssignment(resType.value.type, arrayItemType, true, true)) {
+            else if (!checkAssignment(arrayItemType, resType.value.type, true, resType.isLValue, true)) {
+                if (checkAssignment(resType.value.type, arrayItemType, true, false, true)) {
                     arrayItemType = resType.value.type;
                 } else {
                     addError({CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE, tk->tokenizerIndex, &expList->curr});
@@ -1494,8 +1502,8 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 arrayItemType->next->next->exp.setToken({0, 0, TokenType::CONST});
             }
         }
-        else if (!checkAssignment(arrayItemType, resType.value.type, true, true)) {
-            if (checkAssignment(resType.value.type, arrayItemType, true, true)) {
+        else if (!checkAssignment(arrayItemType, resType.value.type, true, resType.isLValue, true)) {
+            if (checkAssignment(resType.value.type, arrayItemType, true, false, true)) {
                 arrayItemType = resType.value.type;
             } else {
                 addError({CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE, tk->tokenizerIndex, &expList->curr});
@@ -1553,7 +1561,13 @@ bool concreteTypesCanBeDirectlyAssigned(const TokenList* lTypeList, const TokenL
     return rSize <= lSize;
 }
 
-bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightSide, bool initialAssignment, bool checkCompatibility) {
+bool Checker::checkAssignment(
+    const TokenList* leftSide,
+    const TokenList* rightSide,
+    bool initialAssignment,
+    bool rightIsLValue,
+    bool checkCompatibility
+) {
     bool strictRequired = false;
     (void)initialAssignment;
     while (true) {
@@ -1573,9 +1587,14 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
         }
         if (lType == TokenType::REFERENCE || rType == TokenType::REFERENCE) {
             if (lType == TokenType::REFERENCE) {
-                // have to move past the reference, but now strict type checking is required
+                // have to move past the reference
                 leftSide = getNextFromTokenListConst(*leftSide);
+                // now strict type checking is required
                 strictRequired = true;
+                if (rightIsLValue) {
+                    // check for compatibility rather than assignment since we are taking by ref
+                    checkCompatibility = true; 
+                } // if !rightIsLValue, we still need to check for assignment
             }
             if (rType == TokenType::REFERENCE) {
                 // right side being a reference does not matter, just move past
@@ -1586,7 +1605,7 @@ bool Checker::checkAssignment(const TokenList* leftSide, const TokenList* rightS
         const TokenType lQualifier = getTypeQualifier(*leftSide);
         const TokenType rQualifier = getTypeQualifier(*rightSide);
         if (strictRequired) {
-            if (lQualifier != rQualifier) {
+            if (rQualifier != TokenType::NONE && lQualifier != rQualifier) {
                 return false;
             }
         }

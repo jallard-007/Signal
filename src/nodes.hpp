@@ -570,4 +570,13 @@ namespace TokenListTypes {
     extern TokenList nullptrValue;
     extern TokenList stringValue;
     extern TokenList voidValue;
+
+    extern TokenList boolValueConst;
+    extern TokenList int32ValueConst;
+    extern TokenList uint32ValueConst;
+    extern TokenList int64ValueConst;
+    extern TokenList uint64ValueConst;
+    extern TokenList charValueConst;
+    extern TokenList doubleValueConst;
+    extern TokenList fileValueConst;
 };

@@ -16,6 +16,16 @@ namespace TokenListTypes {
     TokenList fileValue {Token{0,0,TokenType::FILE_TYPE}};
     TokenList voidValue {Token{0,0,TokenType::VOID}};
     TokenList nullptrValue {Token{0,0,TokenType::NULL_PTR}};
+
+    TokenList _constValue {Token{0,0,TokenType::CONST}};
+    TokenList boolValueConst {Token{0,0,TokenType::BOOL}, &_constValue};
+    TokenList int32ValueConst {Token{0,0,TokenType::INT32_TYPE}, &_constValue};
+    TokenList uint32ValueConst {Token{0,0,TokenType::UINT32_TYPE}, &_constValue};
+    TokenList int64ValueConst {Token{0,0,TokenType::INT64_TYPE}, &_constValue};
+    TokenList uint64ValueConst {Token{0,0,TokenType::UINT64_TYPE}, &_constValue};
+    TokenList charValueConst {Token{0,0,TokenType::CHAR_TYPE}, &_constValue};
+    TokenList doubleValueConst {Token{0,0,TokenType::DOUBLE_TYPE}, &_constValue};
+    TokenList fileValueConst {Token{0,0,TokenType::FILE_TYPE}, &_constValue};
 };
 
 

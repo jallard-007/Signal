@@ -1333,8 +1333,7 @@ ExpressionResult CodeGen::booleanBinOp(const BinOp& binOp, OpCode op, OpCode jum
             // left result is not an immediate
             byteCode.resize(shortCircuitIndexStart);
             LiteralValue zeroExp;
-            zeroExp.set((int64_t)0);
-            zeroExp.type = &TokenListTypes::int32Value;
+            zeroExp.set((int32_t)0);
             rightResult.value = evaluateBinOpImmExpression(TokenType::NOT_EQUAL, rightResult.value, zeroExp);
             if (!*(bool*)rightResult.value.getData()) {
                 // for &&, cond is always false
