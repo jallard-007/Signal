@@ -135,11 +135,11 @@ struct Statement {
 // typeList: typeQualifier identifier indirectionTypeList
 // indirectionTypeList:= nothing
 //                     | typeQualifier ptr indirectionTypeList
-//                     // | typeQualifier [number | nothing] indirectionTypeList ignore arrays for now
+//                     | typeQualifier [number | nothing] indirectionTypeList
 //                     | typeQualifier ref
 struct TokenList {
     static_assert(sizeof(Expression) == sizeof(Token));
-    Expression exp;
+    Token token;
     TokenList *next{nullptr};
     TokenList() = default;
     TokenList(const Token&);
@@ -556,7 +556,7 @@ struct Program {
  * builtin type TokenLists
  * Used in checker, compTime, and codeGen
 */
-namespace TokenListTypes { 
+namespace BaseTypeListTypes { 
     extern TokenList noneValue;
     extern TokenList badValue;
     extern TokenList boolValue;

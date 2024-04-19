@@ -139,8 +139,8 @@ struct OperatorLessEqual {
 
 template<template<typename, typename> class TFunctor>
 void doBinaryEvaluate(const LiteralValue& left, const LiteralValue& right, LiteralValue& res) {
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
+    const TokenType leftSideType = left.type->token.getType();
+    const TokenType rightSideType = right.type->token.getType();
     assert(leftSideType == TokenType::DOUBLE_TYPE || leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     assert(rightSideType == TokenType::DOUBLE_TYPE || rightSideType == TokenType::UINT64_TYPE || rightSideType == TokenType::INT64_TYPE);
     if (leftSideType == TokenType::DOUBLE_TYPE) {
@@ -181,8 +181,8 @@ void doBinaryEvaluate(const LiteralValue& left, const LiteralValue& right, Liter
 
 template<template<typename, typename> class TFunctor>
 void doBinaryIntegralEvaluate(const LiteralValue& left, const LiteralValue& right, LiteralValue& res) {
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
+    const TokenType leftSideType = left.type->token.getType();
+    const TokenType rightSideType = right.type->token.getType();
     assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     assert(leftSideType == TokenType::UINT64_TYPE || leftSideType == TokenType::INT64_TYPE);
     if (leftSideType == TokenType::UINT64_TYPE) {
@@ -221,7 +221,7 @@ struct OperatorNot {
 
 template<template<typename> class TFunctor>
 void doUnaryEvaluate(const LiteralValue& operand, LiteralValue& res) {
-    TokenType operandType = operand.type->exp.getToken().getType();
+    TokenType operandType = operand.type->token.getType();
     assert(operandType == TokenType::DOUBLE_TYPE || operandType == TokenType::UINT64_TYPE || operandType == TokenType::INT64_TYPE);
     if (operandType == TokenType::DOUBLE_TYPE) {
         auto unaryOpValue = TFunctor<double>()(*(double*)operand.getData());

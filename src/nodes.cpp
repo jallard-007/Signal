@@ -2,7 +2,7 @@
 #include "nodeMemPool.hpp"
 
 
-namespace TokenListTypes { 
+namespace BaseTypeListTypes { 
     TokenList noneValue {Token{0,0,TokenType::NONE}};
     TokenList badValue {Token{0,0,TokenType::BAD_VALUE}};
     TokenList boolValue {Token{0,0,TokenType::BOOL}};
@@ -54,13 +54,13 @@ Statement& Statement::operator=(const Statement& ref) {
     return *this;
 }
 
-TokenList::TokenList(const Token& tk): exp{tk}, next{nullptr} {}
-TokenList::TokenList(const Token& tk, TokenList* next): exp{tk}, next{next} {}
+TokenList::TokenList(const Token& tk): token{tk}, next{nullptr} {}
+TokenList::TokenList(const Token& tk, TokenList* next): token{tk}, next{next} {}
 std::ostream& operator<<(std::ostream& os, const TokenList& obj) {
     if (obj.next) {
         os << *obj.next << ' ';
     }
-    os << obj.exp.getToken().getType();
+    os << obj.token.getType();
     return os;
 }
 
@@ -113,14 +113,8 @@ bool TokenList::operator==(const TokenList& ref) const {
     const TokenList* refCurr = &ref;
     const TokenList* thisCurr = this;
     while (refCurr && thisCurr) {
-        const ExpressionType expType = refCurr->exp.getType();
-        if (expType != thisCurr->exp.getType()) {
+        if (refCurr->token.getType() != thisCurr->token.getType()) {
             return false;
-        }
-        if (expType == ExpressionType::VALUE) {
-            if (refCurr->exp.getToken().getType() != thisCurr->exp.getToken().getType()) {
-                return false;
-            }
         }
         refCurr = refCurr->next;
         thisCurr = thisCurr->next;
@@ -316,7 +310,7 @@ TokenList TokenList::deepCopy(NodeMemPool& mem) {
     TokenList copy;
     TokenList *copyList = &copy;
     for (TokenList *list = this; list; list = list->next, copyList = copyList->next) {
-        copyList->exp = list->exp.deepCopy(mem);
+        copyList->token = list->token;
         copyList->next = mem.makeTokenList();
     }
     mem.release(copyList);

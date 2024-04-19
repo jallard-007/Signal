@@ -51,7 +51,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         ParseExpressionErrorType errorType = parser.parseExpression(expression);
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("max int32") {
@@ -64,7 +64,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         ParseExpressionErrorType errorType = parser.parseExpression(expression);
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("min int32") {
@@ -77,7 +77,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         ParseExpressionErrorType errorType = parser.parseExpression(expression);
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("max uint32") {
@@ -90,7 +90,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         ParseExpressionErrorType errorType = parser.parseExpression(expression);
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("negative max uint32") {
@@ -104,7 +104,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::UNARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::UINT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("complex") {
@@ -118,7 +118,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::DOUBLE_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("overflow") {
@@ -132,7 +132,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 1") {
@@ -146,7 +146,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 2") {
@@ -161,7 +161,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
 
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::DOUBLE_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::DOUBLE_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 3") {
@@ -175,7 +175,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
+        CHECK(expRes.type->token.getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 4") {
@@ -189,7 +189,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT32_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 5") {
@@ -203,7 +203,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 6") {
@@ -217,7 +217,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::INT64_TYPE);
+        CHECK(expRes.type->token.getType() == TokenType::INT64_TYPE);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 7") {
@@ -231,7 +231,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
+        CHECK(expRes.type->token.getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 8") {
@@ -245,7 +245,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
+        CHECK(expRes.type->token.getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 9") {
@@ -259,7 +259,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
+        CHECK(expRes.type->token.getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
     SECTION("ben expression 10") {
@@ -273,7 +273,7 @@ TEST_CASE("constant expressions", "[compTime]") {
         REQUIRE(errorType == ParseExpressionErrorType::NONE);
         REQUIRE(expression.getType() == ExpressionType::BINARY_OP);
         LiteralValue expRes = evaluate(tokenizer, expression);
-        CHECK(expRes.type->exp.getToken().getType() == TokenType::BOOL);
+        CHECK(expRes.type->token.getType() == TokenType::BOOL);
         CHECK(*(decltype(result) *)expRes.getData() == result);
     }
 }

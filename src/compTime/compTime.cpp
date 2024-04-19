@@ -5,41 +5,41 @@
 
 void LiteralValue::set(char c) {
     *(decltype(c) *)data = c;
-    type = &TokenListTypes::charValueConst;
+    type = &BaseTypeListTypes::charValueConst;
 }
 void LiteralValue::set(uint32_t val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::uint32ValueConst;
+    type = &BaseTypeListTypes::uint32ValueConst;
 }
 void LiteralValue::set(uint64_t val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::uint64ValueConst;
+    type = &BaseTypeListTypes::uint64ValueConst;
 }
 void LiteralValue::set(int32_t val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::int32ValueConst;
+    type = &BaseTypeListTypes::int32ValueConst;
 }
 void LiteralValue::set(int64_t val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::int64ValueConst;
+    type = &BaseTypeListTypes::int64ValueConst;
 }
 void LiteralValue::set(FILE *val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::fileValueConst;
+    type = &BaseTypeListTypes::fileValueConst;
 }
 void LiteralValue::set(std::string *val, TokenList* type) {
     *(decltype(val) *)data = val;
     this->type = type;
-    *this->type = TokenListTypes::stringValue;
-    this->type->exp.getTokenRef().setLength((uint16_t)(val->size() + 1));
+    *this->type = BaseTypeListTypes::stringValue;
+    this->type->token.setLength((uint16_t)(val->size() + 1));
 }
 void LiteralValue::set(double val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::doubleValueConst;
+    type = &BaseTypeListTypes::doubleValueConst;
 }
 void LiteralValue::set(bool val) {
     *(decltype(val) *)data = val;
-    type = &TokenListTypes::boolValueConst;
+    type = &BaseTypeListTypes::boolValueConst;
 }
 
 LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
@@ -82,11 +82,11 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
             uint64_t num = std::stoull(decimalNumber);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32ValueConst;
+                expRes.type = &BaseTypeListTypes::int32ValueConst;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32ValueConst;
+                expRes.type = &BaseTypeListTypes::uint32ValueConst;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64ValueConst;
+                expRes.type = &BaseTypeListTypes::int64ValueConst;
             } // else already set to uint64_t
             return expRes;
         }
@@ -96,11 +96,11 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
             uint64_t num = std::stoull(binaryNumber, nullptr, 2);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32ValueConst;
+                expRes.type = &BaseTypeListTypes::int32ValueConst;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32ValueConst;
+                expRes.type = &BaseTypeListTypes::uint32ValueConst;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64ValueConst;
+                expRes.type = &BaseTypeListTypes::int64ValueConst;
             } // else already set to uint64_t
             return expRes;
         }
@@ -120,11 +120,11 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
             uint64_t num = std::stoull(hexNumber, nullptr, 16);
             expRes.set(num);
             if (num <= INT32_MAX) {
-                expRes.type = &TokenListTypes::int32ValueConst;
+                expRes.type = &BaseTypeListTypes::int32ValueConst;
             } else if (num <= UINT32_MAX) {
-                expRes.type = &TokenListTypes::uint32ValueConst;
+                expRes.type = &BaseTypeListTypes::uint32ValueConst;
             } else if (num <= INT64_MAX) {
-                expRes.type = &TokenListTypes::int64ValueConst;
+                expRes.type = &BaseTypeListTypes::int64ValueConst;
             } // else already set to uint64_t
             return expRes;
         }
@@ -137,7 +137,7 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
             return expRes;
         }
         case TokenType::NULL_PTR: {
-            expRes.type = &TokenListTypes::nullptrValue;
+            expRes.type = &BaseTypeListTypes::nullptrValue;
             return expRes;
         }
         default: {
@@ -149,23 +149,23 @@ LiteralValue loadLiteralValue(Tokenizer& tk, const Token token) {
 
 LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, LiteralValue& right) {
     assert(left.type && right.type);
-    const TokenType leftSideType = left.type->exp.getToken().getType();
-    const TokenType rightSideType = right.type->exp.getToken().getType();
+    const TokenType leftSideType = left.type->token.getType();
+    const TokenType rightSideType = right.type->token.getType();
     assert(isConcreteBuiltInType(leftSideType) && leftSideType != TokenType::VOID);
     assert(isConcreteBuiltInType(rightSideType) && rightSideType != TokenType::VOID);
     LiteralValue res;
     // assign to largest type, minimum of int32
-    res.type = &TokenListTypes::int32ValueConst;
-    if (leftSideType > res.type->exp.getToken().getType()) {
+    res.type = &BaseTypeListTypes::int32ValueConst;
+    if (leftSideType > res.type->token.getType()) {
         res.type = left.type;
     }
-    if (rightSideType > res.type->exp.getToken().getType()) {
+    if (rightSideType > res.type->token.getType()) {
         res.type = right.type;
     }
 
     if (isUnsigned(leftSideType) || leftSideType == TokenType::BOOL) {
         // temporarily mark as uint64_t
-        left.type = &TokenListTypes::uint64ValueConst;
+        left.type = &BaseTypeListTypes::uint64ValueConst;
     } else if (isSigned(leftSideType)) {
         // temporarily mark as int64_t
         // sign extend
@@ -183,7 +183,7 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
     }
     if (isUnsigned(rightSideType) || rightSideType == TokenType::BOOL) {
         // temporarily mark as uint64_t
-        right.type = &TokenListTypes::uint64ValueConst;
+        right.type = &BaseTypeListTypes::uint64ValueConst;
     } else if (isSigned(rightSideType)) {
         // temporarily mark as int64_t
         // sign extend
@@ -241,42 +241,42 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
             break;
         }
         case TokenType::EQUAL: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorEqual>(left, right, res);
             break;
         }
         case TokenType::NOT_EQUAL: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorNotEqual>(left, right, res);
             break;
         }
         case TokenType::LOGICAL_AND: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorLogicalAnd>(left, right, res);
             break;
         }
         case TokenType::LOGICAL_OR: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorLogicalOr>(left, right, res);
             break;
         }
         case TokenType::LESS_THAN: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorLess>(left, right, res);
             break;
         }
         case TokenType::LESS_THAN_EQUAL: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorLessEqual>(left, right, res);
             break;
         }
         case TokenType::GREATER_THAN: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorGreater>(left, right, res);
             break;
         }
         case TokenType::GREATER_THAN_EQUAL: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doBinaryEvaluate<OperatorGreaterEqual>(left, right, res);
             break;
         }
@@ -292,17 +292,17 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
 LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand) {
     assert(operand.type);
     LiteralValue res;
-    const TokenType operandType = operand.type->exp.getToken().getType();
+    const TokenType operandType = operand.type->token.getType();
     assert(isBuiltInType(operandType) && operandType != TokenType::VOID && operandType != TokenType::REFERENCE);
     
     // assign to largest type, minimum of int32
-    res.type = &TokenListTypes::int32ValueConst;
-    if (operandType > res.type->exp.getToken().getType()) {
+    res.type = &BaseTypeListTypes::int32ValueConst;
+    if (operandType > res.type->token.getType()) {
         res.type = operand.type;
     }
     if (isUnsigned(operandType) || operandType == TokenType::BOOL) {
         // temporarily mark as uint64_t
-        operand.type = &TokenListTypes::uint64ValueConst;
+        operand.type = &BaseTypeListTypes::uint64ValueConst;
     } else if (isSigned(operandType)) {
         // temporarily mark as int64_t
         // sign extend
@@ -320,7 +320,7 @@ LiteralValue evaluateUnaryOpImmExpression(TokenType op, LiteralValue& operand) {
     }
     switch (op) {
         case TokenType::NOT: {
-            res.type = &TokenListTypes::boolValueConst;
+            res.type = &BaseTypeListTypes::boolValueConst;
             doUnaryEvaluate<OperatorNot>(operand, res);
             break;
         }

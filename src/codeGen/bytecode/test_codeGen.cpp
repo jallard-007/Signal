@@ -25,7 +25,7 @@ TEST_CASE("variable creation", "[codeGen]") {
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.varDec);
 
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
 
         codeGen.generateVariableDeclaration(*statement.varDec);
@@ -42,7 +42,7 @@ TEST_CASE("variable creation", "[codeGen]") {
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.varDec);
 
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
 
         codeGen.generateVariableDeclaration(*statement.varDec);
@@ -64,7 +64,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
         REQUIRE(statement.controlFlow);
         REQUIRE(statement.controlFlow->type == ControlFlowStatementType::CONDITIONAL_STATEMENT);
 
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
 
         codeGen.generateStatement(statement);
@@ -112,7 +112,7 @@ TEST_CASE("jump statements in always true control flow", "[codeGen]") {
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         REQUIRE(statement.controlFlow);
         REQUIRE(statement.controlFlow->type == ControlFlowStatementType::WHILE_LOOP);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
 
         codeGen.generateStatement(statement);
@@ -321,7 +321,7 @@ TEST_CASE("addFunctionSignatureToVirtualStack", "[codeGen]") {
         CHECK(codeGen.stackItems[0].type == StackItemType::VARIABLE);
         CHECK(codeGen.stackItems[0].variable.positionOnStack == 8);
         CHECK(codeGen.tk->extractToken(codeGen.stackItems[0].variable.varDec.name) == "arg1");
-        CHECK(codeGen.stackItems[0].variable.varDec.type.exp.getToken().getType() == TokenType::INT64_TYPE);
+        CHECK(codeGen.stackItems[0].variable.varDec.type.token.getType() == TokenType::INT64_TYPE);
         CHECK(codeGen.stackItems[1].type == StackItemType::RETURN_ADDRESS);
         CHECK(codeGen.stackItems[1].positionOnStack == 16);
     }
@@ -335,7 +335,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
@@ -355,7 +355,7 @@ TEST_CASE("placing literal in data section", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
@@ -763,12 +763,12 @@ TEST_CASE("get address of expression", "[codeGen]") {
         CHECK(res_x.isPointerToValue);
         CHECK(res_x.isReg);
         CHECK(res_x.getReg() == 1);
-        CHECK(res_x.value.type->exp.getToken().getType() == TokenType::UINT32_TYPE);
+        CHECK(res_x.value.type->token.getType() == TokenType::UINT32_TYPE);
         CHECK(res_y.isPointerToValue);
         CHECK(res_y.isReg);
         CHECK(res_y.getReg() == 30);
         CHECK_FALSE(res_y.isTemp);
-        CHECK(res_y.value.type->exp.getToken().getType() == TokenType::INT32_TYPE);
+        CHECK(res_y.value.type->token.getType() == TokenType::INT32_TYPE);
     }
 }
 
@@ -778,7 +778,7 @@ TEST_CASE("generate array", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
@@ -792,7 +792,7 @@ TEST_CASE("generate array", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
@@ -806,7 +806,7 @@ TEST_CASE("generate array", "[codeGen]") {
         testBoilerPlate(str);
         Statement statement;
         REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
-        checker.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(checker.errors.empty());
         codeGen.generateStatement(statement);
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};

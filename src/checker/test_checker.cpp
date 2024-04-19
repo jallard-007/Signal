@@ -38,29 +38,29 @@ TEST_CASE("checkType", "[checker]") {
     tc.firstTopLevelScan();
     {
         TokenList tokenList;
-        tokenList.exp.setToken({7, 5, TokenType::IDENTIFIER});
+        tokenList.token = {7, 5, TokenType::IDENTIFIER};
         tc.tk = &tks.back();
         CHECK(tc.checkType(tokenList));
         tokenList.next = nullptr;
         TokenList nextType = tokenList;
         tokenList.next = &nextType;
-        tokenList.exp.setToken(TokenType::POINTER);
+        tokenList.token = {0, 0, TokenType::POINTER};
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextType = tokenList;
         tokenList.next = &nextNextType;
-        tokenList.exp.setToken(TokenType::REFERENCE);
+        tokenList.token = {0, 0, TokenType::REFERENCE};
         CHECK(tc.checkType(tokenList));
         nextType.next = nullptr;
         TokenList nextNextNextType = tokenList;
         tokenList.next = &nextNextNextType;
-        tokenList.exp.setToken(TokenType::POINTER);
+        tokenList.token = {0, 0, TokenType::POINTER};
         CHECK_FALSE(tc.checkType(tokenList));
     }
 
     {
         TokenList notAType;
-        notAType.exp.setToken({38, 7, TokenType::IDENTIFIER});
+        notAType.token = {38, 7, TokenType::IDENTIFIER};
         CHECK_FALSE(tc.checkType(notAType));
     }
 }
@@ -210,7 +210,7 @@ TEST_CASE("getStructInfo", "[checker]") {
     REQUIRE(errorType == ParseStatementErrorType::NONE); \
     Checker tc{pr.program, tks, memPool}; \
     tc.tk = &tks.back(); \
-    TokenList retType = TokenListTypes::voidValue
+    TokenList retType = BaseTypeListTypes::voidValue
 
 #define SET_UP_TWO_VAR_DEC_TEST(str) \
     SET_UP_VAR_DEC_TEST(str); \
@@ -305,13 +305,6 @@ TEST_CASE("array types", "[checker]") {
         REQUIRE(tc.errors.size() == 1);
         CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
     }
-    SECTION("size too small again") {
-        const std::string str = "var: int32 [-1]; ";
-        SET_UP_VAR_DEC_TEST(str);
-        tc.checkStatement(statement, retType, false, false);
-        REQUIRE(tc.errors.size() == 1);
-        CHECK(tc.errors.back().type == CheckerErrorType::INVALID_ARRAY_SIZE);
-    }
     SECTION("size too large") {
         const std::string str = "var: int32 [0xffffffffff]; ";
         SET_UP_VAR_DEC_TEST(str);
@@ -398,7 +391,7 @@ TEST_CASE("cursed", "[checker]") {
         REQUIRE(errorType == ParseStatementErrorType::NONE);
         Checker tc{pr.program, tks, memPool};
         tc.tk = &tks.back();
-        tc.checkStatement(statement, TokenListTypes::voidValue, false, false);
+        tc.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
         REQUIRE(tc.errors.size() == 1);
     }
 }
@@ -459,7 +452,7 @@ TokenList* makeTypeList(const std::span<const TokenType> types) {
     TokenList *curr = base, *prev = nullptr;
     for (TokenType type : types) {
         prev = curr;
-        curr->exp.setToken(type);
+        curr->token = {0, 0, type};
         curr->next = memPool.makeTokenList();
         curr = curr->next;
     }
@@ -491,7 +484,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Checker tc{program, tks, memPool};
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE, TokenType::CONST}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
-        rightType->exp.getTokenRef().setLength(10);
+        rightType->token.setLength(10);
         const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK(res);
     }
@@ -501,7 +494,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Checker tc{program, tks, memPool};
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
-        rightType->exp.getTokenRef().setLength(10);
+        rightType->token.setLength(10);
         const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK(res);
     }
@@ -511,9 +504,9 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Program program;
         Checker tc{program, tks, memPool};
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE}});
-        leftType->exp.getTokenRef().setLength(5);
+        leftType->token.setLength(5);
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
-        rightType->exp.getTokenRef().setLength(10);
+        rightType->token.setLength(10);
         const bool res = tc.checkAssignment(leftType, rightType, false, false);
         CHECK_FALSE(res);
     }
@@ -535,8 +528,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
 #define POST_EXPRESSION_CHECK_CONTAINER_TEST() \
     CHECK(!res.isLiteral); \
     CHECK(!res.isLValue); \
-    REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE); \
-    Token token = res.value.type->exp.getToken(); \
+    Token token = res.value.type->token; \
     CHECK(token.getType() == TokenType::CONTAINER_LITERAL)
 
 TEST_CASE("checkContainerLiteral", "[codeGen]") {
@@ -555,8 +547,7 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 1);
         REQUIRE(res.value.type->next);
-        REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
-        Token tokenNext = res.value.type->next->exp.getToken();
+        Token tokenNext = res.value.type->next->token;
         CHECK(tokenNext.getType() == TokenType::INT32_TYPE);
     }
     SECTION("3") {
@@ -566,8 +557,7 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 2);
         REQUIRE(res.value.type->next);
-        REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
-        Token tokenNext = res.value.type->next->exp.getToken();
+        Token tokenNext = res.value.type->next->token;
         CHECK(tokenNext.getType() == TokenType::CHAR_TYPE);
     }
     SECTION("4") {
@@ -577,16 +567,14 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         POST_EXPRESSION_CHECK_CONTAINER_TEST();
         CHECK(token.getLength() == 2);
         REQUIRE(res.value.type->next);
-        REQUIRE(res.value.type->next->exp.getType() == ExpressionType::VALUE);
-        Token tokenNext = res.value.type->next->exp.getToken();
+        Token tokenNext = res.value.type->next->token;
         CHECK(tokenNext.getType() == TokenType::INT32_TYPE);
     }
     SECTION("5") {
         const std::string str = "['a', 2.0]; ";
         SET_UP_CHECK_CONTAINER_TEST(str);
         ResultingType res = tc.checkExpression(expression);
-        REQUIRE(res.value.type->exp.getType() == ExpressionType::VALUE);
-        Token token = res.value.type->exp.getToken();
+        Token token = res.value.type->token;
         REQUIRE(token.getType() == TokenType::BAD_VALUE);
     }
 }

@@ -12,9 +12,9 @@ TEST_CASE("getType", "[parser]") {
         REQUIRE(tokens.next);
         REQUIRE(tokens.next->next);
         CHECK_FALSE(tokens.next->next->next);
-        CHECK(tokens.exp.getToken().getType() == TokenType::POINTER);
-        CHECK(tokens.next->exp.getToken().getType() == TokenType::POINTER);
-        CHECK(tokens.next->next->exp.getToken().getType() == TokenType::CHAR_TYPE);
+        CHECK(tokens.token.getType() == TokenType::POINTER);
+        CHECK(tokens.next->token.getType() == TokenType::POINTER);
+        CHECK(tokens.next->next->token.getType() == TokenType::CHAR_TYPE);
     }
     REQUIRE(tokenizer.peekNext().getType() == TokenType::COMMA);
     tokenizer.consumePeek();
@@ -24,9 +24,9 @@ TEST_CASE("getType", "[parser]") {
         REQUIRE(tokens.next);
         REQUIRE(tokens.next->next);
         CHECK_FALSE(tokens.next->next->next);
-        CHECK(tokens.exp.getToken().getType() == TokenType::POINTER);
-        CHECK(tokens.next->exp.getToken().getType() == TokenType::POINTER);
-        CHECK(tokens.next->next->exp.getToken().getType() == TokenType::UINT32_TYPE);
+        CHECK(tokens.token.getType() == TokenType::POINTER);
+        CHECK(tokens.next->token.getType() == TokenType::POINTER);
+        CHECK(tokens.next->next->token.getType() == TokenType::UINT32_TYPE);
     }
 }
 
@@ -48,13 +48,13 @@ TEST_CASE("Function Declaration", "[parser]") {
     REQUIRE(func->params.curr.type == StatementType::VARIABLE_DEC);
     REQUIRE(func->params.curr.varDec);
     CHECK(tokenizer.extractToken(func->params.curr.varDec->name) == "first");
-    CHECK(func->params.curr.varDec->type.exp.getToken().getType() == TokenType::POINTER);
+    CHECK(func->params.curr.varDec->type.token.getType() == TokenType::POINTER);
     REQUIRE(func->params.curr.varDec->type.next);
-    CHECK(func->params.curr.varDec->type.next->exp.getToken().getType() == TokenType::UINT16_TYPE);
+    CHECK(func->params.curr.varDec->type.next->token.getType() == TokenType::UINT16_TYPE);
 
     // check return type
     CHECK(func->returnType.next == nullptr);
-    CHECK(func->returnType.exp.getToken().getType() == TokenType::UINT32_TYPE);
+    CHECK(func->returnType.token.getType() == TokenType::UINT32_TYPE);
     CHECK(func->body.scopeStatements.curr.type == StatementType::NONE);
 }
 
@@ -705,7 +705,7 @@ TEST_CASE("Template Declaration", "[parser]") {
     auto& t = parser.program.decs.curr;
     REQUIRE(t.type == GeneralDecType::TEMPLATE);
     REQUIRE(t.tempDec);
-    CHECK(tokenizer.extractToken(t.tempDec->templateTypes.exp.getToken()) == "T");
+    CHECK(tokenizer.extractToken(t.tempDec->templateTypes.token) == "T");
 
     CHECK(t.tempDec->templateTypes.next == nullptr);
     CHECK(parser.program.decs.next == nullptr);

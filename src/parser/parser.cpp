@@ -1,7 +1,6 @@
 #include <cassert>
 #include "parser.hpp"
 
-TokenType closingOfOpening(TokenType);
 
 Unexpected::Unexpected(const Token& token, uint32_t tkIndex): token{token}, tkIndex{tkIndex} {}
 std::string Unexpected::getErrorMessage(std::vector<Tokenizer>& tks) {
@@ -169,7 +168,7 @@ GeneralDec* Parser::parseNext() {
             expected.emplace_back(ExpectedType::TOKEN, token, TokenType::TYPE, tokenizer->tokenizerIndex);
             return nullptr;
         }
-        globalList->curr.tempCreate->templateTypes.exp.setToken(token);
+        globalList->curr.tempCreate->templateTypes.token = token;
         TokenList *tokenPrev = &globalList->curr.tempCreate->templateTypes;
         tokenPrev->next = memPool.makeTokenList();
         TokenList *tkList = tokenPrev->next;
@@ -181,7 +180,7 @@ GeneralDec* Parser::parseNext() {
                 return nullptr;
             }
             tokenPrev = tkList;
-            tkList->exp.setToken(token);
+            tkList->token = token;
             tkList->next = memPool.makeTokenList();
             tkList = tkList->next;
         }
@@ -426,7 +425,7 @@ bool Parser::parseTemplate(TemplateDec& dec) {
             return false;
         }
         tokenizer->consumePeek();
-        dec.templateTypes.exp.setToken(token);
+        dec.templateTypes.token = token;
         if (tokenizer->peekNext().getType() == TokenType::CLOSE_BRACKET) {
             tokenizer->consumePeek();
             break;
@@ -854,15 +853,6 @@ ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions, Tok
     }
 }
 
-TokenType closingOfOpening(TokenType type) {
-    assert(type == TokenType::OPEN_BRACE || type == TokenType::OPEN_BRACKET || type == TokenType::OPEN_PAREN);
-    #define DIFF_TO_MATCHING_CLOSE ((uint8_t)TokenType::CLOSE_BRACKET - (uint8_t)TokenType::OPEN_BRACKET)
-    assert((uint8_t)TokenType::CLOSE_BRACE - (uint8_t)TokenType::OPEN_BRACE == DIFF_TO_MATCHING_CLOSE);
-    assert((uint8_t)TokenType::CLOSE_PAREN - (uint8_t)TokenType::OPEN_PAREN == DIFF_TO_MATCHING_CLOSE);
-    return (TokenType)((uint8_t)type + DIFF_TO_MATCHING_CLOSE);
-    #undef DIFF_TO_MATCHING_CLOSE
-}
-
 /**
  * Parses a complete expression until it reaches something else, placing the root expression in rootExpression
  * Consumes the entire expression unless there was an error
@@ -1040,7 +1030,7 @@ ParseTypeErrorType Parser::getType(TokenList& type) {
     }
     {
         tokenizer->consumePeek();
-        curr->exp.setToken(tp);
+        curr->token = tp;
         TokenList *prev = curr;
         curr = memPool.makeTokenList();
         curr->next = prev;
@@ -1048,26 +1038,54 @@ ParseTypeErrorType Parser::getType(TokenList& type) {
     }
     while (tp.getType() != TokenType::END_OF_FILE) {
         if (tp.getType() == TokenType::OPEN_BRACKET) {
-            // array
-            parseLeaf(curr->exp);
+            // array type
+            tokenizer->consumePeek();
+            // this is kinda a cursed way to do this, but the length field will act as a isLengthGiven boolean.
+            // if token.length evaluates to true, this means the following token (curr->next) contains the length for the array
+            // else no length was given, and the next token is whatever follows
+            curr->token = {tp.getPosition(), 0, TokenType::ARRAY_TYPE};
+            tp = tokenizer->tokenizeNext();
+            if (
+                tp.getType() == TokenType::DECIMAL_NUMBER ||
+                tp.getType() == TokenType::HEX_NUMBER ||
+                tp.getType() == TokenType::BINARY_NUMBER ||
+                tp.getType() == TokenType::IDENTIFIER
+            ) {
+                // set length to 'true' to say next token is the length
+                curr->token.setLength(1);
+
+                // make length token list
+                TokenList* lengthToken = memPool.makeTokenList();
+                lengthToken->token = tp;
+
+                // insert between array type and next
+                lengthToken->next = curr->next;
+                curr->next = lengthToken;
+
+                tp = tokenizer->tokenizeNext();
+            }
             TokenList *prev = curr;
             curr = memPool.makeTokenList();
             curr->next = prev;
+
+            if (tp.getType() != TokenType::CLOSE_BRACKET) {
+                expected.emplace_back(ExpectedType::TOKEN, tp, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);
+                return ParseTypeErrorType::REPORTED;
+            }
             tp = tokenizer->peekNext();
         }
         else if (!isBuiltInType(tp.getType()) && !isTypeQualifier(tp.getType()) && tp.getType() != TokenType::REFERENCE && tp.getType() != TokenType::IDENTIFIER) {
             break;
         } else {
             tokenizer->consumePeek();
-            curr->exp.setToken(tp);
+            curr->token = tp;
             TokenList *prev = curr;
             curr = memPool.makeTokenList();
             curr->next = prev;
             tp = tokenizer->peekNext();
         }
     }
-    type.exp = curr->next->exp;
-    type.next = curr->next->next;
+    type = *curr->next;
     memPool.release(curr);
     return ParseTypeErrorType::NONE;
 }
