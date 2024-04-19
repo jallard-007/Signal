@@ -206,16 +206,14 @@ struct Checker {
 
     /**
      * \param leftSide the type of the left side
-     * \param rightSide the type of the right side
+     * \param rightSideRes the resulting type of the right side
      * \param initialAssignment if this is an initial assignment
-     * \param rightIsLValue set to true if right side is an l value
      * \param checkCompatibility check if the types are compatible, rather than for assignment, defaults to false
     */
     bool checkAssignment(
         const TokenList*leftSide,
-        const TokenList* rightSide,
+        const ResultingType& rightSideRes,
         bool initialAssignment,
-        bool rightIsLValue,
         bool checkCompatibility = false
     );
 

@@ -138,7 +138,6 @@ struct Statement {
 //                     | typeQualifier [number | nothing] indirectionTypeList
 //                     | typeQualifier ref
 struct TokenList {
-    static_assert(sizeof(Expression) == sizeof(Token));
     Token token;
     TokenList *next{nullptr};
     TokenList() = default;

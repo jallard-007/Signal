@@ -468,7 +468,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Program program;
         std::vector<Tokenizer> tks;
         Checker tc{program, tks, memPool};
-        CHECK(tc.checkAssignment(leftType, rightType, false, true));
+        CHECK(tc.checkAssignment(leftType, ResultingType{rightType, true}, false));
     }
     SECTION("2") {
         TokenList *leftType = makeTypeList({{TokenType::POINTER, TokenType::CHAR_TYPE}});
@@ -476,7 +476,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         Program program;
         std::vector<Tokenizer> tks;
         Checker tc{program, tks, memPool};
-        CHECK_FALSE(tc.checkAssignment(leftType, rightType, false, true));
+        CHECK_FALSE(tc.checkAssignment(leftType, ResultingType{rightType, true}, false));
     }
     SECTION("3") {
         std::vector<Tokenizer> tks;
@@ -485,7 +485,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE, TokenType::CONST}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->token.setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false, false);
+        const bool res = tc.checkAssignment(leftType, ResultingType{rightType, false}, false);
         CHECK(res);
     }
     SECTION("4") {
@@ -495,7 +495,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         TokenList *leftType = makeTypeList({{TokenType::ARRAY_TYPE, TokenType::CHAR_TYPE}});
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->token.setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false, false);
+        const bool res = tc.checkAssignment(leftType, ResultingType{rightType, false}, false);
         CHECK(res);
     }
     SECTION("5") {
@@ -507,7 +507,7 @@ TEST_CASE("checkAssignment", "[codeGen]") {
         leftType->token.setLength(5);
         TokenList *rightType = makeTypeList({{TokenType::CONTAINER_LITERAL, TokenType::CHAR_TYPE, TokenType::CONST}});
         rightType->token.setLength(10);
-        const bool res = tc.checkAssignment(leftType, rightType, false, false);
+        const bool res = tc.checkAssignment(leftType, ResultingType{rightType, false}, false);
         CHECK_FALSE(res);
     }
 }
