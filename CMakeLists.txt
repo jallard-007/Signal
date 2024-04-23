@@ -65,26 +65,6 @@ if ( UNIX )
     catch_discover_tests(tests)
 endif()
 
-# current method
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 9.67076
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 9.60463
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 9.67158
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 9.56606
-
-# strncmp
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 12.2402
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 12.1476
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 12.1315
-# jallard@NoSignal:~/documents/github/CL$ ./main sampleCode/benchmark.pr 
-# Execution time: 12.0802
-
 # -fprofile-arcs -ftest-coverage -fPIC -O0 or -O1
 
 # -pg

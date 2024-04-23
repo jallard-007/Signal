@@ -834,15 +834,25 @@ ParseStatementErrorType Parser::parseExpressionBeforeScope(Expression& expressio
  * Extracts comma delimited expressions until it reaches something else, or an expression parse fails
  * Does NOT consume the final token
 */
-ParseExpressionErrorType Parser::getExpressions(ExpressionList& expressions, TokenType close) {
+ParseExpressionErrorType Parser::getIndexedExpressions(ExpressionList& expressions, TokenType close) {
     if (tokenizer->peekNext().getType() == close) {
         return ParseExpressionErrorType::NONE;
     }
     ExpressionList *list = &expressions;
     while (true) {
+        bool indexed = tokenizer->peekNext().getType() == TokenType::DOT;
+        if (indexed) {
+            tokenizer->consumePeek();
+        }
         ParseExpressionErrorType errorType = parseExpression(list->curr);
         if (errorType != ParseExpressionErrorType::NONE) {
             return errorType;
+        }
+        if (indexed) {
+            if (list->curr.getType() != ExpressionType::BINARY_OP && list->curr.getBinOp()->op.getType() != TokenType::ASSIGNMENT) {
+                return ParseExpressionErrorType::REPORTED;
+            }
+            list->curr.getBinOp()->op.setType(TokenType::INDEXED_ASSIGNMENT);
         }
         if (tokenizer->peekNext().getType() != TokenType::COMMA) {
             return ParseExpressionErrorType::NONE;
@@ -947,16 +957,12 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
         if (next.getType() == TokenType::OPEN_PAREN) {
             tokenizer->consumePeek();
             expression.setFunctionCall(memPool.makeFunctionCall(FunctionCall{token}));
-            ParseExpressionErrorType errorType = getExpressions(expression.getFunctionCall()->args, TokenType::CLOSE_PAREN);
+            ParseExpressionErrorType errorType = getIndexedExpressions(expression.getFunctionCall()->args, TokenType::CLOSE_PAREN);
             if (errorType != ParseExpressionErrorType::NONE) {
                 return ParseExpressionErrorType::REPORTED;
             }
             if (tokenizer->peekNext().getType() != TokenType::CLOSE_PAREN) {
-                if (tokenizer->peeked.getType() == TokenType::COMMA) {
-                    expected.emplace_back(ExpectedType::EXPRESSION, tokenizer->peeked, tokenizer->tokenizerIndex);
-                } else {
-                    expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
-                }
+                expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_PAREN, tokenizer->tokenizerIndex);
                 return ParseExpressionErrorType::REPORTED;
             }
             tokenizer->consumePeek();
@@ -979,6 +985,7 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
         }
     }
     else if (token.getType() == TokenType::OPEN_BRACKET) {
+        // very similar to function call parsing
         tokenizer->consumePeek();
         expression.setContainerLiteral(memPool.makeContainerLiteral());
         if (tokenizer->peekNext().getType() == TokenType::CLOSE_BRACKET) {
@@ -988,18 +995,9 @@ ParseExpressionErrorType Parser::parseLeaf(Expression& expression) {
             return ParseExpressionErrorType::NONE;
         }
         ExpressionList *list = &expression.getContainerLiteral()->values;
-        while (true) {
-            ParseExpressionErrorType errorType;
-            errorType = parseExpression(list->curr);
-            if (errorType != ParseExpressionErrorType::NONE) {
-                return ParseExpressionErrorType::REPORTED;
-            }
-            if (tokenizer->peekNext().getType() != TokenType::COMMA) {
-                break;
-            }
-            tokenizer->consumePeek();
-            list->next = memPool.makeExpressionList();
-            list = list->next;
+        ParseExpressionErrorType errorType = getIndexedExpressions(*list, TokenType::CLOSE_BRACKET);
+        if (errorType != ParseExpressionErrorType::NONE) {
+            return ParseExpressionErrorType::REPORTED;
         }
         if (tokenizer->peekNext().getType() != TokenType::CLOSE_BRACKET) {
             expected.emplace_back(ExpectedType::TOKEN, tokenizer->peeked, TokenType::CLOSE_BRACKET, tokenizer->tokenizerIndex);

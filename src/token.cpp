@@ -427,4 +427,5 @@ const std::unordered_map<TokenType, std::string> typeToString {
     {TokenType::CHAR_LITERAL, "'"},
     {TokenType::IDENTIFIER, "identifier"},
     {TokenType::TYPE, "type"},
+    {TokenType::INDEXED_ASSIGNMENT, " = "},
 };

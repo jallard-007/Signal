@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
-#include <set>
+#include <unordered_set>
+#include <memory>
 #include "checker.hpp"
 
 
@@ -139,6 +140,7 @@ std::string CheckerError::getErrorMessage(std::vector<Tokenizer>& tokenizers) co
         case CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE: message += "Mixing types in array literal\n"; break;
         case CheckerErrorType::REFERENCE_VARIABLE_MISSING_INITIALIZER: message += "Mixing types in array literal\n"; break;
         case CheckerErrorType::INVALID_MAIN_FUNCTION_SIGNATURE: message += "main function should be defined as so:\nfunc main(argc: uint32, argv: char ptr ptr): int32\n"; break;
+        case CheckerErrorType::UNSPECIFIED: message += "TODO\n"; break;
     }
     if (dec) {
         message += "Declaration defined as such:\n  ";
@@ -891,7 +893,28 @@ ResultingType Checker::checkFunctionCallExpression(FunctionCall& funcCall, const
     // valid function, now check parameters
     // parameters are already validated on second top level scan. so assume the statements are all varDecs and valid
     ExpressionList* argList = &funcCall.args;
+    std::unique_ptr<std::unordered_map<std::string, VariableDec*>> params{nullptr};
+
+    // check positional arguments
     do {
+        // check for indexed assignment
+        if (
+            argList->curr.getType() == ExpressionType::BINARY_OP &&
+            argList->curr.getBinOp()->op.getType() == TokenType::INDEXED_ASSIGNMENT
+        ) {
+            // first indexed item. create set of remaining parameters
+            // TODO: maybe change this to mem pool
+            params = std::make_unique<std::unordered_map<std::string, VariableDec*>>();
+            Tokenizer& functionDecTk = tokenizers[decPtr->tokenizerIndex];
+            while (paramList) {
+                std::string paramName = functionDecTk.extractToken(paramList->curr.varDec->name);
+                assert((*params)[paramName] == nullptr);
+                (*params)[paramName] = paramList->curr.varDec;
+                paramList = paramList->next;
+            }
+            break;
+        }
+
         ResultingType resultingType = checkExpression(argList->curr);
         if (resultingType.value.type->token.getType() != TokenType::BAD_VALUE) {
             if (!paramList->curr.varDec) {
@@ -912,8 +935,75 @@ ResultingType Checker::checkFunctionCallExpression(FunctionCall& funcCall, const
         paramList = paramList->next;
         argList = argList->next;
     } while (argList && paramList);
-    if (argList || paramList) {
-        addError({CheckerErrorType::WRONG_NUMBER_OF_ARGS, tk->tokenizerIndex, funcCall.name, decPtr});
+
+    // now check indexed arguments
+    if (params.get()) {
+        for (; argList; argList = argList->next) {
+            if (
+                argList->curr.getType() != ExpressionType::BINARY_OP ||
+                argList->curr.getBinOp()->op.getType() != TokenType::INDEXED_ASSIGNMENT
+            ) {
+                // error, cannot have positional argument after indexed argument
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            BinOp& indexedExpression = *argList->curr.getBinOp();
+            ResultingType rightSideResultingType = checkExpression(indexedExpression.rightSide);
+            if (rightSideResultingType.value.type == &BaseTypeListTypes::badValue) {
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            if (indexedExpression.leftSide.getType() != ExpressionType::VALUE) {
+                // error, can only have identifier indexed arguments in a function call
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            if (indexedExpression.leftSide.getToken().getType() != TokenType::IDENTIFIER) {
+                // error, can only have identifier indexed arguments in a function call
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            std::string paramName = tk->extractToken(indexedExpression.leftSide.getToken());
+            assert(params.get() != nullptr);
+            auto itemIter = params->find(paramName);
+            if (itemIter == params->end()) {
+                // error, not a parameter
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            if (!itemIter->second) {
+                // error, item already assigned to
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+                continue;
+            }
+            TokenList* leftSideType = &itemIter->second->type;
+            // mark as assigned
+            itemIter->second = nullptr;
+            if (!checkAssignment(leftSideType, rightSideResultingType, true)) {
+                // types dont match
+                addError({CheckerErrorType::UNSPECIFIED, tk->tokenizerIndex, &argList->curr, decPtr});
+            }
+        }
+        // check that all required args have been set
+        for (auto& param: *params) {
+            if (param.second && !param.second->initialAssignment) {
+                // error, missing argument for this parameter
+                addError({CheckerErrorType::UNSPECIFIED, decPtr->tokenizerIndex, param.second->name, decPtr});
+            }
+        }
+    } else {
+        if (argList) {
+            // too many arguments for function
+            addError({CheckerErrorType::WRONG_NUMBER_OF_ARGS, tk->tokenizerIndex, funcCall.name, decPtr});
+        } else {
+            for (; paramList; paramList = paramList->next) {
+                if (!paramList->curr.varDec->initialAssignment) {
+                    // missing argument
+                    addError({CheckerErrorType::WRONG_NUMBER_OF_ARGS, tk->tokenizerIndex, funcCall.name, decPtr});
+                    break;
+                }
+            }
+        }
     }
     if (returnType->token.getType() == TokenType::REFERENCE) {
         return {returnType, true};
@@ -1371,7 +1461,7 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
     for (; expList; expList = expList->next) {
         if (
             expList->curr.getType() != ExpressionType::BINARY_OP ||
-            expList->curr.getBinOp()->op.getType() != TokenType::ASSIGNMENT
+            expList->curr.getBinOp()->op.getType() != TokenType::INDEXED_ASSIGNMENT
         ) {
             addError({CheckerErrorType::EXPECTING_NAMED_INDEX, tk->tokenizerIndex, &expList->curr});
             return false;
@@ -1415,7 +1505,7 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
         }
         if (
             expList->curr.getType() == ExpressionType::BINARY_OP &&
-            expList->curr.getBinOp()->op.getType() == TokenType::ASSIGNMENT
+            expList->curr.getBinOp()->op.getType() == TokenType::INDEXED_ASSIGNMENT
         ) {
             ResultingType indexType = checkExpression(expList->curr.getBinOp()->leftSide);
             postCheckExpression(indexType, expList->curr.getBinOp()->leftSide);
@@ -1558,12 +1648,8 @@ bool Checker::checkAssignment(
     bool checkCompatibility
 ) {
     bool strictRequired = false;
-    bool firstItem = true;
     const TokenList* rightSide = rightSideRes.value.type;
-    goto INITIAL_LOOP_START;
-    while (true) {
-        firstItem = false;
-        INITIAL_LOOP_START:
+    for (bool firstItem = true; ; firstItem = false) {
         assert(leftSide && rightSide);
         const Token lTypeToken = getTypeFromTokenList(*leftSide);
         const Token rTypeToken = getTypeFromTokenList(*rightSide);

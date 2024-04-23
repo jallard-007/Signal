@@ -88,7 +88,7 @@ struct Parser {
     ParseStatementErrorType parseVariableDec(VariableDec&);
     ParseExpressionErrorType parseExpression(Expression&);
     ParseExpressionErrorType parseLeaf(Expression&);
-    ParseExpressionErrorType getExpressions(ExpressionList&, TokenType);
+    ParseExpressionErrorType getIndexedExpressions(ExpressionList&, TokenType);
     ParseTypeErrorType getType(TokenList&);
 };
 

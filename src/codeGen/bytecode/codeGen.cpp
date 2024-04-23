@@ -471,8 +471,7 @@ void CodeGen::generateContainerLiteral(
         const Expression *pExp;
         if (
             exp->curr.getType() == ExpressionType::BINARY_OP &&
-            exp->curr.getBinOp()->op.getType() == TokenType::ASSIGNMENT &&
-            exp->curr.getBinOp()->leftSide.getType() == ExpressionType::LITERAL_VALUE
+            exp->curr.getBinOp()->op.getType() == TokenType::INDEXED_ASSIGNMENT
         ) {
             pExp = &exp->curr.getBinOp()->rightSide;
             named = true;

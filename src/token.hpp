@@ -161,6 +161,7 @@ enum class TokenType : uint8_t {
 
     // special tokens that are not directly parsed
     THIS,
+    INDEXED_ASSIGNMENT,
 };
 
 struct Token {

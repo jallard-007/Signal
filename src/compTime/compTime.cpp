@@ -282,6 +282,7 @@ LiteralValue evaluateBinOpImmExpression(TokenType op, LiteralValue& left, Litera
         }
         default: {
             std::cerr << "Invalid TokenType in evaluateExpression [" << (uint32_t)op  << "]\n";
+            assert(false);
             exit(1);
         }
     }

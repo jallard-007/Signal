@@ -419,13 +419,13 @@ TEST_CASE("struct types", "[checker]") {
         CHECK(tc.errors.empty());
     }
     SECTION("3") {
-        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0]; } ";
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [.field = 0]; } ";
         SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         CHECK(tc.errors.empty());
     }
     SECTION("4") {
-        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [field = 0, other = 0]; } ";
+        const std::string str = "struct MyType { field: int32; } func main(): void { var: MyType = [.field = 0, .other = 0]; } ";
         SET_UP_DEFAULT_TEST(str);
         CHECK_FALSE(tc.check(true));
         REQUIRE(tc.errors.size() == 1);
@@ -439,7 +439,7 @@ TEST_CASE("struct types", "[checker]") {
         CHECK(tc.errors.back().type == CheckerErrorType::EXPECTING_NAMED_INDEX);
     }
     SECTION("6") {
-        const std::string str = "struct MyType { field: int32; var: double; } func main(): void { var: MyType = [var = 1.0]; } ";
+        const std::string str = "struct MyType { field: int32; var: double; } func main(): void { var: MyType = [.var = 1.0]; } ";
         SET_UP_DEFAULT_TEST(str);
         tc.check(true);
         CHECK(tc.errors.empty());
@@ -576,5 +576,126 @@ TEST_CASE("checkContainerLiteral", "[codeGen]") {
         ResultingType res = tc.checkExpression(expression);
         Token token = res.value.type->token;
         REQUIRE(token.getType() == TokenType::BAD_VALUE);
+    }
+}
+
+#undef SET_UP_CHECK_CONTAINER_TEST
+#undef POST_EXPRESSION_CHECK_CONTAINER_TEST
+
+
+#define SET_UP_CHECK_FUNCTION_CALL_TEST(str) \
+    std::vector<Tokenizer> tks; \
+    tks.emplace_back("./src/checker/test_checker.cpp", str); \
+    Parser pr{tks.back(), memPool}; \
+    const bool parseRes = pr.parse(); \
+    REQUIRE(parseRes); \
+    REQUIRE(pr.expected.empty()); \
+    REQUIRE(pr.unexpected.empty()); \
+    Checker tc{pr.program, tks, memPool}; \
+    tc.tk = &tks.back()
+
+TEST_CASE("checkFunctionCallExpression", "[codeGen]") {
+    // this tests function calls, not the function header; the function header should be valid
+    SECTION("base case") {
+        const std::string str = "func foo(): void { foo(); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("valid argument") {
+        const std::string str = "func foo(x:int32): void { foo(1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("missing argument") {
+        const std::string str = "func foo(x:int32): void { foo(); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("valid indexed argument") {
+        const std::string str = "func foo(x:int32): void { foo(.x=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("invalid indexed argument") {
+        const std::string str = "func foo(x:int32): void { foo(.y=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("too many arguments") {
+        const std::string str = "func foo(x:int32): void { foo(.x=1, .y=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("valid multi argument") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(1, 1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("not enough arguments") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("valid multi indexed arguments") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(.x=1, .y=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("missing argument .2") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(.y=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("mixing positional and indexed") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(1, .y=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("putting positional after indexed") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(.x=1, 1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("using default argument") {
+        const std::string str = "func foo(x:int32, y:int32 = 1): void { foo(1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("using default argument .2") {
+        const std::string str = "func foo(x:int32, y:int32 = 1): void { foo(.x=1); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("overriding default argument") {
+        const std::string str = "func foo(x:int32, y:int32 = 1): void { foo(.x=1, .y=2); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
+    }
+    SECTION("overriding default argument but missing other") {
+        const std::string str = "func foo(x:int32, y:int32 = 1): void { foo(.y=2); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK_FALSE(checkRes);
+    }
+    SECTION("changing order of arguments") {
+        const std::string str = "func foo(x:int32, y:int32): void { foo(.y=2, .x=3); } ";
+        SET_UP_CHECK_FUNCTION_CALL_TEST(str);
+        const bool checkRes = tc.check(true);
+        CHECK(checkRes);
     }
 }

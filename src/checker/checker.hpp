@@ -73,6 +73,8 @@ enum class CheckerErrorType: uint8_t {
     CANNOT_ASSIGN,
     OPERATION_NOT_DEFINED,
     OPERATION_ON_VOID,
+
+    UNSPECIFIED, // temporary, using this means development is in progress and will be replaced
 };
 
 struct StructMemberInformation {
@@ -174,10 +176,7 @@ struct Checker {
 
     /**
      * Returns the resulting type from an expression. The ResultingType always contains a valid pointer.
-     * You must check if the result is a literal.
-     * If it is a literal, release the sub expression, then make a new LiteralValue node using the memPool,
-     * assign the LiteralValue to the original root expression
-     * and copy the returned ResultingType.value to the newly allocated LiteralValue node.
+     * postCheckExpression should always be called after calling this.
      * \param expression the expression to check
      * \param structMap pointer to a struct's lookup map. only used for the right side of binary member access operators
     */

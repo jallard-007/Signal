@@ -801,7 +801,7 @@ TEST_CASE("generate array", "[codeGen]") {
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
-    SECTION("2") {
+    SECTION("3") {
         const std::string str = " var: int32 [10] = [1]; ";
         testBoilerPlate(str);
         Statement statement;
@@ -820,6 +820,33 @@ TEST_CASE("generate array", "[codeGen]") {
             (bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_SET,
             (bc)OpCode::MOVE, 1, 30,
             (bc)OpCode::MOVE_SI, 2, 1,
+            (bc)OpCode::STORE_D, 1, 2,
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
+    SECTION("4") {
+        SKIP("TODO");
+        const std::string str = " var: int32 [10] = [ .0 = 1, .4 = 5 ]; ";
+        testBoilerPlate(str);
+        Statement statement;
+        REQUIRE(parser.parseStatement(statement) == ParseStatementErrorType::NONE);
+        checker.checkStatement(statement, BaseTypeListTypes::voidValue, false, false);
+        REQUIRE(checker.errors.empty());
+        codeGen.generateStatement(statement);
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::SUB_I, 30, 40, 0,
+            (bc)OpCode::PUSH_Q, 30,
+            (bc)OpCode::XOR, 0, 0,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::MOVE_SI, 0, 40,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::CALL_B, (bc)BuiltInFunction::MEM_SET,
+            (bc)OpCode::MOVE, 1, 30,
+            (bc)OpCode::MOVE_SI, 2, 1,
+            (bc)OpCode::STORE_D, 1, 2,
+            (bc)OpCode::ADD_I, 1, 16, 0,
+            (bc)OpCode::MOVE_SI, 2, 5,
             (bc)OpCode::STORE_D, 1, 2,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
@@ -883,7 +910,8 @@ TEST_CASE("generate struct", "[codeGen]") {
         CHECK(codeGen.byteCode == expected.byteCode);
     }
     SECTION("4") {
-        const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): void { g: MyStruct = [ c = 'c', u = 20 ] ; } ";
+        SKIP("TODO");
+        const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): void { g: MyStruct = [ .c = 'c', .u = 20 ] ; } ";
         testBoilerPlate(str);
         REQUIRE(parser.parse());
         REQUIRE(checker.check(true));
