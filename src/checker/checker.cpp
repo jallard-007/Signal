@@ -1489,7 +1489,6 @@ bool Checker::checkContainerLiteralStruct(ContainerLiteral& containerLiteral, co
 }
 
 ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLiteral) {
-    bool namedIndices = false;
     ExpressionList* expList = &containerLiteral.values;
     TokenList *actualContainerType = memPool.makeTokenList();
     actualContainerType->token = {containerLiteral.pos, 0, TokenType::CONTAINER_LITERAL};
@@ -1514,27 +1513,10 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 return {&BaseTypeListTypes::badValue, false};
             }
             if (!isUnsigned(typeToken.getType()) && !isSigned(typeToken.getType())) {
-                if (namedIndices) {
-                    addError({CheckerErrorType::EXPECTING_NAMED_INDEX, tk->tokenizerIndex, &expList->curr});
-                    return {&BaseTypeListTypes::badValue, false};
-                }
-                // not a named index, variable assignment within container literal
-                ResultingType resType = checkExpression(expList->curr);
-                postCheckExpression(resType, expList->curr);
-                if (!arrayItemType.value.type) {
-                    arrayItemType.value.type = resType.value.type;
-                }
-                else if (!checkAssignment(arrayItemType.value.type, resType, true, true)) {
-                    if (checkAssignment(resType.value.type, arrayItemType, true, true)) {
-                        arrayItemType.value.type = resType.value.type;
-                    } else {
-                        addError({CheckerErrorType::ELEMENT_TYPE_DOES_NOT_MATCH_ARRAY_TYPE, tk->tokenizerIndex, &expList->curr});
-                        return {&BaseTypeListTypes::badValue, false};
-                    }
-                }
-                continue;
+                addError({CheckerErrorType::EXPECTING_NAMED_INDEX, tk->tokenizerIndex, &expList->curr});
+                return {&BaseTypeListTypes::badValue, false};
             }
-            namedIndices = true;
+
             ResultingType resType = checkExpression(expList->curr.getBinOp()->rightSide);
             postCheckExpression(resType, expList->curr.getBinOp()->rightSide);
             if (!arrayItemType.value.type) {
@@ -1552,22 +1534,18 @@ ResultingType Checker::checkContainerLiteralArray(ContainerLiteral& containerLit
                 addError({CheckerErrorType::VARIABLE_INDEX_IN_CONTAINER_LITERAL, tk->tokenizerIndex, &expList->curr});
                 return {&BaseTypeListTypes::badValue, false};
             }
-            assert(typeToken.getType() == TokenType::INT64_TYPE || typeToken.getType() == TokenType::UINT64_TYPE);
+            assert(isUnsigned(typeToken.getType()) || isSigned(typeToken.getType()));
             LiteralValue zeroLiteral;
-            zeroLiteral.set(0u);
+            zeroLiteral.set(0);
             LiteralValue isValidSize = evaluateBinOpImmExpression(TokenType::GREATER_THAN_EQUAL, indexType.value, zeroLiteral);
             if (!*(bool *)isValidSize.getData()) {
                 return {&BaseTypeListTypes::badValue, false};
             }
             uint64_t index = *(uint64_t*)indexType.value.getData();
-            if (index > size) {
-                size = index;
+            if (index + 1 > size) {
+                size = index + 1;
             }
             continue;
-        }
-        if (namedIndices) {
-            addError({CheckerErrorType::EXPECTING_NAMED_INDEX, tk->tokenizerIndex, &expList->curr});
-            return {&BaseTypeListTypes::badValue, false};
         }
         ResultingType resType = checkExpression(expList->curr);
         if (!arrayItemType.value.type) {

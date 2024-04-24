@@ -272,9 +272,14 @@ struct CodeGen {
 
     void generateArrayVariableDeclaration(VariableDec&);
 
-    void generateContainerLiteral(const ExpressionList *exp, TokenList *type, ExpressionResult& pointerExp, uint32_t&, uint32_t);
+    void generateContainerLiteralArray(const ExpressionList *exp, TokenList *containerType, ExpressionResult& pointerExp, uint32_t&, uint32_t);
 
     void generateStructDeclaration(const StructDec&);
+
+    void generateStructVariableDeclaration(VariableDec& varDec);
+
+    void generateContainerLiteralStruct(const ExpressionList *exp, TokenList *containerType, ExpressionResult& pointerExp, uint32_t&, uint32_t);
+
 
     void generateFunctionDeclaration(const FunctionDec&);
 
@@ -436,6 +441,8 @@ struct CodeGen {
      * \returns the offset for start of 'space'
     */
     uint32_t addPaddingAndSpaceToStack(uint32_t padding, uint32_t space);
+
+    uint32_t addZeroedSpaceToStack(uint32_t padding, uint32_t space);
 
     /**
      * Adds a variable dec to the virtual stack. Also adds padding if necessary.

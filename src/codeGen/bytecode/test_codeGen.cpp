@@ -825,7 +825,6 @@ TEST_CASE("generate array", "[codeGen]") {
         CHECK(codeGen.byteCode == expected.byteCode);
     }
     SECTION("4") {
-        SKIP("TODO");
         const std::string str = " var: int32 [10] = [ .0 = 1, .4 = 5 ]; ";
         testBoilerPlate(str);
         Statement statement;
@@ -845,6 +844,7 @@ TEST_CASE("generate array", "[codeGen]") {
             (bc)OpCode::MOVE, 1, 30,
             (bc)OpCode::MOVE_SI, 2, 1,
             (bc)OpCode::STORE_D, 1, 2,
+            (bc)OpCode::NOP,
             (bc)OpCode::ADD_I, 1, 16, 0,
             (bc)OpCode::MOVE_SI, 2, 5,
             (bc)OpCode::STORE_D, 1, 2,
@@ -910,7 +910,6 @@ TEST_CASE("generate struct", "[codeGen]") {
         CHECK(codeGen.byteCode == expected.byteCode);
     }
     SECTION("4") {
-        SKIP("TODO");
         const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): void { g: MyStruct = [ .c = 'c', .u = 20 ] ; } ";
         testBoilerPlate(str);
         REQUIRE(parser.parse());
@@ -918,19 +917,18 @@ TEST_CASE("generate struct", "[codeGen]") {
         codeGen.generate();
         CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
         expected.addBytes({{
-            (bc)OpCode::XOR, 1, 1,
-            (bc)OpCode::PUSH_Q, 1,
-            (bc)OpCode::MOVE_SI, 1, 'c',
-            (bc)OpCode::STORE_B, stackPointerIndex, 1,
-
-            (bc)OpCode::MOVE, 2, stackPointerIndex,
-            (bc)OpCode::ADD_I, 2, 4, 0,
-            (bc)OpCode::MOVE_SI, 1, 20,
-            (bc)OpCode::STORE_W, 2, 1,
+            (bc)OpCode::XOR, 0, 0,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::MOVE, 1, stackPointerIndex,
+            (bc)OpCode::MOVE_SI, 2, 'c',
+            (bc)OpCode::STORE_B, 1, 2, 
+            (bc)OpCode::ADD_I, 1, 4, 0,
+            (bc)OpCode::MOVE_SI, 2, 20,
+            (bc)OpCode::STORE_D, 1, 2,
 
             (bc)OpCode::ADD_I, stackPointerIndex, 8, 0,
-            (bc)OpCode::POP_Q, 2,
-            (bc)OpCode::JUMP, 2,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
