@@ -932,4 +932,27 @@ TEST_CASE("generate struct", "[codeGen]") {
         }});
         CHECK(codeGen.byteCode == expected.byteCode);
     }
+    SECTION("5") {
+        const std::string str = "struct MyStruct { c: char; v: char; u:int32; } func MyFunc(): void { g: MyStruct = [ .c = 'c', .u = 20 ] ; f: MyStruct = g ; } ";
+        testBoilerPlate(str);
+        REQUIRE(parser.parse());
+        REQUIRE(checker.check(true));
+        codeGen.generate();
+        CodeGen expected{parser.program, tokenizers, checker.lookUp, checker.structLookUp};
+        expected.addBytes({{
+            (bc)OpCode::XOR, 0, 0,
+            (bc)OpCode::PUSH_Q, 0,
+            (bc)OpCode::MOVE, 1, stackPointerIndex,
+            (bc)OpCode::MOVE_SI, 2, 'c',
+            (bc)OpCode::STORE_B, 1, 2, 
+            (bc)OpCode::ADD_I, 1, 4, 0,
+            (bc)OpCode::MOVE_SI, 2, 20,
+            (bc)OpCode::STORE_D, 1, 2,
+            
+            (bc)OpCode::ADD_I, stackPointerIndex, 16, 0,
+            (bc)OpCode::POP_Q, 1,
+            (bc)OpCode::JUMP, 1,
+        }});
+        CHECK(codeGen.byteCode == expected.byteCode);
+    }
 }

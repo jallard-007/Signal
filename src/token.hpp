@@ -169,7 +169,6 @@ struct Token {
     uint64_t token = 0;
     public:
     Token() = default;
-    Token(const Token&) = default;
     Token(uint32_t pos, uint16_t len, TokenType t) {
         token = ((uint64_t)t << 8) | ((uint64_t)len << 16) | ((uint64_t)pos << 32);
     }

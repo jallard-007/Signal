@@ -535,7 +535,8 @@ void CodeGen::generateStructVariableDeclaration(VariableDec& varDec) {
     assert(genDec->type == GeneralDecType::STRUCT);
     StructInformation& structInfo = structLookUp[genDec->structDec];
     const uint32_t padding = getPaddingNeeded(getCurrStackPointerPosition(), structInfo.size, structInfo.alignTo);
-    const uint32_t pos = varDec.initialAssignment ? addZeroedSpaceToStack(padding, structInfo.size) : addPaddingAndSpaceToStack(padding, structInfo.size);
+    const uint32_t pos = varDec.initialAssignment && varDec.initialAssignment->getType() == ExpressionType::CONTAINER_LITERAL ?
+        addZeroedSpaceToStack(padding, structInfo.size) : addPaddingAndSpaceToStack(padding, structInfo.size);
     StackItem stackItem {
         .variable = {
             .varDec = varDec,
@@ -558,10 +559,21 @@ void CodeGen::generateStructVariableDeclaration(VariableDec& varDec) {
         (bc)OpCode::MOVE, pointerExp.getReg(), stackPointerIndex // modifiable pointer to write values to
     }});
 
-    assert(varDec.initialAssignment->getType() == ExpressionType::CONTAINER_LITERAL);
-    ExpressionList* expList = &varDec.initialAssignment->getContainerLiteral()->values;
-    uint32_t currIndex = 0;
-    generateContainerLiteralStruct(expList, &varDec.type, pointerExp, currIndex, 0);
+    assert(
+        varDec.initialAssignment->getType() == ExpressionType::CONTAINER_LITERAL || 
+        varDec.initialAssignment->getType() == ExpressionType::VALUE
+    );
+    if (varDec.initialAssignment->getType() == ExpressionType::VALUE) {
+        ExpressionResult expRes = getAddressOfExpression(*varDec.initialAssignment);
+        copyValue(pointerExp, expRes);
+        if (expRes.isTemp) {
+            freeRegister(expRes.getReg());
+        }
+    } else {
+        ExpressionList* expList = &varDec.initialAssignment->getContainerLiteral()->values;
+        uint32_t currIndex = 0;
+        generateContainerLiteralStruct(expList, &varDec.type, pointerExp, currIndex, 0);
+    }
     freeRegister(pointerExp.getReg());
 }
 
@@ -847,7 +859,7 @@ ExpressionResult CodeGen::generateExpressionFunctionCall(const FunctionCall &fun
 
     tk = oldTk;
 
-    return { std::move(returnValueExpression) };
+    return { returnValueExpression };
 }
 
 void CodeGen::expressionResWithOp(OpCode op, OpCode immOp, const ExpressionResult& left, const ExpressionResult& right) {
@@ -1183,9 +1195,9 @@ void CodeGen::storeValueToPointer(const ExpressionResult &pointerExp, Expression
     addBytes({{(bc)storeOp, pointerExp.getReg(), valueExp.getReg()}});
 }
 
-void CodeGen::copyValue(ExpressionResult &pointerExp, ExpressionResult &valueExp) {
-    (void)pointerExp;
-    (void)valueExp;
+void CodeGen::copyValue(ExpressionResult &destPointerExp, ExpressionResult &srcPointerExp) {
+    (void)destPointerExp;
+    (void)srcPointerExp;
 }
 
 void CodeGen::doPointerIndex(const ExpressionResult &pointerExp, ExpressionResult &indexExp) {
